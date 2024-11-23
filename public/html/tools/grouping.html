@@ -9,14 +9,27 @@
     <meta name="description"
         content="This tool manages cubing competitions, allowing organizers to select events, manage competitors, and assign groups. The JavaScript-based interface enables streamlined event setup, efficient competitor registration, and automated group assignments based on selected parameters." />
     <meta name="keywords"
-        content="cubing competition, event manager, competitor registration, group assignments, cubing events, competition, WCA, speedcubing, groupifier" />
+        content="WCA, world cube association, cubing, speedcubing, tool, tools, cubingtools, cubing tool, cubing tools, competition, cubing competition, event manager, competitor, competitors, competitions, group, groups, manager, group manager, assignments, cubing assignments, group assignments" />
     <meta name="author" content="CubingTools" />
 
     <link rel="stylesheet" href="../../css/global.css">
     <link rel="stylesheet" href="../../css/grouping.css">
+
     <link rel="icon" href="../../assets/cubingtools.png" type="image/x-icon">
     <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 </head>
+
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P"></script>
+<script>
+    if (window.location.hostname == 'cubingtools') {
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+
+        gtag('config', 'G-7FDCB5928P');
+    }
+</script>
 
 <body>
     <div class="container">
@@ -25,7 +38,6 @@
             <div class="navbar">
                 <a href="/">Home</a>
                 <a href="mailto: info@cubingtools.de">Contact</a>
-                <a target="_blank" href="https://GitHub.com/MPGsebkli27/cubingtools">GitHub</a>
             </div>
         </nav>
 
@@ -34,7 +46,7 @@
         </div>
 
         <main>
-            <div class="heading">
+            <section class="heading">
                 <h1>Unofficial Competition Groupifier</h1>
                 <p>
                     This is the Unofficial Competition Groupifier. To start, input the name of the competition and the
@@ -112,16 +124,12 @@
                     <h2>Grouping Results</h2>
                     <div id="grouping-output"></div>
                 </div>
-            </div>
+            </section>
         </main>
         <footer>
             <div class="footer-content">
                 <p>Developed by <a href="mailto:sebastian@cubingtools.de">Sebastian Kling</a>, with dedication to the
                     cubing community.</p>
-                <p class="hide-sm">
-                    Have you encountered a bug? We appreciate your feedback! Please report it on our
-                    <a target="_blank" href="https://github.com/MPGsebkli27/cubingtools/issues">GitHub issues page</a>.
-                </p>
                 <p class="hide-sm">
                     CubingTools.de is using the <a target="_blank"
                         href="https://wca-rest-api.robiningelbrecht.be/">Unofficial World Cube Association API</a>.
@@ -129,8 +137,6 @@
             </div>
         </footer>
     </div>
-
-    <div id="loadingPopup" style="display: none;">Loading...</div>
 
     <script src="../../js/loadTools.js"></script>
     <script src="../../js/grouping.js"></script>

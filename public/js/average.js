@@ -65,7 +65,6 @@ async function updateTimeList(wcaId, event) {
 // Function to fetch personal rank for a given time from WCA API
 async function getPersonalRank(wcaId, event, time, fetchSingles) {
     try {
-        showLoadingPopup(true);
         if (fetchSingles) {
             // Only fetch the solves on the first entry
             if (time == times[0]) {
@@ -92,15 +91,12 @@ async function getPersonalRank(wcaId, event, time, fetchSingles) {
             rank++;
         }
 
-        showLoadingPopup(false);
-
         // Add the new time to allResults so that the previous times get an updated rank
         allResults.push(time);
         return rank;
 
     } catch (error) {
         console.error('Error fetching WCA data:', error);
-        showLoadingPopup(false);
         alert('Something went wrong! If this issue persists please contact us as soon as possible!');
         return '';
     }
@@ -284,9 +280,3 @@ document.getElementById('timeInput').addEventListener('keypress', function (even
         addTime();
     }
 });
-
-// Function to show or hide the loading popup
-function showLoadingPopup(show) {
-    const popup = document.getElementById('loadingPopup');
-    popup.style.display = show ? 'flex' : 'none';
-}

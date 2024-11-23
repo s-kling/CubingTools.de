@@ -25,7 +25,7 @@ const events = [
     { id: 'clock', name: 'Clock', shortName: 'Clock' },
     { id: '555clk', name: 'Pentagonal Clock', shortName: '5x5 Clock' },
 
-    { id: 'pyra', name: 'Pyraminx', shortName: 'Pyra' },
+    { id: 'pyram', name: 'Pyraminx', shortName: 'Pyra' },
     { id: 'maspyr', name: 'Master Pyraminx', shortName: 'Master Pyra' },
 
     { id: 'skewb', name: 'Skewb', shortName: 'Skewb' },
@@ -43,7 +43,7 @@ const events = [
     { id: '333doh', name: '3x3x3 Double One-Handed', shortName: '3x3 Double OH' },
     { id: '3333', name: 'Three 3x3x3 Cubes Relay', shortName: 'Three 3x3 Relay' },
 
-    { id: 'mega', name: 'Megaminx', shortName: 'Mega' },
+    { id: 'minx', name: 'Megaminx', shortName: 'Mega' },
     { id: 'kilo', name: 'Kilominx', shortName: 'Kilo' },
     { id: 'giga', name: 'Gigaminx', shortName: 'Giga' },
 
@@ -302,7 +302,6 @@ function addCompetitor() {
 }
 
 async function displayCompetitors() {
-    showLoadingPopup(true);
     const competitorListBody = document.querySelector('#competitor-list tbody');
     competitorListBody.innerHTML = '';
 
@@ -342,12 +341,10 @@ async function displayCompetitors() {
     }
 
     updateCompetitorForm();
-    showLoadingPopup(false);
 }
 
 
 async function getCompetitorName(wcaId) {
-    showLoadingPopup(true);
     const apiUrl = `/api/wca/${wcaId}/name`;
 
     try {
@@ -364,8 +361,6 @@ async function getCompetitorName(wcaId) {
     } catch (error) {
         console.error(`Error fetching name for event ${wcaId}: ${error.message}`);
         return wcaId;
-    } finally {
-        showLoadingPopup(false);
     }
 }
 
@@ -391,8 +386,6 @@ function finalizeCompetitors() {
 }
 
 async function sortArray(array, eventId) {
-    showLoadingPopup(true);
-
     // Store the average times for each competitor
     const averages = {};
 
@@ -429,7 +422,6 @@ async function sortArray(array, eventId) {
         // If neither has an average, sort by WCA ID (or another fallback criterion)
         return (a.wcaId || '').localeCompare(b.wcaId || '');
     });
-    showLoadingPopup(false);
     return array;
 }
 
@@ -442,7 +434,6 @@ function shuffleArray(array) {
 }
 
 async function generateGroups() {
-    showLoadingPopup(true);
     const maxCompetitors = competitionData.maxCompetitors;
     const groupingOutput = document.getElementById('grouping-output');
     groupingOutput.innerHTML = '';  // Clear the output div before appending
@@ -562,11 +553,4 @@ async function generateGroups() {
 
         groupingOutput.appendChild(eventDiv);
     }
-    showLoadingPopup(false);
-}
-
-// Function to show or hide the loading popup
-function showLoadingPopup(show) {
-    const popup = document.getElementById('loadingPopup');
-    popup.style.display = show ? 'flex' : 'none';
 }

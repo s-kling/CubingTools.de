@@ -1,0 +1,157 @@
+/* Additional Styles for Global Calculator Page */
+
+/* File Upload and WCA ID Fetch Section */
+#fileUpload,
+#wcaIdFetch {
+    background-color: var(--main-lighter);
+    border-radius: var(--main-radius);
+    padding: var(--space-md);
+    margin-bottom: var(--space-md);
+}
+
+#fileUpload label,
+#wcaIdFetch label {
+    font-size: var(--font-size-base);
+    color: var(--main-text);
+    margin-bottom: var(--space-xs);
+}
+
+#fileUpload input[type="file"],
+#wcaIdFetch input[type="text"],
+select {
+    padding: var(--space-xs);
+    border-radius: var(--main-radius);
+    border: 1px solid var(--input-border);
+    background-color: var(--input-background);
+    color: var(--main-text);
+}
+
+button {
+    margin-left: 10px;
+}
+
+/* Session Dropdown */
+#sessionDropdownContainer {
+    margin-top: var(--space-md);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+#sessionDropdown {
+    margin-top: var(--space-xs);
+    padding: var(--space-xs);
+    border-radius: var(--main-radius);
+    border: 1px solid var(--input-border);
+    background-color: var(--input-background);
+    color: var(--main-text);
+}
+
+/* Predicted Global Section */
+#globalTime {
+    margin: var(--space-md) 0;
+    text-align: center;
+}
+
+#globalTime h3 {
+    font-size: var(--font-size-lg);
+    color: var(--main-text);
+    margin-bottom: var(--space-sm);
+}
+
+#predictedGlobal {
+    font-size: var(--font-size-xl);
+    font-weight: bold;
+    color: var(--button-background);
+}
+
+/* Top 5 Most Frequent Times */
+#topTimes {
+    margin: var(--space-md) 0;
+}
+
+#topTimes ul {
+    list-style: none;
+    padding: 0;
+}
+
+#topTimes li {
+    margin: var(--space-xs) 0;
+    font-size: var(--font-size-base);
+    color: var(--main-text);
+}
+
+/* Chart Section */
+#chartContainer {
+    margin-top: var(--space-md);
+    padding: var(--space-sm);
+    border-radius: var(--main-radius);
+    background-color: var(--main-lighter);
+}
+
+#frequencyChart {
+    max-width: 100%;
+    height: auto;
+}
+
+#sliderContainer {
+    margin-top: var(--space-md);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+#sliderContainer label {
+    margin-bottom: var(--space-xs);
+    color: var(--main-text);
+}
+
+#elementSlider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: var(--space-sm);
+    border-radius: var(--main-radius);
+    background: var(--button-background);
+    outline: none;
+    cursor: pointer;
+}
+
+#elementSlider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: var(--space-md);
+    height: var(--space-md);
+    border-radius: 50%;
+    background: var(--main-text);
+    cursor: pointer;
+}
+
+/* Responsive Design Enhancements */
+@media only screen and (max-width: 650px) {
+    main .heading {
+        margin: 0;
+        padding: var(--space-md);
+    }
+
+    #fileUpload,
+    #wcaIdFetch,
+    #globalTime,
+    #topTimes,
+    #chartContainer {
+        padding: var(--space-sm);
+    }
+
+    #globalTime h3,
+    #topTimes h3 {
+        font-size: var(--font-size-base);
+    }
+
+    #predictedGlobal {
+        font-size: var(--font-size-lg);
+    }
+
+    #frequencyChart {
+        height: 300px;
+    }
+}

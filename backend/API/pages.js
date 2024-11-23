@@ -35,18 +35,35 @@ router.get('/googlea20166777fc211f6.html', (req, res) => {
 // Serve specific tool pages
 router.get('/tools/:toolName', (req, res) => {
     const toolName = req.params.toolName;
-    const filePath = path.join(__dirname, '../../public/html/tools', `${toolName}.html`);
+    const filePath = path.join(__dirname, `../../public/html/tools`, `${toolName}.html`);
 
     res.sendFile(filePath, (err) => {
         if (err) {
-            res.status(404).send('Tool not found');
+            // Extract the directory from the requested path
+            const requestedPath = req.path;
+
+            // Find the directory from the requested path (first segment of the path after '/')
+            const pathSegments = requestedPath.split('/').filter(Boolean); // Filter out empty strings
+            const directory = pathSegments.length > 0 ? pathSegments[0] : '';
+
+            // Redirect to the 404 page with the directory as a query parameter
+            res.redirect(`/404?dir=${pathSegments.join('/')}`);
+            res.status(404);
         }
     });
 });
 
 // Catch-all route for non-existing paths
 router.get('*', (req, res) => {
-    res.redirect('/404');
+    // Extract the directory from the requested path
+    const requestedPath = req.path;
+
+    // Find the directory from the requested path (first segment of the path after '/')
+    const pathSegments = requestedPath.split('/').filter(Boolean); // Filter out empty strings
+
+    // Redirect to the 404 page with the directory as a query parameter
+    res.redirect(`/404?dir=${pathSegments.join('/')}`);
+    res.status(404);
 });
 
 module.exports = router;

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Calculator</title>
+    <meta name="keywords"
+        content="WCA, world cube association, cubing, speedcubing, tool, tools, cubingtools, cubing tool, cubing tools, cubing analysis, WCA solve time analysis, cubing data tool, cstimer analysis, cubing performance tracking, solve time distribution, cubing statistics, cubing solve history, cubing data visualization, Rubik's cube analysis, WCA data analysis, cubing data trends, solve time chart, custom cubing times, Rubik's cube solve tracking, cubing progress tool, cubing solve patterns, WCA event analysis, cubing solve frequency, cubing performance insights, cubing trends, cubing analytics, cubing chart tool, Rubik's cube data analysis, cubing histogram, cubing graph, cubing solve analytics, custom solve analysis, cubing solve times, speedcubing data tool, cubing solve frequency analysis, cubing improvement tracker, Rubik's cube timing analysis, cstimer data import, WCA cubing data, cubing data insights, speedcubing tool, cubing solve distribution, Rubik's cube progress tracker, cubing solve trends, WCA solve distribution, WCA data insights, cubing frequency chart, speedcubing data visualization, solve time analysis, Rubik's cube analyzer, cubing statistics tool, Rubik's cube solve data, cubing records analyzer, WCA event solve times, cubing time tracker, cstimer, global, global finder, global analyzer" />
+    <meta name="author" content="CubingTools" />
+    <link rel="stylesheet" href="../../css/global.css">
+    <link rel="stylesheet" href="../../css/globalCalc.css">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Navigation -->
+        <nav>
+            <a href="/" class="logo">CubingTools</a>
+            <div class="navbar">
+                <a href="/">Home</a>
+                <a href="mailto: info@cubingtools.de">Contact</a>
+            </div>
+        </nav>
+
+        <!-- Sidebar -->
+        <div id="sidebar">
+            <h2>Tools</h2>
+        </div>
+
+        <!-- Main Content -->
+        <main>
+            <section class="heading">
+                <h1>Global Calculator from csTimer or WCA</h1>
+                <p>
+                    Analyze your cube solve times. Upload a cstimer file or fetch data from the WCA API.
+                </p>
+                <div id="mainGrid">
+                    <div id="fileUpload">
+                        <label>Upload a cstimer file:
+                            <input type="file" id="fileInput" accept=".txt" onchange="loadCSTimerFile(event)">
+                        </label>
+                        <div id="sessionDropdownContainer" style="display: none;">
+                            <label for="sessionDropdown">Select Session:</label>
+                            <select id="sessionDropdown" onchange="generateChartFromSession()"></select>
+                        </div>
+                    </div>
+
+                    <div id="wcaIdFetch">
+                        <label>Enter your WCA ID:
+                            <input type="text" id="wcaIdInput" placeholder="e.g., 2023KLIN02">
+                        </label>
+                        <select name="event" id="event-type">
+                            <option value="333">3x3x3</option>
+                            <option value="222">2x2x2</option>
+                            <option value="444">4x4x4</option>
+                            <option value="555">5x5x5</option>
+                            <option value="666">6x6x6</option>
+                            <option value="777">7x7x7</option>
+                            <option value="333bf">3x3x3 Blindfolded</option>
+                            <option value="333oh">3x3x3 One-Handed</option>
+                            <option value="clock">Clock</option>
+                            <option value="minx">Megaminx</option>
+                            <option value="pyram">Pyraminx</option>
+                            <option value="skewb">Skewb</option>
+                            <option value="sq1">Square-1</option>
+                            <option value="444bf">4x4x4 Blindfolded</option>
+                            <option value="555bf">5x5x5 Blindfolded</option>
+                        </select>
+                        <button onclick="fetchWCAData()">Fetch WCA Data</button>
+                    </div>
+
+                    <div id="topTimes">
+                        <h3>Top 5 Most Frequent Times</h3>
+                        <ul id="topTimesList"></ul>
+                    </div>
+
+                    <div id="globalTime">
+                        <h3>Predicted Global</h3>
+                        <span id="predictedGlobal"></span>
+                    </div>
+
+                    <div id="chartContainer">
+                        <div id="sliderContainer" style="display: none;">
+                            <label for="elementSlider">Number of elements to consider:
+                                <span id="sliderValue">0</span>
+                            </label>
+                            <input type="range" id="elementSlider" min="1" max="100" value="10" oninput="updateChart()">
+                        </div>
+                        <canvas id="frequencyChart"></canvas>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer>
+            <div class="footer-content">
+                <p>Developed by <a href="mailto:sebastian@cubingtools.de">Sebastian Kling</a>, with dedication to the
+                    cubing community.</p>
+                <p class="hide-sm">
+                    CubingTools.de is using the <a target="_blank"
+                        href="https://wca-rest-api.robiningelbrecht.be/">Unofficial World Cube Association API</a>.
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="../../js/loadTools.js"></script>
+    <script src="../../js/globalCalc.js"></script>
+</body>
+
+</html>

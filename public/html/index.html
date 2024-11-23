@@ -7,10 +7,25 @@
     <title>CubingTools.de</title>
     <meta name="description"
         content="Explore CubingTools.de, your go-to resource for competitive cubing enthusiasts! Our suite of tools enables you to optimize event performances, track solve times, and analyze competitor data. From dynamic time management to advanced event optimization algorithms, we provide everything you need to enhance your cubing experience. Join our community and elevate your skills today!">
+    <meta name="keywords" content="WCA, world cube association, cubing, speedcubing, tool, tools, cubingtools, cubing tool, cubing tools, 
+    ">
+    <meta name="author" content="CubingTools">
     <link rel="stylesheet" href="../css/global.css">
     <link rel="icon" href="../../assets/cubingtools.png" type="image/x-icon">
     <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 </head>
+
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P"></script>
+<script>
+    if (window.location.hostname == 'cubingtools') {
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+
+        gtag('config', 'G-7FDCB5928P');
+    }
+</script>
 
 <body>
     <div class="container">
@@ -19,7 +34,6 @@
             <div class="navbar">
                 <a href="/">Home</a>
                 <a href="mailto: info@cubingtools.de">Contact</a>
-                <a target="_blank" href="https://GitHub.com/MPGsebkli27/cubingtools">GitHub</a>
             </div>
         </nav>
 
@@ -28,7 +42,7 @@
         </div>
 
         <main>
-            <div class="heading">
+            <section class="heading">
                 <h1>Solve Smarter, Not Harder: Cubing Tools at Your Fingertips!</h1>
                 <p>Welcome to CubingTools.de, the ultimate online resource for competitive cubing enthusiasts! Our
                     platform is designed to provide you with a comprehensive suite of tools tailored to enhance your
@@ -42,16 +56,12 @@
                     various features, including event optimization tools and real-time data analysis, to make the most
                     of your competitive experience. Whether you’re preparing for your next competition or simply honing
                     your skills at home, CubingTools.de has everything you need to succeed.</p>
-            </div>
+            </section>
         </main>
         <footer>
             <div class="footer-content">
                 <p>Developed by <a href="mailto:sebastian@cubingtools.de">Sebastian Kling</a>, with dedication to the
                     cubing community.</p>
-                <p class="hide-sm">
-                    Have you encountered a bug? We appreciate your feedback! Please report it on our
-                    <a target="_blank" href="https://github.com/MPGsebkli27/cubingtools/issues">GitHub issues page</a>.
-                </p>
                 <p class="hide-sm">
                     CubingTools.de is using the <a target="_blank"
                         href="https://wca-rest-api.robiningelbrecht.be/">Unofficial World Cube Association API</a>.
@@ -60,7 +70,7 @@
         </footer>
     </div>
 
-    <script src="../js/loadTools.js"></script>
+    <script src="../../js/loadTools.js"></script>
 </body>
 
 </html>

@@ -9,6 +9,18 @@
     <link rel="icon" href="../../assets/cubingtools.png" type="image/x-icon">
 </head>
 
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P"></script>
+<script>
+    if (window.location.hostname == 'cubingtools') {
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+
+        gtag('config', 'G-7FDCB5928P');
+    }
+</script>
+
 <body>
     <div class="container">
         <nav>
@@ -16,7 +28,6 @@
             <div class="navbar">
                 <a href="/">Home</a>
                 <a href="mailto: info@cubingtools.de">Contact</a>
-                <a target="_blank" href="https://GitHub.com/MPGsebkli27/cubingtools">GitHub</a>
             </div>
         </nav>
 
@@ -25,17 +36,14 @@
         </div>
 
         <main>
-            <div class="heading">
-                <h1 style="text-align: center;">The page you were trying to access doesn't exist</h1>
+            <section class="heading">
+                <div style="text-align: center;" id="message">The page you were trying to access doesn't exist</div>
+            </section>
         </main>
         <footer>
             <div class="footer-content">
                 <p>Developed by <a href="mailto:sebastian@cubingtools.de">Sebastian Kling</a>, with dedication to the
                     cubing community.</p>
-                <p class="hide-sm">
-                    Have you encountered a bug? We appreciate your feedback! Please report it on our
-                    <a target="_blank" href="https://github.com/MPGsebkli27/cubingtools/issues">GitHub issues page</a>.
-                </p>
                 <p class="hide-sm">
                     CubingTools.de is using the <a target="_blank"
                         href="https://wca-rest-api.robiningelbrecht.be/">Unofficial World Cube Association API</a>.
@@ -44,7 +52,8 @@
         </footer>
     </div>
 
-    <script src="../js/loadTools.js"></script>
+    <script src="https://localhost/js/loadTools.js"></script>
+    <script src="https://localhost/js/404.js"></script>
 </body>
 
 </html>

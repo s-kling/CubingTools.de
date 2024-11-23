@@ -63,6 +63,14 @@ function populateFormFromURL() {
 // Call populateFormFromURL on page load to set inputs
 document.addEventListener('DOMContentLoaded', populateFormFromURL);
 
+let competitor1Name = '';
+let competitor2Name = '';
+
+async function handleButtons(competitor) {
+    await getWCAData(competitor);
+    updateURLWithFormData();
+}
+
 // Get the pickup time
 var pickupTime = parseFloat(document.getElementById('pickup').value) || 1.5;
 
@@ -79,23 +87,11 @@ document.getElementById('timeForm').addEventListener('submit', async function (e
     const competitor1Id = 'c1';
     const competitor2Id = 'c2';
 
-    // Fetch WCA data for both competitors
-    await getWCAData(competitor1Id);
-    await getWCAData(competitor2Id);
-
     // Collect the times after they have been populated by WCA data
     const competitor1 = collectCompetitorTimes(competitor1Id);
     const competitor2 = collectCompetitorTimes(competitor2Id);
 
-    showLoadingPopup(true);
-
-    // Optimize Guildford challenge with the collected times
-    const result = optimizeGuildford(competitor1, competitor2);
-
-    // Display results
-    displayResults(result, competitor1, competitor2);
-
-    showLoadingPopup(false);
+    optimizeAndDisplayLive(competitor1, competitor2)
 });
 
 // Function to fetch average times from the API for a given WCA ID and event
@@ -123,8 +119,6 @@ async function getWCAData(competitorId) {
     // Test if a WCA ID was given
     if (!/\d{4}[a-zA-Z]{4}\d{2}/.test(wcaId)) return;
 
-    showLoadingPopup(true);
-
     try {
         const events = {
             '2x2': '222',
@@ -141,21 +135,18 @@ async function getWCAData(competitorId) {
 
         const times = {};
 
+
         for (const [eventName, eventId] of Object.entries(events)) {
             const average = await getCurrentAverage(wcaId, eventId);
+            times[eventName] = average !== null ? average : null;
 
-            if (average !== null) {
-                times[eventName] = average; // Already in seconds
-            } else {
-                times[eventName] = null; // Mark as unable to solve if no valid average
-            }
+            // Update the input field live
+            const input = document.getElementById(`${competitorId}-${eventName}`);
+            input.value = times[eventName] !== null ? times[eventName].toFixed(2) : 'DNF';
         }
 
-        fillCompetitorTimes(competitorId, times);
     } catch (error) {
         alert(`Error fetching data: ${error.message}`);
-    } finally {
-        showLoadingPopup(false);
     }
 }
 
@@ -188,28 +179,6 @@ function collectCompetitorTimes(competitorId) {
     return times;
 }
 
-// Function to generate all possible combinations of events split between two competitors
-function generateCombinations(events) {
-    const combinations = [];
-    const totalCombinations = 1 << events.length;
-
-    for (let i = 0; i < totalCombinations; i++) {
-        const comb1 = [];
-        const comb2 = [];
-        for (let j = 0; j < events.length; j++) {
-            if (i & (1 << j)) {
-                comb1.push(events[j]);
-            } else {
-                comb2.push(events[j]);
-            }
-        }
-        combinations.push([comb1, comb2]);
-    }
-
-    return combinations;
-}
-
-// Function to calculate the maximum time taken between two competitors for a combination of events
 function calculateMaxTime(combination, competitor1, competitor2, pickup) {
     const time1 = combination[0].reduce((sum, event) => sum + (competitor1[event] || 0) + pickup, 0) - pickup;
     const time2 = combination[1].reduce((sum, event) => sum + (competitor2[event] || 0) + pickup, 0) - pickup;
@@ -223,78 +192,89 @@ function formatTime(seconds) {
     return `${minutes}m ${secs.toFixed(2)}s`;
 }
 
-// Function to find the best combination of events split between two competitors based on minimum total time
-function optimizeGuildford(competitor1, competitor2) {
-    const events = ['2x2', '3x3', '4x4', '5x5', 'OH', 'Pyraminx', 'Clock', 'Skewb', 'Megaminx', 'Square-1'];
-    const combinations = generateCombinations(events);
+// Function to generate combinations and process them live
+async function processCombinationsLive(events, competitor1, competitor2, pickupTime) {
+    const totalCombinations = 1 << events.length;
     let bestCombination = null;
     let bestTime = Infinity;
 
-    pickupTime = parseFloat(document.getElementById('pickup').value) || 0;
-
-    const results = combinations.map(combination => {
-        const maxTime = calculateMaxTime(combination, competitor1, competitor2, pickupTime);
-
-        if (maxTime < bestTime) {
-            bestTime = maxTime;
-            bestCombination = combination;
-        }
-        return {
-            combination,
-            maxTime,
-            formattedMaxTime: formatTime(maxTime)
-        };
-    });
-
-    results.sort((a, b) => a.maxTime - b.maxTime);
-
-    return {
-        allCombinations: results,
-        bestCombination: {
-            combination: bestCombination,
-            formattedMaxTime: formatTime(bestTime)
-        }
-    };
-}
-
-// Function to display the results in the HTML, including predicted times for each competitor
-function displayResults(result, competitor1, competitor2) {
     const bestCombinationDiv = document.getElementById('bestCombination');
     const allCombinationsDiv = document.getElementById('allCombinations');
 
-    // Calculate individual competitor times for the best combination
-    const competitor1Events = result.bestCombination.combination[0];
-    const competitor2Events = result.bestCombination.combination[1];
-
-    const competitor1Time = competitor1Events.reduce((sum, event) => sum + (competitor1[event] || 0) + pickupTime, 0) - pickupTime;
-    const competitor2Time = competitor2Events.reduce((sum, event) => sum + (competitor2[event] || 0) + pickupTime, 0) - pickupTime;
-
-    bestCombinationDiv.innerHTML =
-        `
-            <h3>Best Combination</h3>
-            <p>Competitor 1 (${formatTime(competitor1Time)}): ${competitor1Events.join(', ')}</p>
-            <p>Competitor 2 (${formatTime(competitor2Time)}): ${competitor2Events.join(', ')}</p>
-            <p>Total Time: ${result.bestCombination.formattedMaxTime}</p>
-        `;
-
+    bestCombinationDiv.innerHTML = '<h3>Best Combination</h3><p>Processing...</p>';
     allCombinationsDiv.innerHTML = '<h3>All Combinations (Ordered by Speed)</h3>';
-    result.allCombinations.forEach(combination => {
-        if (combination.maxTime < 600) {
-            const comb1Time = combination.combination[0].reduce((sum, event) => sum + (competitor1[event] || 0) + pickupTime, 0) - pickupTime;
-            const comb2Time = combination.combination[1].reduce((sum, event) => sum + (competitor2[event] || 0) + pickupTime, 0) - pickupTime;
 
-            allCombinationsDiv.innerHTML +=
-                `<div>
-                        <p>Competitor 1 (${formatTime(comb1Time)}): ${combination.combination[0].join(', ')}</p>
-                        <p>Competitor 2 (${formatTime(comb2Time)}): ${combination.combination[1].join(', ')}</p>
-                        <p>Total Time: ${combination.formattedMaxTime}</p>
-                 </div>`;
+    const combinationsResults = []; // Store all combinations for sorting later
+
+    for (let i = 0; i < totalCombinations; i++) {
+        const comb1 = [];
+        const comb2 = [];
+        for (let j = 0; j < events.length; j++) {
+            if (i & (1 << j)) {
+                comb1.push(events[j]);
+            } else {
+                comb2.push(events[j]);
+            }
         }
+
+        const maxTime = calculateMaxTime([comb1, comb2], competitor1, competitor2, pickupTime);
+
+        if (maxTime < bestTime) {
+            bestTime = maxTime;
+            bestCombination = [comb1, comb2];
+        }
+
+        const comb1Time = comb1.reduce((sum, event) => sum + (competitor1[event] || 0) + pickupTime, 0) - pickupTime;
+        const comb2Time = comb2.reduce((sum, event) => sum + (competitor2[event] || 0) + pickupTime, 0) - pickupTime;
+
+        combinationsResults.push({
+            combination: [comb1, comb2],
+            maxTime,
+            comb1Time,
+            comb2Time
+        });
+
+        // Update the best combination live
+        if (bestCombination) {
+            const [bestComb1, bestComb2] = bestCombination;
+            const bestComb1Time = bestComb1.reduce((sum, event) => sum + (competitor1[event] || 0) + pickupTime, 0) - pickupTime;
+            const bestComb2Time = bestComb2.reduce((sum, event) => sum + (competitor2[event] || 0) + pickupTime, 0) - pickupTime;
+
+            bestCombinationDiv.innerHTML = `
+                <h3>Best Combination</h3>
+                <p>Competitor 1 (${formatTime(bestComb1Time)}): ${bestComb1.join(', ')}</p>
+                <p>Competitor 2 (${formatTime(bestComb2Time)}): ${bestComb2.join(', ')}</p>
+                <p>Total Time: ${formatTime(bestTime)}</p>`;
+        }
+
+        // Allow UI to update during processing
+        await new Promise(resolve => setTimeout(resolve, 0));
+    }
+
+    // Sort combinations by maxTime after processing
+    combinationsResults.sort((a, b) => a.maxTime - b.maxTime);
+
+    // Update allCombinationsDiv with sorted combinations
+    allCombinationsDiv.innerHTML = '<h3>All Combinations (Ordered by Speed)</h3>';
+    combinationsResults.forEach(result => {
+        const { combination, comb1Time, comb2Time, maxTime } = result;
+        const [comb1, comb2] = combination;
+
+        allCombinationsDiv.innerHTML += `
+            <div>
+                <p>Competitor 1 (${formatTime(comb1Time)}): ${comb1.join(', ')}</p>
+                <p>Competitor 2 (${formatTime(comb2Time)}): ${comb2.join(', ')}</p>
+                <p>Total Time: ${formatTime(maxTime)}</p>
+            </div>`;
     });
+
+    alert('Finished analysing combinations!');
 }
 
-// Function to show or hide the loading popup
-function showLoadingPopup(show) {
-    const popup = document.getElementById('loadingPopup');
-    popup.style.display = show ? 'flex' : 'none';
+// Main function to start the optimization and live update
+function optimizeAndDisplayLive(competitor1, competitor2) {
+    const events = ['2x2', '3x3', '4x4', '5x5', 'OH', 'Pyraminx', 'Clock', 'Skewb', 'Megaminx', 'Square-1'];
+    const pickupTime = parseFloat(document.getElementById('pickup').value) || 0;
+
+    processCombinationsLive(events, competitor1, competitor2, pickupTime);
 }
