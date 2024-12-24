@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>CubingTools.de</title>
+        <meta
+            name="description"
+            content="Explore CubingTools.de, your go-to resource for competitive cubing enthusiasts! Our suite of tools enables you to optimize event performances, track solve times, and analyze competitor data. From dynamic time management to advanced event optimization algorithms, we provide everything you need to enhance your cubing experience. Join our community and elevate your skills today!"
+        >
+        <meta
+            name="keywords"
+            content="WCA, world cube association, cubing, speedcubing, tool, tools, cubingtools, cubing tool, cubing tools, 
+    "
+        >
+        <meta name="author" content="CubingTools">
+        <link rel="stylesheet" href="../css/global.css">
+        <link
+            rel="icon"
+            href="../../assets/cubingtools.png"
+            type="image/x-icon"
+        >
+        <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
+    </head>
+
+    <script
+        async
+        src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P"
+    ></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const consentBanner = document.getElementById(
+                "cookie-consent-banner",
+            );
+
+            // If cookies are accepted and on the correct hostname, initialize Google Analytics
+            if (
+                cookiesAccepted === "true" &&
+                window.location.hostname === "cubingtools"
+            ) {
+                window.dataLayer = window.dataLayer || [];
+                function gtag() {
+                    dataLayer.push(arguments);
+                }
+                gtag("js", new Date());
+                gtag("config", "G-7FDCB5928P");
+            } else if (!cookiesAccepted) {
+                consentBanner.style.display = "block";
+            }
+
+            // Function to handle cookie consent
+            function handleConsent(isAccepted) {
+                consentBanner.style.display = "none";
+            }
+
+            // Event listeners for accept and decline buttons
+            document.getElementById("accept-cookies")
+                .addEventListener(
+                    "click",
+                    () => handleConsent("true"),
+                );
+            document.getElementById("decline-cookies")
+                .addEventListener(
+                    "click",
+                    () => handleConsent("false"),
+                );
+        });
+    </script>
+
+    <div
+        id="cookie-consent-banner"
+        style="background-color: #333; color: white; padding: 10px; text-align: center; position: fixed; bottom: 0; width: 100%; display: none; z-index: 99999"
+    >
+        <p>
+            We use cookies to improve your experience. By using our website, you
+            agree to our <a href="/privacy-policy" style="color: #ffd700"
+            >privacy policy</a>.
+            <button
+                id="accept-cookies"
+                style="background-color: #ffd700; color: #333; padding: 5px 10px"
+            >
+                Accept
+            </button>
+            <button
+                id="decline-cookies"
+                style="background-color: #ff0000; color: #333; padding: 5px 10px"
+            >
+                Decline
+            </button>
+        </p>
+    </div>
+
+    <body>
+        <div class="container">
+            <nav>
+                <a href="/" class="logo">CubingTools</a>
+                <div class="navbar">
+                    <a href="/">Home</a>
+                    <a href="mailto: info@cubingtools.de">Contact</a>
+                    <a href="/privacy-policy">Privacy Policy</a>
+                </div>
+            </nav>
+
+            <div id="sidebar">
+                <h2>Tools</h2>
+            </div>
+
+            <main>
+                <section class="heading">
+                    <h1>What Time Is It In Rüppurr 2025 Registration</h1>
+                    <p>
+                        Registration for this competitions opens on the <strong
+                        >6. January 2025 at 18:00</strong>
+                        <span id="time-until-open"></span>
+                    </p>
+
+                    <!-- <form id="registration-form">
+                    <label for="full-name">* Full Name:</label>
+                    <input type="text" id="full-name" name="full-name" required>
+
+                    <label for="email">* Email:</label>
+                    <input type="email" id="email" name="email" required>
+
+                    <label for="wca-id">WCA ID:</label>
+                    <input type="text" id="wca-id" name="wca-id">
+
+                    <label for="events">* Select Events:</label>
+                    <div id="events">
+                        <input type="checkbox" id="event1" name="events" value="event1">
+                        <label for="event1">Event 1</label><br>
+                        <input type="checkbox" id="event2" name="events" value="event2">
+                        <label for="event2">Event 2</label><br>
+                        <input type="checkbox" id="event3" name="events" value="event3">
+                        <label for="event3">Event 3</label><br>
+                    </div>
+
+                    <button type="submit">Register</button>
+                </form>
+                <p id="submission-message"></p> -->
+
+                    <script>
+                        document.addEventListener("DOMContentLoaded", function () {
+                            const openDate = new Date("January 6, 2025 18:00:00");
+                            const now = new Date();
+                            const timeDiff = openDate - now;
+
+                            let timeUntilOpen;
+                            if (timeDiff > 24 * 60 * 60 * 1000) {
+                                const daysUntilOpen = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+                                timeUntilOpen = `${daysUntilOpen} days from now`;
+                            } else if (timeDiff > 60 * 60 * 1000) {
+                                const hoursUntilOpen = Math.floor(timeDiff / (1000 * 60 * 60));
+                                timeUntilOpen = `${hoursUntilOpen} hours from now`;
+                            } else if (timeDiff > 60 * 1000) {
+                                const minutesUntilOpen = Math.floor(timeDiff / (1000 * 60));
+                                timeUntilOpen = `${minutesUntilOpen} minutes from now`;
+                            } else {
+                                const secondsUntilOpen = Math.floor(timeDiff / 1000);
+                                timeUntilOpen = `${secondsUntilOpen} seconds from now`;
+                            }
+
+                            document.getElementById("time-until-open").textContent = `(${timeUntilOpen})`;
+                        });
+
+                        document.getElementById("registration-form").addEventListener("submit", async function (event) {
+                            event.preventDefault();
+
+                            const fullName = document.getElementById("full-name").value;
+                            const email = document.getElementById("email").value;
+                            const wcaId = document.getElementById("wca-id").value;
+                            const events = Array.from(document.querySelectorAll('input[name="events"]:checked')).map((el) => el.value);
+                            const competitionName = "Cubing In Rüppurr #4 2025";
+
+                            const formData = {
+                                fullName,
+                                email,
+                                wcaId,
+                                events,
+                                competitionName,
+                            };
+
+                            const response = await fetch("/submit-registration", {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify(formData),
+                            });
+
+                            if (response.ok) {
+                                document.getElementById("submission-message").textContent = "Registration successful!";
+                            } else {
+                                document.getElementById("submission-message").textContent = "There was an error submitting your registration. Please try again.";
+                            }
+                        });
+                    </script>
+                </section>
+            </main>
+
+            <footer>
+                <div class="footer-content">
+                    <p>
+                        Developed by <a href="mailto:sebastian@cubingtools.de"
+                        >Sebastian Kling</a>, with dedication to the cubing
+                        community.
+                    </p>
+                    <p class="hide-sm">
+                        CubingTools.de is using the <a
+                            target="_blank"
+                            href="https://wca-rest-api.robiningelbrecht.be/"
+                        >Unofficial World Cube Association API</a>.
+                    </p>
+                </div>
+            </footer>
+        </div>
+
+        <script src="../../js/loadTools.js"></script>
+    </body>
+</html>

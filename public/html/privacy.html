@@ -4,9 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CubingTools.de</title>
+    <title>Privacy Policy - CubingTools.de</title>
+    <meta name="description" content="Privacy Policy for CubingTools.de. Learn how we handle your data responsibly.">
     <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/privacy.css">
     <link rel="icon" href="../../assets/cubingtools.png" type="image/x-icon">
+    <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 </head>
 
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P"></script>
@@ -64,9 +67,17 @@
 
         <main>
             <section class="heading">
-                <div style="text-align: center;" id="message">The page you were trying to access doesn't exist</div>
+                <h1>CubingTools.de Privacy Policy</h1>
+                <p>Select a version to view:</p>
+                <select id="policy-version-dropdown"></select>
+                <button onclick="localStorage.clear(); window.location.reload()">Reset Cookie Response</button>
+
+                <section id="policy-content">
+                    <!-- The Privacy Policy content will be dynamically injected here -->
+                </section>
             </section>
         </main>
+
         <footer>
             <div class="footer-content">
                 <p>Developed by <a href="mailto:sebastian@cubingtools.de">Sebastian Kling</a>, with dedication to the
@@ -79,8 +90,9 @@
         </footer>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="../js/loadTools.js"></script>
-    <script src="../js/404.js"></script>
+    <script src="../js/privacy.js"></script>
 </body>
 
 </html>

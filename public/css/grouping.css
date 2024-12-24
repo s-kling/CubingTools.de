@@ -1,29 +1,13 @@
-.inline {
-    display: flex;
-    align-items: center;
-    margin-top: var(--space-sm);
+#event-checkboxes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto;
+    grid-gap: var(--space-sm);
 }
 
-.inline-btn {
-    display: flex;
-    align-items: center;
-    justify-content: space-evenly;
-    margin: var(--space-sm) 0;
+.event-checkbox>p {
+    color: var(--main-text);
 }
-
-
-/* Labels and inputs */
-
-.checkbox-label {
-    display: inline-block;
-}
-
-input[type="checkbox"] {
-    margin-right: 5px;
-}
-
-
-/* Event section titles */
 
 .event-section-title {
     font-size: 0.8em;
@@ -33,14 +17,89 @@ input[type="checkbox"] {
     padding-bottom: var(--space-xs);
     cursor: pointer;
     user-select: none;
+    grid-column-start: 1;
+    grid-column-end: 3;
 }
 
+.event-checkbox.unchecked {
+    height: fit-content;
+    min-height: 50px;
+    width: 100%;
+    background-color: var(--input-background);
+    border: 1px solid var(--input-border);
+    border-radius: var(--main-radius);
+    padding: var(--space-sm);
+    transition: all 0.2s ease-in-out;
+}
+
+.event-checkbox:hover {
+    scale: 1.02;
+}
+
+.event-checkbox.checked {
+    height: fit-content;
+    min-height: 100px;
+    width: 100%;
+    background-color: var(--input-background);
+    border: 1px solid var(--input-border);
+    border-radius: var(--main-radius);
+    padding: var(--space-sm);
+    transition: all 0.2s ease-in-out;
+}
+
+.checkbox-label {
+    display: inline-block;
+}
+
+input[type="checkbox"] {
+    margin-right: 5px;
+}
+
+.inline {
+    display: flex;
+    align-items: center;
+    margin-top: var(--space-sm);
+}
+
+
+/* Competitor Assignment Table Styling */
+
+.competitor-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: var(--space-md);
+}
+
+.competitor-assignments {
+    margin-top: var(--space-lg);
+    border: 1px solid var(--input-border);
+}
+
+.competitor-assignments>h4 {
+    padding: 10px 0 0 10px;
+}
+
+.competitor-table th,
+.competitor-table td {
+    padding: var(--space-sm);
+    text-align: left;
+    border-bottom: 1px solid var(--input-border);
+}
+
+.competitor-table th {
+    background-color: var(--main-lighter);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.competitor-table td {
+    background-color: var(--input-background);
+}
 
 /* Competitor List Table Styling */
 
 #competitor-list-wrapper {
-    max-height: 300px;
-    overflow-y: auto;
     border: 1px solid var(--input-border);
     margin-top: var(--space-sm);
 }

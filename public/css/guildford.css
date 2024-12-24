@@ -4,7 +4,7 @@ form {
     justify-content: space-between;
 }
 
-button {
+button:not(#accept-cookies):not(#decline-cookies) {
     width: 100%;
 }
 

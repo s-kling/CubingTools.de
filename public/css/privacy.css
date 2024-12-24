@@ -1,0 +1,156 @@
+select {
+    margin: 10px 0;
+    padding: 10px;
+    font-size: 16px;
+}
+
+#policy-content,
+#policy-content * {
+    all: unset;
+    display: revert;
+    box-sizing: border-box;
+}
+
+#policy-content {
+    font-family: 'Inter', sans-serif;
+    /* Matches global font for consistency */
+    line-height: 1.6;
+    /* Improves readability */
+    color: #333;
+    /* Neutral text color for contrast */
+    background-color: #fff;
+    /* Ensure clear contrast with text */
+    padding: 20px;
+    /* Add spacing for content */
+    margin-top: 20px;
+    border-radius: 5px;
+    /* A subtle rounded corner */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    /* Subtle shadow for separation */
+    overflow: auto;
+    /* Handle overflow for large content */
+}
+
+#policy-content h1,
+#policy-content h2,
+#policy-content h3,
+#policy-content h4,
+#policy-content h5,
+#policy-content h6 {
+    color: #222;
+    /* Headers slightly darker for emphasis */
+    margin: 1.5em 0 0.5em;
+    /* Space before/after headers */
+    line-height: 1.2;
+    font-weight: bold;
+}
+
+#policy-content h1 {
+    font-size: 2em;
+    border-bottom: 2px solid #ddd;
+    /* Underline for h1 headers */
+    padding-bottom: 0.3em;
+}
+
+#policy-content h2 {
+    font-size: 1.75em;
+}
+
+#policy-content h3 {
+    font-size: 1.5em;
+}
+
+#policy-content h4 {
+    font-size: 1.25em;
+}
+
+#policy-content h5 {
+    font-size: 1.1em;
+}
+
+#policy-content p {
+    margin: 1em 0;
+    /* Space between paragraphs */
+    color: #444;
+    /* Slightly lighter for readability */
+}
+
+#policy-content a {
+    color: #007bff;
+    /* Link color */
+    text-decoration: underline;
+    /* Standard link styling */
+}
+
+#policy-content a:hover {
+    color: #0056b3;
+    /* Darker link color on hover */
+    text-decoration: none;
+    /* Remove underline on hover */
+}
+
+#policy-content ul,
+#policy-content ol {
+    margin: 1em 0;
+    padding-left: 2em;
+    /* Indent for lists */
+    list-style: disc;
+    /* Default bullet for unordered lists */
+}
+
+#policy-content ol {
+    list-style: decimal;
+    /* Numbered bullets for ordered lists */
+}
+
+#policy-content li {
+    margin: 0.5em 0;
+    /* Space between list items */
+}
+
+#policy-content blockquote {
+    margin: 1em 0;
+    padding: 1em;
+    border-left: 4px solid #ddd;
+    /* Standard Markdown blockquote style */
+    background-color: #f9f9f9;
+    color: #666;
+    font-style: italic;
+}
+
+#policy-content pre,
+#policy-content code {
+    font-family: 'Courier New', Courier, monospace;
+    /* Monospace font for code */
+    background-color: #f4f4f4;
+    color: #d63384;
+    /* Highlighted code text color */
+    border: 1px solid #e0e0e0;
+    border-radius: 5px;
+    padding: 0.5em;
+    overflow-x: auto;
+    /* Horizontal scroll for long code */
+}
+
+#policy-content pre {
+    padding: 1em;
+    margin: 1em 0;
+}
+
+#policy-content hr {
+    border: none;
+    border-top: 1px solid #ddd;
+    /* Subtle horizontal rule */
+    margin: 2em 0;
+    /* Space above and below */
+}
+
+#policy-content img {
+    max-width: 100%;
+    /* Ensure images fit the container */
+    height: auto;
+    /* Maintain aspect ratio */
+    display: block;
+    /* Center images */
+    margin: 1em auto;
+}

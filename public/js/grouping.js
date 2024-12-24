@@ -1,4 +1,5 @@
 const events = [
+    // NxNxN Cubes
     { id: '333', name: '3x3x3 Cube', shortName: '3x3' },
     { id: '222', name: '2x2x2 Cube', shortName: '2x2' },
     { id: '444', name: '4x4x4 Cube', shortName: '4x4' },
@@ -8,58 +9,138 @@ const events = [
     { id: '888', name: '8x8x8 Cube', shortName: '8x8' },
     { id: '999', name: '9x9x9 Cube', shortName: '9x9' },
 
+    // One-Handed
     { id: '333oh', name: '3x3x3 One-Handed', shortName: '3x3 OH' },
     { id: '222oh', name: '2x2x2 One-Handed', shortName: '2x2 OH' },
+    { id: '333oh_x2', name: '3x3x3 Double One-Handed', shortName: 'Double OH' },
+    { id: '333oh_water', name: '3x3x3 H2OH', shortName: 'H2OH' },
+    { id: '444oh', name: '4x4x4 One-Handed', shortName: '4x4 OH' },
+    { id: 'minx_oh', name: 'Megaminx One-Handed', shortName: 'Minx OH' },
+    { id: 'clock_oh', name: 'Clock One-Handed', shortName: 'Clock OH' },
+    { id: 'magic_oh', name: 'Magic One-Handed', shortName: 'Magic OH' },
 
+    // FTO
     { id: 'fto', name: 'Face-Turning Octahedron', shortName: 'FTO' },
+    { id: 'fto_bld', name: 'Face-Turning Octahedron Blindfolded', shortName: 'FTO BLD' },
+    { id: 'fto_mbld', name: 'Face-Turning Octahedron Multi-Blind', shortName: 'FTO MBLD' },
 
-    { id: '333tb', name: '3x3x3 Team-Blind', shortName: 'Team BLD' },
-    { id: '333bf', name: '3x3x3 Blindfolded', shortName: '3x3 BLD' },
-    { id: '222bf', name: '2x2x2 Blindfolded', shortName: '2x2 BLD' },
-    { id: '444bf', name: '4x4x4 Blindfolded', shortName: '4x4 BLD' },
-    { id: '555bf', name: '5x5x5 Blindfolded', shortName: '5x5 BLD' },
-
-    { id: '333ft', name: '3x3x3 With Feet', shortName: '3x3 Feet' },
+    // Feet
+    { id: '333ft', name: '3x3x3 With Feet', shortName: 'Feet' },
     { id: '444ft', name: '4x4x4 With Feet', shortName: '4x4 Feet' },
 
+    // Clock
     { id: 'clock', name: 'Clock', shortName: 'Clock' },
-    { id: '555clk', name: 'Pentagonal Clock', shortName: '5x5 Clock' },
+    { id: 'penta_clock', name: 'Pentagonal Clock', shortName: '5x5 Clock' },
+    { id: 'clock_doubles', name: 'Clock Doubles', shortName: 'Clock Dbl.' },
 
-    { id: 'pyram', name: 'Pyraminx', shortName: 'Pyra' },
-    { id: 'maspyr', name: 'Master Pyraminx', shortName: 'Master Pyra' },
+    // Pyraminx
+    { id: 'pyram', name: 'Pyraminx', shortName: 'Pyram' },
+    { id: 'mpyram', name: 'Master Pyraminx', shortName: 'Master Pyram' },
+    { id: 'pyram_duo', name: 'Pyraminx Duo', shortName: 'Pyram Duo' },
+    { id: 'pyramorphix', name: 'Pyramorphix', shortName: 'Pyramorph' },
 
-    { id: 'skewb', name: 'Skewb', shortName: 'Skewb' },
+    // Minx
+    { id: 'minx', name: 'Megaminx', shortName: 'Minx' },
+    { id: 'kilominx', name: 'Kilominx', shortName: 'Kilo' },
+    { id: 'mkilominx', name: 'Master Kilominx', shortName: 'M. Kilo' },
+    { id: 'gigaminx', name: 'Gigaminx', shortName: 'Giga' },
+
+    // Skewb
     { id: 'redi', name: 'Redi Cube', shortName: 'Redi' },
+    { id: 'skewb', name: 'Skewb', shortName: 'Skewb' },
+    { id: 'ivy_cube', name: 'Ivy Cube', shortName: 'Ivy' },
 
-    { id: 'sq1', name: 'Square-1', shortName: 'Squan' },
+    // Square-1
+    { id: 'sq1', name: 'Square-1', shortName: 'SQ1' },
 
-    { id: '333fm', name: '3x3x3 Fewest Moves', shortName: 'FMC' },
-    { id: '333lfm', name: '3x3x3 Linear Fewest Moves', shortName: '3x3 LFM' },
-    { id: '333mts', name: '3x3x3 Match The Scramble', shortName: '3x3 MTS' },
-    { id: '333tf', name: '3x3x3 Team-Factory', shortName: '3x3 Team Factory' },
-    { id: '333ni', name: '3x3x3 No Inspection', shortName: '3x3 No Inspection' },
-    { id: '333sc', name: '3x3x3 Scrambling', shortName: '3x3 Scrambling' },
-    { id: '333on', name: '3x3x3 One Side', shortName: '3x3 One Side' },
-    { id: '333doh', name: '3x3x3 Double One-Handed', shortName: '3x3 Double OH' },
-    { id: '3333', name: 'Three 3x3x3 Cubes Relay', shortName: 'Three 3x3 Relay' },
+    // Mirror Blocks
+    { id: '333_mirror_blocks', name: 'Mirror Blocks', shortName: 'Mirror' },
+    { id: '222_mirror_blocks', name: '2x2x2 Mirror Blocks', shortName: '2x2 Mirror' },
+    { id: '333_mirror_blocks_bld', name: 'Mirror Blocks Blindfolded', shortName: 'Mirror BLD' },
 
-    { id: 'minx', name: 'Megaminx', shortName: 'Mega' },
-    { id: 'kilo', name: 'Kilominx', shortName: 'Kilo' },
-    { id: 'giga', name: 'Gigaminx', shortName: 'Giga' },
+    // Magic
+    { id: 'magic', name: 'Magic', shortName: 'Magic' },
+    { id: 'mmagic', name: 'Master Magic', shortName: 'M. Magic' },
 
-    { id: 'mrb', name: '3x3x3 Mirror Blocks', shortName: 'Mirror Blocks' },
-    { id: 'mrbbf', name: '3x3x3 Mirror Blocks Blindfolded', shortName: 'Mirror Blind' },
+    // Relays
+    { id: 'miniguild', name: 'Mini Guildford', shortName: 'Mini Guild' },
+    { id: 'miniguild_2_person', name: '2-man Mini Guildford', shortName: '2p Guild' },
+    { id: '234relay', name: '2x2x2-4x4x4 Relay', shortName: '2-4 Relay' },
+    { id: '2345relay', name: '2x2x2-5x5x5 Relay', shortName: '2-5 Relay' },
+    { id: '234567relay', name: '2x2x2-7x7x7 Relay', shortName: '2-7 Relay' },
+    { id: '234567relay_2_person', name: '2-man 2x2x2-7x7x7 Relay', shortName: '2p 2-7 Relay' },
 
-    { id: 'mag', name: 'Magic', shortName: 'Magic' },
-    { id: 'masmag', name: 'Master Magic', shortName: 'Master Magic' },
+    // 3x3 Variations
+    { id: '333fm', name: '3x3x3 Fewest Moves', shortName: '3x3 FM' },
+    { id: '333_linear_fm', name: '3x3x3 Linear Fewest Moves', shortName: 'Linear FM' },
+    { id: '333mts', name: '3x3x3 Match The Scramble', shortName: 'MTS' },
+    { id: '333mts_old', name: '3x3x3 Match The Scramble With Inspection', shortName: 'MTS Old' },
+    { id: '333_team_factory', name: '3x3x3 Team Factory', shortName: 'Team Factory' },
+    { id: '333_inspectionless', name: '3x3x3 No Inspection', shortName: 'No Inspect' },
+    { id: '333_scrambling', name: '3x3x3 Scrambling', shortName: 'Scramble' },
+    { id: '333_one_side', name: '3x3x3 One Side', shortName: 'One Side' },
+    { id: '333_x3_relay', name: 'Three 3x3x3 Cubes Relay', shortName: '3x3 Relay' },
+    { id: '333_cube_mile', name: '3x3x3 Cube Mile', shortName: 'Cube Mile' },
+    { id: '333_oven_mitts', name: '3x3x3 With Oven Mitts', shortName: 'Oven Mitts' },
+    { id: '333_supersolve', name: '3x3x3 Supersolve', shortName: 'Supersolve' },
+    { id: '333_siamese', name: 'Siamese Cube', shortName: 'Siamese' },
 
-    { id: 'guildford', name: '2-Man Mini Guildford', shortName: 'Mini Guildford' },
-    { id: '24r', name: '2x2x2-4x4x4 Relay', shortName: '2 To 4 Relay' },
-    { id: '25r', name: '2x2x2-5x5x5 Relay', shortName: '2 To 5 Relay' },
-    { id: '27r', name: '2x2x2-7x7x7 Relay', shortName: '2 To 7 Relay' },
+    // Cuboids
+    { id: '222_squared', name: '2x2x2 Squared', shortName: '2x2 Sq.' },
+    { id: '223_cuboid', name: '2x2x3 Cuboid', shortName: '2x2x3' },
+    { id: '223_banana', name: '2x2x3 Banana', shortName: 'Banana' },
 
-    { id: '223', name: '2x2x3 Cube', shortName: '2x2x3' },
-    { id: 'gear', name: 'Gear Cube', shortName: 'Gear Cube' },
+    // NxNxN Blindfolded
+    { id: '222bf', name: '2x2x2 Blindfolded', shortName: '2x2 BLD' },
+    { id: '333bf', name: '3x3x3 Blindfolded', shortName: '3x3 BLD' },
+    { id: '444bf', name: '4x4x4 Blindfolded', shortName: '4x4 BLD' },
+    { id: '555bf', name: '5x5x5 Blindfolded', shortName: '5x5 BLD' },
+    { id: '666bf', name: '6x6x6 Blindfolded', shortName: '6x6 BLD' },
+    { id: '777bf', name: '7x7x7 Blindfolded', shortName: '7x7 BLD' },
+    { id: '888bf', name: '8x8x8 Blindfolded', shortName: '8x8 BLD' },
+    { id: '999bf', name: '9x9x9 Blindfolded', shortName: '9x9 BLD' },
+    { id: '101010bf', name: '10x10x10 Blindfolded', shortName: '10x10 BLD' },
+    { id: '111111bf', name: '11x11x11 Blindfolded', shortName: '11x11 BLD' },
+
+    // Minx Blindfolded
+    { id: 'minx_bld', name: 'Megaminx Blindfolded', shortName: 'Minx BLD' },
+    { id: 'minx444_bld', name: 'Master Kilominx Blindfolded', shortName: 'M. Kilo BLD' },
+    { id: 'minx555_bld', name: 'Gigaminx Blindfolded', shortName: 'Giga BLD' },
+    { id: 'minx2345relay_bld', name: 'Kilo-Gigaminx Relay Blindfolded', shortName: 'Kilo-Giga BLD' },
+
+    // Other Blindfolded
+    { id: '333_speed_bld', name: '3x3x3 Speed-Blind', shortName: 'Speed BLD' },
+    { id: '333_team_bld', name: '3x3x3 Team-Blind', shortName: 'Team BLD' },
+    { id: '333_team_bld_old', name: '3x3x3 Team-Blind With Inspection', shortName: 'Team BLD Old' },
+    { id: 'sq1_bld', name: 'Square-1 Blindfolded', shortName: 'SQ1 BLD' },
+    { id: 'pyram_crystal_bld', name: 'Pyraminx Crystal Blindfolded', shortName: 'Pyram Cr. BLD' },
+
+    // Multi-Blindfolded
+    { id: '333mbf', name: '3x3x3 Multi-Blind', shortName: '3x3 MBLD' },
+    { id: '444mbf', name: '4x4x4 Multi-Blind', shortName: '4x4 MBLD' },
+    { id: '555mbf', name: '5x5x5 Multi-Blind', shortName: '5x5 MBLD' },
+    { id: 'sq1_mbo', name: 'Square-1 Multi-Blind', shortName: 'SQ1 MBLD' },
+    { id: '333mbo', name: '3x3x3 Multi-Blind Old Style', shortName: 'Old MBLD' },
+
+    // Relays Blindfolded
+    { id: '333_oh_bld_team_relay', name: '3x3x3 + OH + BLD Team Relay', shortName: '3x3+OH+Blind Relay' },
+    { id: '333bf_2_person_relay', name: '3x3x3 Blindfolded 2-man Relay', shortName: 'BLD 2p Relay' },
+    { id: '333bf_3_person_relay', name: '3x3x3 Blindfolded 3-man Relay', shortName: 'BLD 3p Relay' },
+    { id: '333bf_4_person_relay', name: '3x3x3 Blindfolded 4-man Relay', shortName: 'BLD 4p Relay' },
+    { id: '333bf_8_person_relay', name: '3x3x3 Blindfolded 8-man Relay', shortName: 'BLD 8p Relay' },
+    { id: '2345relay_bld', name: '2x2x2-5x5x5 Relay Blindfolded', shortName: '2-5 BLD Relay' },
+    { id: '234567relay_bld', name: '2x2x2-7x7x7 Relay Blindfolded', shortName: '2-7 BLD Relay' },
+    { id: '2345678relay_bld', name: '2x2x2-8x8x8 Relay Blindfolded', shortName: '2-8 BLD Relay' },
+    { id: 'miniguild_bld', name: 'Mini Guildford Blindfolded', shortName: 'Mini Guild BLD' },
+
+    // Other
+    { id: '15puzzle', name: '15 Puzzle', shortName: '15 Puzz.' },
+    { id: 'corner_heli222', name: 'Corner Helicopter 2x2x2', shortName: 'Heli 2x2' },
+    { id: 'gear_cube', name: 'Gear Cube', shortName: 'Gear' },
+    { id: 'rainbow_cube', name: 'Rainbow Cube', shortName: 'Rainbow' },
+    { id: '360_puzzle', name: '360 Puzzle', shortName: '360' },
+    { id: 'snake', name: 'Snake', shortName: 'Snake' },
+    { id: 'dino', name: 'Dino Cube', shortName: 'Dino' },
 ];
 
 let selectedEvents = [];
@@ -95,7 +176,6 @@ function selectAllUnderLabel(labelId) {
     checkboxes.forEach(checkbox => checkbox.checked = true);
 }
 
-
 function setupCompetition() {
     const competitionName = document.getElementById('competition-name').value;
     const maxCompetitors = document.getElementById('max-competitors').value;
@@ -122,21 +202,26 @@ function setupCompetition() {
             let newTitle = '';
 
             // Determine the title based on the event's id
-            if (event.id === '333') newTitle = 'NxNxN Cube';
+            if (event.id === '333') newTitle = 'NxNxN Cubes';
             else if (event.id === '333oh') newTitle = 'One-Handed';
             else if (event.id === 'fto') newTitle = 'FTO';
-            else if (event.id === '333tb') newTitle = 'Blindfolded';
             else if (event.id === '333ft') newTitle = 'Feet';
             else if (event.id === 'clock') newTitle = 'Clock';
-            else if (event.id === 'pyra') newTitle = 'Pyraminx';
-            else if (event.id === 'skewb') newTitle = 'Skewb';
+            else if (event.id === 'pyram') newTitle = 'Pyraminx';
+            else if (event.id === 'minx') newTitle = 'Minx';
+            else if (event.id === 'redi') newTitle = 'Skewb';
             else if (event.id === 'sq1') newTitle = 'Square-1';
+            else if (event.id === '333_mirror_blocks') newTitle = 'Mirror Blocks';
+            else if (event.id === 'magic') newTitle = 'Magic';
+            else if (event.id === 'miniguild') newTitle = 'Relays';
             else if (event.id === '333fm') newTitle = '3x3 Variations';
-            else if (event.id === 'mega') newTitle = 'Minx';
-            else if (event.id === 'mrb') newTitle = 'Mirror Blocks';
-            else if (event.id === 'mag') newTitle = 'Magic';
-            else if (event.id === 'guildford') newTitle = 'Relays';
-            else if (event.id === '223') newTitle = 'Other Puzzles';
+            else if (event.id === '222_squared') newTitle = 'Cuboids';
+            else if (event.id === '222bf') newTitle = 'Blindfolded';
+            else if (event.id === 'minx_bld') newTitle = 'Minx Blindfolded';
+            else if (event.id === '333_speed_bld') newTitle = 'Other Blindfolded';
+            else if (event.id === '333mbf') newTitle = 'Multi Blindfolded';
+            else if (event.id === '333_oh_bld_team_relay') newTitle = 'Relays Blindfolded';
+            else if (event.id === '15puzzle') newTitle = 'Other';
 
             // If the title changes, add a heading before the next section
             if (newTitle && newTitle !== currentTitle) {
@@ -144,7 +229,6 @@ function setupCompetition() {
                 titleDiv.className = 'event-section-title';
                 titleDiv.textContent = newTitle;
 
-                // Add a click event listener to the titleDiv
                 // Add a click event listener to the titleDiv
                 titleDiv.addEventListener('click', () => {
                     let nextElement = titleDiv.nextElementSibling;
@@ -168,57 +252,106 @@ function setupCompetition() {
                     });
                 });
 
-
                 eventCheckboxes.appendChild(titleDiv);
                 currentTitle = newTitle;
             }
 
-            // Create the checkbox
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.id = event.id;
-            checkbox.value = event.id;
-            checkbox.name = 'event-checkbox';
-
-            // Create the label and append the checkbox inside it
-            const label = document.createElement('label');
-            label.classList += 'checkbox-label';
-            label.appendChild(checkbox);          // Append the checkbox to the label
-            label.appendChild(document.createTextNode(event.name)); // Add the event name as the label's text
-
-            // Append the label directly to the parent container
-            eventCheckboxes.appendChild(label);
-
+            handleAddingEventDivs(event, eventCheckboxes);
         });
     }
 }
-
-
 
 function addCustomEvent() {
     const newEventName = prompt('What is the events\' name?', '');
     if (newEventName == null || newEventName == '') return;
 
-    const newEventId = newEventName.substring(0, 3);
-    events.push({ id: newEventId, name: newEventName, shortName: newEventName });
+    const newEventId = prompt('What is the events\' ID?', '');
+    if (newEventId == null || newEventId == '') return;
+
+    const newEventShortName = prompt('What is the events\' short name?', '');
+    if (newEventShortName == null || newEventShortName == '') return;
+
+    const event = {
+        id: newEventId,
+        name: newEventName,
+        shortName: newEventShortName
+    };
+
+    events.push(event);
 
     const eventCheckboxes = document.getElementById('event-checkboxes');
 
-    // Create the checkbox
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.id = newEventId;
-    checkbox.value = newEventId;
-    checkbox.name = 'event-checkbox';
+    handleAddingEventDivs(event, eventCheckboxes);
+}
 
-    // Create the label and append the checkbox inside it
-    const label = document.createElement('label');
-    label.classList += 'checkbox-label'
-    label.appendChild(checkbox);          // Append the checkbox to the label
-    label.appendChild(document.createTextNode(newEventName)); // Add the event name as the label's text
+function handleAddingEventDivs(event, eventCheckboxes) {
+    if (!eventCheckboxes) eventCheckboxes = document.getElementById('event-checkboxes');
+
+    // Create the checkbox
+    const checkbox = document.createElement('div');
+    checkbox.classList = 'event-checkbox unchecked';
+    checkbox.id = event.id;
+    checkbox.value = event.id;
+    checkbox.innerHTML = `<p>${event.name}</p>`;
 
     // Append the label directly to the parent container
-    eventCheckboxes.appendChild(label);
+    eventCheckboxes.appendChild(checkbox);
+
+    checkbox.addEventListener('click', () => {
+        checkbox.classList.toggle('checked');
+        checkbox.classList.toggle('unchecked');
+
+        if (checkbox.classList.contains('checked')) {
+            checkbox.innerHTML = `<p>${event.name} (Selected)</p>`;
+
+            const dynamicGroupCheckbox = document.createElement('input');
+            dynamicGroupCheckbox.type = 'checkbox';
+            dynamicGroupCheckbox.addEventListener('click', (e) => e.stopPropagation());
+            dynamicGroupCheckbox.id = `dynamic-group-${event.id}`;
+            dynamicGroupCheckbox.name = 'dynamic-group';
+            dynamicGroupCheckbox.value = event.id;
+            dynamicGroupCheckbox.checked = true;
+
+            const dynamicGroupLabel = document.createElement('label');
+            dynamicGroupLabel.htmlFor = `dynamic-group-${event.id}`;
+            dynamicGroupLabel.textContent = 'Dynamic Groups';
+
+            const groupInput = document.createElement('input');
+            groupInput.type = 'number';
+            groupInput.id = `group-input-${event.id}`;
+            groupInput.name = 'group-input';
+            groupInput.placeholder = 'Max Groups';
+            groupInput.style.display = 'none';
+
+            dynamicGroupCheckbox.addEventListener('change', () => {
+                groupInput.style.display = dynamicGroupCheckbox.checked ? 'none' : 'block';
+            });
+
+            const wrapper = document.createElement('div');
+            dynamicGroupLabel.appendChild(dynamicGroupCheckbox);
+            wrapper.appendChild(dynamicGroupLabel);
+            wrapper.appendChild(groupInput);
+
+            // Prevent the checkbox from closing if the input is clicked
+            wrapper.addEventListener('click', (e) => e.stopPropagation());
+
+            checkbox.appendChild(wrapper);
+
+            // Special events (all fewest moves and multi blind events)
+            if (event.id.includes('fm') || event.id.includes('mbf') || event.id.includes('mbld') || event.id === '333_mbo') {
+                dynamicGroupCheckbox.checked = false;
+                dynamicGroupCheckbox.disabled = true;
+                groupInput.value = 1;
+                groupInput.disabled = true;
+                groupInput.style.display = 'block';
+            }
+        } else {
+            checkbox.innerHTML = `<p>${event.name}</p>`;
+
+            const wrapper = checkbox.querySelector('div');
+            if (wrapper) wrapper.remove();
+        }
+    });
 }
 
 function goToSetupCompetition() {
@@ -232,12 +365,9 @@ function goToEventSelection() {
 }
 
 function selectEvents() {
-    const checkboxes = document.querySelectorAll('#event-checkboxes input:checked');
-    selectedEvents = Array.from(checkboxes).map(checkbox => checkbox.value);
+    selectedEvents = Array.from(document.querySelectorAll('.event-checkbox.checked')).map(checkbox => checkbox.id);
 
     if (selectedEvents.length > 0) {
-        competitionData.events = selectedEvents;
-
         document.getElementById('event-selection').style.display = 'none';
         document.getElementById('competitor-setup').style.display = 'block';
         updateCompetitorForm();
@@ -371,10 +501,18 @@ function deleteCompetitor(id) {
     // If a competitor with the given id is found, remove it from the array
     if (index !== -1) {
         competitors.splice(index, 1);
+
+        // Update the IDs of all competitors
+        competitors.forEach((competitor, idx) => {
+            competitor.id = idx + 1;
+        });
+
         displayCompetitors();
+        selectedEvents = selectedEvents.filter(eventId =>
+            competitors.some(competitor => competitor.events.includes(eventId))
+        );
     }
 }
-
 
 function finalizeCompetitors() {
     competitionData.competitors = competitors;
@@ -384,6 +522,15 @@ function finalizeCompetitors() {
 
     generateGroups();
 }
+
+document.getElementById('copyData').addEventListener('click', () => {
+    const competitionDataStr = JSON.stringify(competitionData, null, 2);
+    navigator.clipboard.writeText(competitionDataStr).then(() => {
+        alert('Competition data copied to clipboard!');
+    }).catch(err => {
+        console.error('Failed to copy competition data: ', err);
+    });
+});
 
 async function sortArray(array, eventId) {
     // Store the average times for each competitor
@@ -419,7 +566,7 @@ async function sortArray(array, eventId) {
         if (avgA !== null) return -1;
         if (avgB !== null) return 1;
 
-        // If neither has an average, sort by WCA ID (or another fallback criterion)
+        // If neither has an average, sort by WCA ID
         return (a.wcaId || '').localeCompare(b.wcaId || '');
     });
     return array;
@@ -447,7 +594,16 @@ async function generateGroups() {
         eventCompetitors = await sortArray(eventCompetitors, eventId);
 
         // Determine the number of groups
-        const numGroups = Math.ceil(eventCompetitors.length / maxCompetitors);
+        const dynamicGroupCheckbox = document.getElementById(`dynamic-group-${eventId}`);
+        let numGroups;
+
+        if (dynamicGroupCheckbox && !dynamicGroupCheckbox.checked) {
+            const groupInput = document.getElementById(`group-input-${eventId}`);
+            numGroups = (parseInt(groupInput.value, 10) < eventCompetitors.length) ? parseInt(groupInput.value, 10) : eventCompetitors.length;
+        } else {
+            numGroups = Math.ceil(eventCompetitors.length / maxCompetitors);
+        }
+
         const eventGroups = Array.from({ length: numGroups }, () => ({
             competitors: [],
             judges: [],
@@ -462,7 +618,6 @@ async function generateGroups() {
             competitor.groupAssignments[eventId] = groupIndex + 1; // Groups are 1-indexed
         });
 
-
         // Assign runners, judges, and scramblers ensuring no overlap
         for (let groupIndex = 0; groupIndex < eventGroups.length; groupIndex++) {
             const shuffledCompetitors = shuffleArray(competitors);
@@ -470,12 +625,50 @@ async function generateGroups() {
             const group = eventGroups[groupIndex];
 
             // Number of Scramblers and Runners per group
-            const numOfHelpers = Math.ceil(Math.pow(group.competitors.length / 6, 1 / 1.32));
+            // const numOfHelpers = Math.ceil(Math.pow(group.competitors.length / 6, 1 / 1.32));
+            const numOfHelpers = Math.ceil(Math.ceil(group.competitors.length) / 5.7);
 
-            // Assign scramblers: competitors not in this group but in the event
-            const availableScramblers = eventCompetitors.filter(competitor => competitor.groupAssignments[eventId] !== (groupIndex + 1));
-            if (availableScramblers.length > 0) {
-                group.scramblers = availableScramblers.slice(0, numOfHelpers);
+            // Assign scramblers: top n * numOfHelpers competitors sorted by speed
+            const topCompetitors = eventCompetitors.slice(0, numOfHelpers * eventGroups.length);
+            const availableScramblers = topCompetitors.filter(competitor => competitor.groupAssignments[eventId] !== (groupIndex + 1));
+
+            if (availableScramblers.length > 0 || eventCompetitors.length == 1) {
+                const scramblers = [];
+                for (let i = 0; i < numOfHelpers; i++) {
+                    const totalWeight = availableScramblers.reduce((sum, competitor, index) => {
+                        const weight = competitor.wcaId ? (availableScramblers.length - index) : 1;
+                        return sum + weight;
+                    }, 0);
+                    let randomWeight = Math.random() * totalWeight;
+                    for (let j = 0; j < availableScramblers.length; j++) {
+                        const weight = availableScramblers[j].wcaId ? (availableScramblers.length - j) : 1;
+                        randomWeight -= weight;
+                        if (randomWeight <= 0) {
+                            scramblers.push(availableScramblers[j]);
+                            availableScramblers.splice(j, 1);
+                            break;
+                        }
+                    }
+                }
+                group.scramblers = scramblers;
+            } else {
+                // Increase the number of groups by 1 and redo the process
+                numGroups += 1;
+                eventGroups.length = 0;
+                for (let i = 0; i < numGroups; i++) {
+                    eventGroups.push({
+                        competitors: [],
+                        judges: [],
+                        scramblers: [],
+                        runners: []
+                    });
+                }
+                eventCompetitors.forEach((competitor, index) => {
+                    const groupIndex = (numGroups - 1) - (index % numGroups);
+                    eventGroups[groupIndex].competitors.push(competitor);
+                    competitor.groupAssignments[eventId] = groupIndex + 1;
+                });
+                groupIndex = 0; // Reset groupIndex to reassign helpers
             }
 
             // Assign judges if applicable
@@ -520,7 +713,7 @@ async function generateGroups() {
             groupDiv.className = 'group';
 
             const groupTitle = document.createElement('h4');
-            groupTitle.textContent = `Group ${groupIndex + 1}`;
+            groupTitle.textContent = `Group ${groupIndex + 1} (${group.competitors.length} competitors)`;
             groupDiv.appendChild(groupTitle);
 
             const competitorDiv = document.createElement('ul');
@@ -553,4 +746,94 @@ async function generateGroups() {
 
         groupingOutput.appendChild(eventDiv);
     }
+
+    // Create a table for each competitor sorted by their ID
+    competitors.sort((a, b) => a.id - b.id).forEach(competitor => {
+        const competitorTable = document.createElement('table');
+        competitorTable.className = 'competitor-table';
+
+        const headerRow = document.createElement('tr');
+        const headerCells = ['Event', 'Compete', 'Judge', 'Run', 'Scramble'];
+        headerCells.forEach(text => {
+            const th = document.createElement('th');
+            th.textContent = text;
+            headerRow.appendChild(th);
+        });
+        competitorTable.appendChild(headerRow);
+
+        selectedEvents.forEach(eventId => {
+            const event = events.find(e => e.id === eventId);
+            const row = document.createElement('tr');
+
+            const eventCell = document.createElement('td');
+            eventCell.textContent = event.shortName;
+            row.appendChild(eventCell);
+
+            const competeCell = document.createElement('td');
+            competeCell.textContent = competitor.groupAssignments[eventId] || '';
+            row.appendChild(competeCell);
+
+            const judgeGroups = competitionData.groups[eventId]
+                .map((group, index) => group.judges.includes(competitor) ? index + 1 : null)
+                .filter(group => group !== null)
+                .join(', ');
+
+            const judgeCell = document.createElement('td');
+            judgeCell.textContent = judgeGroups;
+            row.appendChild(judgeCell);
+
+            const runGroups = competitionData.groups[eventId]
+                .map((group, index) => group.runners.includes(competitor) ? index + 1 : null)
+                .filter(group => group !== null)
+                .join(', ');
+
+            const runCell = document.createElement('td');
+            runCell.textContent = runGroups;
+            row.appendChild(runCell);
+
+            const scrambleGroups = competitionData.groups[eventId]
+                .map((group, index) => group.scramblers.includes(competitor) ? index + 1 : null)
+                .filter(group => group !== null)
+                .join(', ');
+
+            const scrambleCell = document.createElement('td');
+            scrambleCell.textContent = scrambleGroups;
+            row.appendChild(scrambleCell);
+
+            competitorTable.appendChild(row);
+        });
+
+        const competitorDiv = document.createElement('div');
+        const competitorName = document.createElement('h4');
+        competitorName.textContent = competitor.name;
+        competitorDiv.appendChild(competitorName);
+        competitorDiv.appendChild(competitorTable);
+        competitorDiv.className = 'competitor-assignments';
+
+        groupingOutput.appendChild(competitorDiv);
+    });
 }
+
+// document.getElementById('send-email').addEventListener('click', async () => {
+//     const email = prompt('Please enter your email address:');
+//     if (!email) return;
+
+//     try {
+//         const response = await fetch('/api/send-email', {
+//             method: 'POST',
+//             headers: {
+//                 'Content-Type': 'application/json'
+//             },
+//             body: JSON.stringify({ email, competitionData, selectedEvents })
+//         });
+
+//         if (response.ok) {
+//             alert('Email sent successfully!');
+//         } else {
+//             throw new Error('Failed to send email');
+//         }
+//     } catch (error) {
+//         console.error('Error sending email:', error);
+//         alert('There was an error sending the email. Please try again later.');
+//     }
+// });

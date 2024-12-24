@@ -15,17 +15,43 @@
     <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 </head>
 
-<!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P"></script>
 <script>
-    if (window.location.hostname == 'cubingtools') {
-        window.dataLayer = window.dataLayer || [];
-        function gtag() { dataLayer.push(arguments); }
-        gtag('js', new Date());
+    document.addEventListener('DOMContentLoaded', function () {
+        const consentBanner = document.getElementById('cookie-consent-banner');
+        const cookiesAccepted = localStorage.getItem('cookies_accepted');
 
-        gtag('config', 'G-7FDCB5928P');
-    }
+        // If cookies are accepted and on the correct hostname, initialize Google Analytics
+        if (cookiesAccepted === 'true' && window.location.hostname === 'cubingtools') {
+            window.dataLayer = window.dataLayer || [];
+            function gtag() { dataLayer.push(arguments); }
+            gtag('js', new Date());
+            gtag('config', 'G-7FDCB5928P');
+        } else if (!cookiesAccepted) {
+            consentBanner.style.display = 'block';
+        }
+
+        // Function to handle cookie consent
+        function handleConsent(isAccepted) {
+            localStorage.setItem('cookies_accepted', isAccepted);
+            consentBanner.style.display = 'none';
+        }
+
+        // Event listeners for accept and decline buttons
+        document.getElementById('accept-cookies').addEventListener('click', () => handleConsent('true'));
+        document.getElementById('decline-cookies').addEventListener('click', () => handleConsent('false'));
+    });
 </script>
+
+<div id="cookie-consent-banner"
+    style="background-color: #333; color: white; padding: 10px; text-align: center; position: fixed; bottom: 0; width: 100%; display: none; z-index: 99999;">
+    <p>
+        We use cookies to improve your experience. By using our website, you agree to our <a href="/privacy-policy"
+            style="color: #ffd700;">privacy policy</a>.
+        <button id="accept-cookies" style="background-color: #ffd700; color: #333; padding: 5px 10px;">Accept</button>
+        <button id="decline-cookies" style="background-color: #ff0000; color: #333; padding: 5px 10px;">Decline</button>
+    </p>
+</div>
 
 <body>
     <div class="container">
@@ -34,6 +60,7 @@
             <div class="navbar">
                 <a href="/">Home</a>
                 <a href="mailto: info@cubingtools.de">Contact</a>
+                <a href="/privacy-policy">Privacy Policy</a>
             </div>
         </nav>
 
@@ -43,19 +70,33 @@
 
         <main>
             <section class="heading">
-                <h1>Solve Smarter, Not Harder: Cubing Tools at Your Fingertips!</h1>
-                <p>Welcome to CubingTools.de, the ultimate online resource for competitive cubing enthusiasts! Our
-                    platform is designed to provide you with a comprehensive suite of tools tailored to enhance your
-                    cubing experience. Whether you’re a seasoned competitor or just starting your journey, our tools
-                    help you optimize your performance and manage your solve times effectively.</p>
-                <p>At CubingTools.de, we understand the importance of precise data management in competitive cubing. Our
-                    dynamic time management tools allow you to track your solve times, calculate averages, and assess
-                    your personal records with ease. With our innovative algorithms, you can efficiently analyze
-                    competitor data and gain insights that can help you improve your skills and strategies.</p>
-                <p>Join our vibrant community of cubing enthusiasts and take your skills to the next level! Explore our
-                    various features, including event optimization tools and real-time data analysis, to make the most
-                    of your competitive experience. Whether you’re preparing for your next competition or simply honing
-                    your skills at home, CubingTools.de has everything you need to succeed.</p>
+                <h1>Solve Smarter, Not Harder</h1>
+                <p>Welcome to CubingTools.de, your ultimate destination for enhancing your cubing performance. Our
+                    platform offers a variety of tools designed to help you achieve your best results in competitive
+                    cubing.</p>
+
+                <h2><a href="/tools/groupifier">Groupifier</a></h2>
+                <p>The Groupifier tool is designed to streamline the process of organizing competitors into groups for
+                    cubing competitions. It ensures that each group is balanced in terms of skill level and number of
+                    participants, making the competition fair and efficient. By using advanced algorithms, the
+                    Groupifier minimizes waiting times and maximizes the use of available resources, providing a
+                    seamless experience for both organizers and competitors.</p>
+
+                <h2><a href="/tools/guildford">Guildford Optimizer</a></h2>
+                <p>The Guildford Optimizer is a powerful tool that helps you plan and optimize your events for the
+                    Guildford Challenge. It takes into account various factors such as event duration, competitor
+                    availability, and resource allocation to create the most efficient schedule possible. This tool
+                    ensures that you can complete all events within the given time frame while maximizing the
+                    performance of each competitor.</p>
+
+                <h2><a href="/tools/average">WCA Average Calculator</a></h2>
+                <p>The WCA Average Calculator tool allows you to record and analyze your solve times with ease. It
+                    provides
+                    detailed statistics based on previous competitions to show you what PR rank a specific solve is,
+                    what time is required for the target average and more.</p>
+
+                <h2><a href="/tools/globalCalc">Global Calculator</a></h2>
+                <p>The Global Calculator tool allows you to calculate and compare your global rankings across different events. It provides detailed insights into your performance on a global scale, helping you understand where you stand among other competitors worldwide. You can use your WCA ID to check your official global rankings, and also upload your csTimer file to see your global performance based on your practice sessions. This tool is essential for tracking your progress and setting new goals.</p>
             </section>
         </main>
         <footer>
@@ -70,7 +111,7 @@
         </footer>
     </div>
 
-    <script src="../../js/loadTools.js"></script>
+    <script src="../js/loadTools.js"></script>
 </body>
 
 </html>

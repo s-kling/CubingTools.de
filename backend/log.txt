@@ -1,0 +1,8 @@
+7
+2024-12-24T14:06:49.734Z - IP: ::1 - GET /assets/cubingtools.png - User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 - Status: 200 - Response Time: 5ms - Day: Tuesday - Hour: 15
+2024-12-24T14:06:49.718Z - IP: ::1 - GET /api/tools - User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 - Status: 200 - Response Time: 3ms - Day: Tuesday - Hour: 15
+2024-12-24T14:06:49.699Z - IP: ::1 - GET /js/guildford.js - User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 - Status: 200 - Response Time: 4ms - Day: Tuesday - Hour: 15
+2024-12-24T14:06:49.696Z - IP: ::1 - GET /css/guildford.css - User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 - Status: 200 - Response Time: 5ms - Day: Tuesday - Hour: 15
+2024-12-24T14:06:49.695Z - IP: ::1 - GET /js/loadTools.js - User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 - Status: 200 - Response Time: 6ms - Day: Tuesday - Hour: 15
+2024-12-24T14:06:49.679Z - IP: ::1 - GET /css/global.css - User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 - Status: 200 - Response Time: 14ms - Day: Tuesday - Hour: 15
+2024-12-24T14:06:49.575Z - IP: ::1 - GET /tools/guildford - User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 - Status: 200 - Response Time: 53ms - Day: Tuesday - Hour: 15

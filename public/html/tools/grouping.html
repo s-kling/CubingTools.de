@@ -1,145 +1,290 @@
 <!DOCTYPE html>
 <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Competition Grouping</title>
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Competition Grouping</title>
+        <meta
+            name="description"
+            content="This tool manages cubing competitions, allowing organizers to select events, manage competitors, and assign groups. The JavaScript-based interface enables streamlined event setup, efficient competitor registration, and automated group assignments based on selected parameters."
+        />
+        <meta
+            name="keywords"
+            content="WCA, world cube association, cubing, speedcubing, tool, tools, cubingtools, cubing tool, cubing tools, competition, cubing competition, event manager, competitor, competitors, competitions, group, groups, manager, group manager, assignments, cubing assignments, group assignments"
+        />
+        <meta name="author" content="CubingTools" />
 
-    <meta name="description"
-        content="This tool manages cubing competitions, allowing organizers to select events, manage competitors, and assign groups. The JavaScript-based interface enables streamlined event setup, efficient competitor registration, and automated group assignments based on selected parameters." />
-    <meta name="keywords"
-        content="WCA, world cube association, cubing, speedcubing, tool, tools, cubingtools, cubing tool, cubing tools, competition, cubing competition, event manager, competitor, competitors, competitions, group, groups, manager, group manager, assignments, cubing assignments, group assignments" />
-    <meta name="author" content="CubingTools" />
+        <link rel="stylesheet" href="../../css/global.css">
+        <link rel="stylesheet" href="../../css/grouping.css">
 
-    <link rel="stylesheet" href="../../css/global.css">
-    <link rel="stylesheet" href="../../css/grouping.css">
+        <link
+            rel="icon"
+            href="../../assets/cubingtools.png"
+            type="image/x-icon"
+        >
+        <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
+    </head>
 
-    <link rel="icon" href="../../assets/cubingtools.png" type="image/x-icon">
-    <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
-</head>
+    <script
+        async
+        src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P"
+    ></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const consentBanner = document.getElementById(
+                "cookie-consent-banner",
+            );
+            const cookiesAccepted = localStorage.getItem(
+                "cookies_accepted",
+            );
 
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P"></script>
-<script>
-    if (window.location.hostname == 'cubingtools') {
-        window.dataLayer = window.dataLayer || [];
-        function gtag() { dataLayer.push(arguments); }
-        gtag('js', new Date());
+            // If cookies are accepted and on the correct hostname, initialize Google Analytics
+            if (
+                cookiesAccepted === "true" &&
+                window.location.hostname === "cubingtools"
+            ) {
+                window.dataLayer = window.dataLayer || [];
+                function gtag() {
+                    dataLayer.push(arguments);
+                }
+                gtag("js", new Date());
+                gtag("config", "G-7FDCB5928P");
+            } else if (!cookiesAccepted) {
+                consentBanner.style.display = "block";
+            }
 
-        gtag('config', 'G-7FDCB5928P');
-    }
-</script>
+            // Function to handle cookie consent
+            function handleConsent(isAccepted) {
+                localStorage.setItem(
+                    "cookies_accepted",
+                    isAccepted,
+                );
+                consentBanner.style.display = "none";
+            }
 
-<body>
-    <div class="container">
-        <nav>
-            <a href="/" class="logo">CubingTools</a>
-            <div class="navbar">
-                <a href="/">Home</a>
-                <a href="mailto: info@cubingtools.de">Contact</a>
-            </div>
-        </nav>
+            // Event listeners for accept and decline buttons
+            document.getElementById("accept-cookies")
+                .addEventListener(
+                    "click",
+                    () => handleConsent("true"),
+                );
+            document.getElementById("decline-cookies")
+                .addEventListener(
+                    "click",
+                    () => handleConsent("false"),
+                );
+        });
+    </script>
 
-        <div id="sidebar">
-            <h2>Tools</h2>
-        </div>
-
-        <main>
-            <section class="heading">
-                <h1>Unofficial Competition Groupifier</h1>
-                <p>
-                    This is the Unofficial Competition Groupifier. To start, input the name of the competition and the
-                    maximum ammount of competitors
-                    that can be in one single group.
-                </p>
-                <p>
-                    The grouping works on a round robin system. If you input a <span class="bold">WCA ID</span> as the
-                    name for a competitor, the script will recognize this and use their latest Ao12 for each official
-                    event to sort them. The first seed will go into the last group, the second in the second to last and
-                    so on.
-                </p>
-
-                <div id="competition-setup">
-                    <h2>Setup Competition</h2>
-                    <label>Competition Name:<input type="text" id="competition-name"
-                            placeholder="Super Cool Unofficial Competition">
-                    </label>
-                    <label title="Number of Competitors per Group">Maximum number of competitors per
-                        group:<input type="number" id="max-competitors" placeholder="10"></label>
-                    <label class="checkbox-label"><input type="checkbox" id="do-runners">Do Runners?</label>
-                    <label class="checkbox-label"><input type="checkbox" id="do-judges">Do Judges?</label>
-                    <button onclick="setupCompetition()">Next</button>
-                </div>
-
-                <div id="event-selection" style="display: none;">
-                    <h2>Select Events</h2>
-                    <p>Check all of the event you plan to host at your unofficial competition. If an event you want to
-                        host
-                        is
-                        not here, add it with the "Add Event" button!</p>
-                    <div class="inline-btn">
-                        <button title="Previous Page" onclick="goToSetupCompetition()">←</button>
-                        <button title="Deselect All Checkboxes" onclick="deselectAllEventCheckboxes()">Deselect
-                            All</button>
-                        <button title="Add a Custom Event" onclick="addCustomEvent()">Add Event</button>
-                        <button title="Select All Checkboxes" onclick="selectAllEventCheckboxes()">Select All</button>
-                        <button title="Next Page" onclick="selectEvents()">→</button>
-                    </div>
-                    <div id="event-checkboxes"></div>
-                </div>
-
-                <div id="competitor-setup" style="display: none;">
-                    <h2>Add Competitors</h2>
-                    <div class="inline-btn">
-                        <button title="Previous Page" onclick="goToEventSelection()">←</button>
-                        <button title="Deselect All Checkboxes" onclick="deselectAllEventCheckboxes()">Deselect
-                            All</button>
-                        <button title="Select All Checkboxes" onclick="selectAllEventCheckboxes()">Select All</button>
-                        <button title="Finalize Competitors" onclick="finalizeCompetitors()">→</button>
-                    </div>
-                    <br>
-                    <div id="competitor-form"></div>
-                    <button title="Add Competitor" onclick="addCompetitor()">Add Competitor</button>
-                    <!-- Competitor List Table -->
-                    <div id="competitor-list-wrapper">
-                        <table id="competitor-list">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Name</th>
-                                    <th>Events</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- Competitors will be dynamically added here -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-
-                <div id="grouping-results" style="display: none;">
-                    <h2>Grouping Results</h2>
-                    <div id="grouping-output"></div>
-                </div>
-            </section>
-        </main>
-        <footer>
-            <div class="footer-content">
-                <p>Developed by <a href="mailto:sebastian@cubingtools.de">Sebastian Kling</a>, with dedication to the
-                    cubing community.</p>
-                <p class="hide-sm">
-                    CubingTools.de is using the <a target="_blank"
-                        href="https://wca-rest-api.robiningelbrecht.be/">Unofficial World Cube Association API</a>.
-                </p>
-            </div>
-        </footer>
+    <div
+        id="cookie-consent-banner"
+        style="background-color: #333; color: white; padding: 10px; text-align: center; position: fixed; bottom: 0; width: 100%; display: none; z-index: 99999"
+    >
+        <p>
+            We use cookies to improve your experience. By using our website, you
+            agree to our <a href="/privacy-policy" style="color: #ffd700"
+            >privacy policy</a>.
+            <button
+                id="accept-cookies"
+                style="background-color: #ffd700; color: #333; padding: 5px 10px"
+            >
+                Accept
+            </button>
+            <button
+                id="decline-cookies"
+                style="background-color: #ff0000; color: #333; padding: 5px 10px"
+            >
+                Decline
+            </button>
+        </p>
     </div>
 
-    <script src="../../js/loadTools.js"></script>
-    <script src="../../js/grouping.js"></script>
-</body>
+    <script>
+        // Check if user has already consented
+        if (!localStorage.getItem("cookies_accepted")) {
+            document.getElementById("cookie-consent-banner").style
+                .display = "block";
+        }
 
+        document.getElementById("accept-cookies").addEventListener(
+            "click",
+            function () {
+                localStorage.setItem("cookies_accepted", "true");
+                document.getElementById("cookie-consent-banner")
+                    .style.display = "none";
+            },
+        );
+    </script>
+
+    <body>
+        <div class="container">
+            <nav>
+                <a href="/" class="logo">CubingTools</a>
+                <div class="navbar">
+                    <a href="/">Home</a>
+                    <a href="mailto: info@cubingtools.de">Contact</a>
+                    <a href="/privacy-policy">Privacy Policy</a>
+                </div>
+            </nav>
+
+            <div id="sidebar">
+                <h2>Tools</h2>
+            </div>
+
+            <main>
+                <section class="heading">
+                    <h1>Unofficial Competition Groupifier</h1>
+                    <p>
+                        Welcome to the Unofficial Competition Groupifier. To
+                        begin, enter the competition name and the maximum number
+                        of competitors per group.
+                    </p>
+                    <p>
+                        The grouping uses a round robin system. If you enter a
+                        <span class="bold">WCA ID</span> as a competitor's name,
+                        the script will recognize it and use their latest Ao12
+                        for each official event to sort them. The top seed will
+                        be placed in the last group, the second seed in the
+                        second to last group, and so on.
+                    </p>
+
+                    <div id="competition-setup">
+                        <h2>Setup Competition</h2>
+                        <label>Competition Name:<input
+                                type="text"
+                                id="competition-name"
+                                placeholder="Super Cool Unofficial Competition"
+                            >
+                        </label>
+                        <label title="Number of Competitors per Group">Maximum
+                            number of competitors per group:<input
+                                type="number"
+                                id="max-competitors"
+                                placeholder="10"
+                            ></label>
+                        <label class="checkbox-label"><input
+                                type="checkbox"
+                                id="do-runners"
+                            >Do Runners?</label>
+                        <label class="checkbox-label"><input
+                                type="checkbox"
+                                id="do-judges"
+                            >Do Judges?</label>
+                        <button onclick="setupCompetition()">Next</button>
+                    </div>
+
+                    <div id="event-selection" style="display: none">
+                        <h2>Select Events</h2>
+                        <p>
+                            Check all of the events you plan to host at your
+                            unofficial competition. If an event you want to host
+                            is not here, add it with the "Add Event" button! The
+                            groups for each event will be dynamically created
+                            based on the number of competitors and the maximum
+                            number of competitors per group you specified
+                            earlier.
+                        </p>
+                        <div class="inline-btn">
+                            <button
+                                title="Previous Page"
+                                onclick="goToSetupCompetition()"
+                            >
+                                ←
+                            </button>
+                            <button
+                                title="Add a Custom Event"
+                                onclick="addCustomEvent()"
+                            >
+                                Add Event
+                            </button>
+                            <button title="Next Page" onclick="selectEvents()">
+                                →
+                            </button>
+                        </div>
+                        <div id="event-checkboxes"></div>
+                    </div>
+
+                    <div id="competitor-setup" style="display: none">
+                        <h2>Add Competitors</h2>
+                        <div class="inline-btn">
+                            <button
+                                title="Previous Page"
+                                onclick="goToEventSelection()"
+                            >
+                                ←
+                            </button>
+                            <button
+                                title="Deselect All Checkboxes"
+                                onclick="deselectAllEventCheckboxes()"
+                            >
+                                Deselect All
+                            </button>
+                            <button
+                                title="Select All Checkboxes"
+                                onclick="selectAllEventCheckboxes()"
+                            >
+                                Select All
+                            </button>
+                            <button
+                                title="Finalize Competitors"
+                                onclick="finalizeCompetitors()"
+                            >
+                                →
+                            </button>
+                        </div>
+                        <br>
+                        <div id="competitor-form"></div>
+                        <button
+                            title="Add Competitor"
+                            onclick="addCompetitor()"
+                        >
+                            Add Competitor
+                        </button>
+                        <!-- Competitor List Table -->
+                        <div id="competitor-list-wrapper">
+                            <table id="competitor-list">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Name</th>
+                                        <th>Events</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Competitors will be dynamically added here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div id="grouping-results" style="display: none">
+                        <h2>Grouping Results</h2>
+                        <!-- <button id="copyData">Copy Grouping Data</button>
+                        <button id="send-email">Email me the Results!</button> -->
+                        <div id="grouping-output"></div>
+                    </div>
+                </section>
+            </main>
+            <footer>
+                <div class="footer-content">
+                    <p>
+                        Developed by <a href="mailto:sebastian@cubingtools.de"
+                        >Sebastian Kling</a>, with dedication to the cubing
+                        community.
+                    </p>
+                    <p>
+                        CubingTools.de is using the <a
+                            target="_blank"
+                            href="https://wca-rest-api.robiningelbrecht.be/"
+                        >Unofficial World Cube Association API</a>.
+                    </p>
+                </div>
+            </footer>
+        </div>
+
+        <script src="../../js/loadTools.js"></script>
+        <script src="../../js/grouping.js"></script>
+    </body>
 </html>

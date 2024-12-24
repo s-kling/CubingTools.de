@@ -14,13 +14,14 @@
     --space-xxl: 84px;
 
     /* Colors */
-    --main-background: #1e1e1e;
-    --secondary-background: #252525;
-    --main-lighter: #333333;
+    --main-background: #121212;
+    --secondary-background: #1f1f1f;
+    --main-lighter: #272727;
     --main-text: #ffffff;
     --secondary-text: #b3b3b3;
     --hover-text: #ffffff;
     --hover-background: #444444;
+    --link-color: #0088cc;
     --link-underline: #ffffff;
     --input-background: #2c2c2c;
     --input-border: #444444;
@@ -35,6 +36,9 @@
     /* Padding & Margin */
     --main-padding: 16px;
     --main-margin: 8px;
+
+    --card-width: 320px;
+    --card-height: 200px;
 }
 
 ::-webkit-scrollbar {
@@ -60,13 +64,36 @@
 body {
     background-color: var(--main-background);
     color: var(--main-text);
+    max-height: 100vh;
+    overflow: hidden;
+}
+
+#cookie-consent-banner {
+    background-color: var(--main-background);
+    padding: 10px;
+    text-align: center;
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    display: none;
+    z-index: 9999;
+}
+
+#accept-cookies {
+    background-color: var(--link-color);
+    padding: 5 10px;
+}
+
+#decline-cookies {
+    background-color: #ff0000;
+    padding: 5 10px;
 }
 
 .container {
     display: grid;
     height: 100svh;
     grid-template-columns: repeat(4, 1fr);
-    grid-template-rows: 0.3fr 2.7fr 0.8fr;
+    grid-template-rows: 0.3fr 3fr 0.5fr;
     grid-template-areas:
         "nav nav nav nav"
         "sidebar main main main"
@@ -105,7 +132,7 @@ button:hover {
 
 a {
     position: relative;
-    color: var(--main-text);
+    color: var(--link-color);
     text-decoration: none;
     font-weight: 500;
 }
@@ -149,6 +176,7 @@ nav .navbar {
 
 nav .navbar a {
     font-size: var(--font-size-lg);
+    color: var(--main-text);
     margin: 0 var(--space-sm);
 }
 
@@ -172,15 +200,15 @@ nav .navbar a {
 
 /* Main Section Styles */
 
+main .heading {
+    margin: 0 13.5%;
+}
+
 main {
     grid-area: main;
     overflow-x: hidden;
     overflow-y: scroll;
     padding: var(--space-lg);
-}
-
-main .heading {
-    margin: 0 13.5%;
 }
 
 main h1 {
@@ -266,12 +294,15 @@ footer p {
 @media only screen and (max-width: 650px) {
     .container {
         grid-template-columns: 1fr;
-        grid-template-rows: 0.4fr 0.8fr 5.6fr 0.8fr;
+        grid-template-rows: 0.4fr 0.8fr 5.6fr;
         grid-template-areas:
             "nav"
             "sidebar"
             "main"
-            "footer";
+    }
+
+    main .heading {
+        margin: 0 2%;
     }
 
     #sidebar {
@@ -308,11 +339,7 @@ footer p {
         display: none;
     }
 
-    .footer-content {
-        overflow: hidden;
-    }
-
-    .hide-sm {
+    footer {
         display: none;
     }
 }

@@ -201,13 +201,15 @@ function resetTimes() {
 
 // Function to save a new average tag after the 5th time
 function saveTag() {
-    const currentAverage = (times.slice(1, -1).reduce((a, b) => a + b, 0) / 3).toFixed(2);
-    const timestamp = new Date().toLocaleString();
-    const tag = { average: currentAverage, times: [...times], date: timestamp };
+    if (localStorage.getItem("cookies_accepted") === 'true') {
+        const currentAverage = (times.slice(1, -1).reduce((a, b) => a + b, 0) / 3).toFixed(2);
+        const timestamp = new Date().toLocaleString();
+        const tag = { average: currentAverage, times: [...times], date: timestamp };
 
-    averageTags.push(tag);
-    saveTagsToCookies();
-    displayTags();
+        averageTags.push(tag);
+        saveTagsToCookies();
+        displayTags();
+    }
 }
 
 // Save tags to cookies

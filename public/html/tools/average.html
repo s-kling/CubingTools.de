@@ -19,17 +19,43 @@
     <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 </head>
 
-<!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P"></script>
 <script>
-    if (window.location.hostname == 'cubingtools') {
-        window.dataLayer = window.dataLayer || [];
-        function gtag() { dataLayer.push(arguments); }
-        gtag('js', new Date());
+    document.addEventListener('DOMContentLoaded', function () {
+        const consentBanner = document.getElementById('cookie-consent-banner');
+        const cookiesAccepted = localStorage.getItem('cookies_accepted');
 
-        gtag('config', 'G-7FDCB5928P');
-    }
+        // If cookies are accepted and on the correct hostname, initialize Google Analytics
+        if (cookiesAccepted === 'true' && window.location.hostname === 'cubingtools') {
+            window.dataLayer = window.dataLayer || [];
+            function gtag() { dataLayer.push(arguments); }
+            gtag('js', new Date());
+            gtag('config', 'G-7FDCB5928P');
+        } else if (!cookiesAccepted) {
+            consentBanner.style.display = 'block';
+        }
+
+        // Function to handle cookie consent
+        function handleConsent(isAccepted) {
+            localStorage.setItem('cookies_accepted', isAccepted);
+            consentBanner.style.display = 'none';
+        }
+
+        // Event listeners for accept and decline buttons
+        document.getElementById('accept-cookies').addEventListener('click', () => handleConsent('true'));
+        document.getElementById('decline-cookies').addEventListener('click', () => handleConsent('false'));
+    });
 </script>
+
+<div id="cookie-consent-banner"
+    style="background-color: #333; color: white; padding: 10px; text-align: center; position: fixed; bottom: 0; width: 100%; display: none; z-index: 99999;">
+    <p>
+        We use cookies to improve your experience. By using our website, you agree to our <a href="/privacy-policy"
+            style="color: #ffd700;">privacy policy</a>.
+        <button id="accept-cookies" style="background-color: #ffd700; color: #333; padding: 5px 10px;">Accept</button>
+        <button id="decline-cookies" style="background-color: #ff0000; color: #333; padding: 5px 10px;">Decline</button>
+    </p>
+</div>
 
 <body>
     <div class="container">
@@ -38,6 +64,7 @@
             <div class="navbar">
                 <a href="/">Home</a>
                 <a href="mailto: info@cubingtools.de">Contact</a>
+                <a href="/privacy-policy">Privacy Policy</a>
             </div>
         </nav>
 

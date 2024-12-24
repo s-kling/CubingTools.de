@@ -19,17 +19,44 @@
     <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 </head>
 
-<!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P"></script>
 <script>
-    if (window.location.hostname == 'cubingtools') {
-        window.dataLayer = window.dataLayer || [];
-        function gtag() { dataLayer.push(arguments); }
-        gtag('js', new Date());
+    document.addEventListener('DOMContentLoaded', function () {
+        const consentBanner = document.getElementById('cookie-consent-banner');
+        const cookiesAccepted = localStorage.getItem('cookies_accepted');
 
-        gtag('config', 'G-7FDCB5928P');
-    }
+        // If cookies are accepted and on the correct hostname, initialize Google Analytics
+        if (cookiesAccepted === 'true' && window.location.hostname === 'cubingtools') {
+            window.dataLayer = window.dataLayer || [];
+            function gtag() { dataLayer.push(arguments); }
+            gtag('js', new Date());
+            gtag('config', 'G-7FDCB5928P');
+        } else if (!cookiesAccepted) {
+            consentBanner.style.display = 'block';
+        }
+
+        // Function to handle cookie consent
+        function handleConsent(isAccepted) {
+            localStorage.setItem('cookies_accepted', isAccepted);
+            consentBanner.style.display = 'none';
+        }
+
+        // Event listeners for accept and decline buttons
+        document.getElementById('accept-cookies').addEventListener('click', () => handleConsent('true'));
+        document.getElementById('decline-cookies').addEventListener('click', () => handleConsent('false'));
+
+    });
 </script>
+
+<div id="cookie-consent-banner"
+    style="background-color: #333; color: white; padding: 10px; text-align: center; position: fixed; bottom: 0; width: 100%; display: none; z-index: 99999;">
+    <p>
+        We use cookies to improve your experience. By using our website, you agree to our <a href="/privacy-policy"
+            style="color: #ffd700;">privacy policy</a>.
+        <button id="accept-cookies" style="background-color: #ffd700; color: #333; padding: 5px 10px;">Accept</button>
+        <button id="decline-cookies" style="background-color: #ff0000; color: #333; padding: 5px 10px;">Decline</button>
+    </p>
+</div>
 
 <body>
     <div class="container">
@@ -38,6 +65,7 @@
             <div class="navbar">
                 <a href="/">Home</a>
                 <a href="mailto: info@cubingtools.de">Contact</a>
+                <a href="/privacy-policy">Privacy Policy</a>
             </div>
         </nav>
 
@@ -65,6 +93,13 @@
                 <div class="input-container">
                     <label><span>Pick Up Time:</span> <input type="number" id="pickup" value="1.5"></label>
                     <label><span>Solve count to process:</span> <input type="number" id="solvecount" value="25"></label>
+                    <label><span>Relay preset:</span><select name="relay" id="relay">
+                            <option value="miniguild">Mini Guildford</option>
+                            <option value="guildford">Guildford</option>
+                            <option value="miniguildfto">Mini Guildford (FTO)</option>
+                            <option value="guildfordfto">Guildford (FTO)</option>
+                            <option value="twotoseven">2x2-7x7 Relay</option>
+                        </select></label>
                 </div>
 
                 <form id="timeForm">
@@ -72,54 +107,14 @@
                         <h3 id="competitor-1-name">Competitor 1</h3>
                         <label><span>WCA:</span> <input type="text" id="c1-wca"></label>
                         <button class="globals-btn" type="button" onclick="handleButtons('c1')">Add Globals</button>
-                        <div id="c1-times">
-                            <label><span>2x2:</span> <input inputmode="numeric" type="text" id="c1-2x2"
-                                    required></label>
-                            <label><span>3x3:</span> <input inputmode="numeric" type="text" id="c1-3x3"
-                                    required></label>
-                            <label><span>4x4:</span> <input inputmode="numeric" type="text" id="c1-4x4"
-                                    required></label>
-                            <label><span>5x5:</span> <input inputmode="numeric" type="text" id="c1-5x5"
-                                    required></label>
-                            <label><span>OH:</span> <input inputmode="numeric" type="text" id="c1-OH" required></label>
-                            <label><span>Pyraminx:</span> <input inputmode="numeric" type="text" id="c1-Pyraminx"
-                                    required></label>
-                            <label><span>Clock:</span> <input inputmode="numeric" type="text" id="c1-Clock"
-                                    required></label>
-                            <label><span>Skewb:</span> <input inputmode="numeric" type="text" id="c1-Skewb"
-                                    required></label>
-                            <label><span>Megaminx:</span> <input inputmode="numeric" type="text" id="c1-Megaminx"
-                                    required></label>
-                            <label><span>Square-1:</span> <input inputmode="numeric" type="text" id="c1-Square-1"
-                                    required></label>
-                        </div>
+                        <div id="c1-times"></div>
                     </div>
 
                     <div class="competitor">
                         <h3 id="competitor-2-name">Competitor 2</h3>
                         <label><span>WCA:</span> <input type="text" id="c2-wca"></label>
                         <button class="globals-btn" type="button" onclick="handleButtons('c2')">Add Globals</button>
-                        <div id="c2-times">
-                            <label><span>2x2:</span> <input inputmode="numeric" type="text" id="c2-2x2"
-                                    required></label>
-                            <label><span>3x3:</span> <input inputmode="numeric" type="text" id="c2-3x3"
-                                    required></label>
-                            <label><span>4x4:</span> <input inputmode="numeric" type="text" id="c2-4x4"
-                                    required></label>
-                            <label><span>5x5:</span> <input inputmode="numeric" type="text" id="c2-5x5"
-                                    required></label>
-                            <label><span>OH:</span> <input inputmode="numeric" type="text" id="c2-OH" required></label>
-                            <label><span>Pyraminx:</span> <input inputmode="numeric" type="text" id="c2-Pyraminx"
-                                    required></label>
-                            <label><span>Clock:</span> <input inputmode="numeric" type="text" id="c2-Clock"
-                                    required></label>
-                            <label><span>Skewb:</span> <input inputmode="numeric" type="text" id="c2-Skewb"
-                                    required></label>
-                            <label><span>Megaminx:</span> <input inputmode="numeric" type="text" id="c2-Megaminx"
-                                    required></label>
-                            <label><span>Square-1:</span> <input inputmode="numeric" type="text" id="c2-Square-1"
-                                    required></label>
-                        </div>
+                        <div id="c2-times"></div>
                     </div>
 
                     <button type="submit">Optimize</button>
@@ -127,8 +122,8 @@
                 </form>
                 <div class="result" id="result">
                     <h2>Results</h2>
+                    <div id="combinationsCounted"></div>
                     <div id="bestCombination"></div>
-                    <div id="allCombinations"></div>
                 </div>
             </section>
         </main>
