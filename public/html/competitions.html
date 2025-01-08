@@ -1,46 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>CubingTools.de</title>
-        <meta
-            name="description"
-            content="Explore CubingTools.de, your go-to resource for competitive cubing enthusiasts! Our suite of tools enables you to optimize event performances, track solve times, and analyze competitor data. From dynamic time management to advanced event optimization algorithms, we provide everything you need to enhance your cubing experience. Join our community and elevate your skills today!"
-        >
-        <meta
-            name="keywords"
-            content="WCA, world cube association, cubing, speedcubing, tool, tools, cubingtools, cubing tool, cubing tools, 
-    "
-        >
-        <meta name="author" content="CubingTools">
-        <link rel="stylesheet" href="../css/global.css">
-        <link
-            rel="icon"
-            href="../../assets/cubingtools.png"
-            type="image/x-icon"
-        >
-        <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
-    </head>
-
-    <script
-        async
-        src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P"
-    ></script>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CubingTools.de</title>
+    <meta name="description" content="Explore CubingTools.de, your go-to resource for competitive cubing enthusiasts! Our suite of tools enables you to optimize event performances, track solve times, and analyze competitor data. From dynamic time management to advanced event optimization algorithms, we provide everything you need to enhance your cubing experience. Join our community and elevate your skills today!">
+    <meta name="keywords" content="WCA, world cube association, cubing, speedcubing, tool, tools, cubingtools, cubing tool, cubing tools">
+    <meta name="author" content="CubingTools">
+    <link rel="stylesheet" href="../css/global.css">
+    <link rel="icon" href="../../assets/cubingtools.png" type="image/x-icon">
+    <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
+</head>
+<body>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            const consentBanner = document.getElementById(
-                "cookie-consent-banner",
-            );
-            const cookiesAccepted = localStorage.getItem(
-                "cookies_accepted",
-            );
+            const consentBanner = document.getElementById("cookie-consent-banner");
+            const cookiesAccepted = localStorage.getItem("cookies_accepted");
 
             // If cookies are accepted and on the correct hostname, initialize Google Analytics
-            if (
-                cookiesAccepted === "true" &&
-                window.location.hostname === "cubingtools"
-            ) {
+            if (cookiesAccepted === "true" && window.location.hostname === "cubingtools") {
                 window.dataLayer = window.dataLayer || [];
                 function gtag() {
                     dataLayer.push(arguments);
@@ -53,99 +32,58 @@
 
             // Function to handle cookie consent
             function handleConsent(isAccepted) {
-                localStorage.setItem(
-                    "cookies_accepted",
-                    isAccepted,
-                );
+                localStorage.setItem("cookies_accepted", isAccepted);
                 consentBanner.style.display = "none";
             }
 
             // Event listeners for accept and decline buttons
-            document.getElementById("accept-cookies")
-                .addEventListener(
-                    "click",
-                    () => handleConsent("true"),
-                );
-            document.getElementById("decline-cookies")
-                .addEventListener(
-                    "click",
-                    () => handleConsent("false"),
-                );
+            document.getElementById("accept-cookies").addEventListener("click", () => handleConsent("true"));
+            document.getElementById("decline-cookies").addEventListener("click", () => handleConsent("false"));
         });
     </script>
 
-    <div
-        id="cookie-consent-banner"
-        style="background-color: #333; color: white; padding: 10px; text-align: center; position: fixed; bottom: 0; width: 100%; display: none; z-index: 99999"
-    >
+    <div id="cookie-consent-banner" style="background-color: #333; color: white; padding: 10px; text-align: center; position: fixed; bottom: 0; width: 100%; display: none; z-index: 99999">
         <p>
-            We use cookies to improve your experience. By using our website, you
-            agree to our <a href="/privacy-policy" style="color: #ffd700"
-            >privacy policy</a>.
-            <button
-                id="accept-cookies"
-                style="background-color: #ffd700; color: #333; padding: 5px 10px"
-            >
-                Accept
-            </button>
-            <button
-                id="decline-cookies"
-                style="background-color: #ff0000; color: #333; padding: 5px 10px"
-            >
-                Decline
-            </button>
+            We use cookies to improve your experience. By using our website, you agree to our <a href="/privacy-policy" style="color: #ffd700">privacy policy</a>.
+            <button id="accept-cookies" style="background-color: #ffd700; color: #333; padding: 5px 10px">Accept</button>
+            <button id="decline-cookies" style="background-color: #ff0000; color: #333; padding: 5px 10px">Decline</button>
         </p>
     </div>
 
-    <body>
-        <div class="container">
-            <nav>
-                <a href="/" class="logo">CubingTools</a>
-                <div class="navbar">
-                    <a href="/">Home</a>
-                    <a href="mailto: info@cubingtools.de">Contact</a>
-                    <a href="/privacy-policy">Privacy Policy</a>
-                </div>
-            </nav>
-
-            <div id="sidebar">
-                <h2>Tools</h2>
+    <div class="container">
+        <nav>
+            <a href="/" class="logo">CubingTools</a>
+            <div class="navbar">
+                <a href="/">Home</a>
+                <a href="mailto:info@cubingtools.de">Contact</a>
+                <a href="/privacy-policy">Privacy Policy</a>
             </div>
+        </nav>
 
-            <main>
-                <section class="heading">
-                    <h1>Login</h1>
-                    <form id="login-form">
-                        <label for="competition-id">Competition ID:</label>
-                        <input
-                            type="text"
-                            id="competition-id"
-                            name="competition-id"
-                            required
-                        >
-                        <button type="submit">Login</button>
-                    </form>
-                    <p id="login-message"></p>
-                </section>
-            </main>
-            <footer>
-                <div class="footer-content">
-                    <p>
-                        Developed by <a href="mailto:sebastian@cubingtools.de"
-                        >Sebastian Kling</a>, with dedication to the cubing
-                        community.
-                    </p>
-                    <p class="hide-sm">
-                        CubingTools.de is using the <a
-                            target="_blank"
-                            href="https://wca-rest-api.robiningelbrecht.be/"
-                        >Unofficial World Cube Association API</a>.
-                    </p>
-                </div>
-            </footer>
+        <div id="sidebar">
+            <h2>Tools</h2>
         </div>
 
-        <script src="../js/loadTools.js"></script>
-        <script src="../js/competitions.js"></script>
-    </body>
+        <main>
+            <section class="heading">
+                <h1>Login</h1>
+                <form id="login-form">
+                    <label for="competition-id">Competition ID:</label>
+                    <input type="text" id="competition-id" name="competition-id" required>
+                    <button type="submit">Login</button>
+                </form>
+                <p id="login-message"></p>
+            </section>
+        </main>
+        <footer>
+            <div class="footer-content">
+                <p>Developed by <a href="mailto:sebastian@cubingtools.de">Sebastian Kling</a>, with dedication to the cubing community.</p>
+                <p class="hide-sm">CubingTools.de is using the <a target="_blank" href="https://wca-rest-api.robiningelbrecht.be/">Unofficial World Cube Association API</a>.</p>
+            </div>
+        </footer>
+    </div>
+
+    <script src="../js/loadTools.js"></script>
+    <script src="../js/competitions.js"></script>
+</body>
 </html>

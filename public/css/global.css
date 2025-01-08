@@ -143,7 +143,7 @@ a::before {
     top: 100%;
     left: 0;
     width: 0;
-    height: 2px;
+    height: 1.75px;
     background-color: var(--link-underline);
     transition: width 0.2s;
 }
@@ -240,6 +240,7 @@ main label {
 
 main input[type="text"],
 main input[type="number"],
+main input[type="email"],
 main input[type="file"],
 select {
     flex-grow: 1;
