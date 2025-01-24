@@ -9,54 +9,18 @@
     <link rel="icon" href="../../assets/cubingtools.png" type="image/x-icon">
 </head>
 
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const consentBanner = document.getElementById('cookie-consent-banner');
-        const cookiesAccepted = localStorage.getItem('cookies_accepted');
-
-        // If cookies are accepted and on the correct hostname, initialize Google Analytics
-        if (cookiesAccepted === 'true' && window.location.hostname === 'cubingtools') {
-            window.dataLayer = window.dataLayer || [];
-            function gtag() { dataLayer.push(arguments); }
-            gtag('js', new Date());
-            gtag('config', 'G-7FDCB5928P');
-        } else if (!cookiesAccepted) {
-            consentBanner.style.display = 'block';
-        }
-
-        // Function to handle cookie consent
-        function handleConsent(isAccepted) {
-            localStorage.setItem('cookies_accepted', isAccepted);
-            consentBanner.style.display = 'none';
-        }
-
-        // Event listeners for accept and decline buttons
-        document.getElementById('accept-cookies').addEventListener('click', () => handleConsent('true'));
-        document.getElementById('decline-cookies').addEventListener('click', () => handleConsent('false'));
-    });
-</script>
-
-<div id="cookie-consent-banner"
-    style="background-color: #333; color: white; padding: 10px; text-align: center; position: fixed; bottom: 0; width: 100%; display: none; z-index: 99999;">
+<div id="cookie-consent-banner">
     <p>
-        We use cookies to improve your experience. By using our website, you agree to our <a href="/privacy-policy"
+        We use cookies to improve your experience. By accepting these cookies, you agree to our <a href="/privacy-policy"
             style="color: #ffd700;">privacy policy</a>.
-        <button id="accept-cookies" style="background-color: #ffd700; color: #333; padding: 5px 10px;">Accept</button>
-        <button id="decline-cookies" style="background-color: #ff0000; color: #333; padding: 5px 10px;">Decline</button>
+        <button id="accept-cookies">Accept</button>
+        <button id="decline-cookies">Decline</button>
     </p>
 </div>
 
 <body>
     <div class="container">
-        <nav>
-            <a href="/" class="logo">CubingTools</a>
-            <div class="navbar">
-                <a href="/">Home</a>
-                <a href="mailto: info@cubingtools.de">Contact</a>
-                <a href="/privacy-policy">Privacy Policy</a>
-            </div>
-        </nav>
+        <nav id="navbar"></nav>
 
         <div id="sidebar">
             <h2>Tools</h2>
@@ -67,19 +31,12 @@
                 <div style="text-align: center;" id="message">The page you were trying to access doesn't exist</div>
             </section>
         </main>
-        <footer>
-            <div class="footer-content">
-                <p>Developed by <a href="mailto:sebastian@cubingtools.de">Sebastian Kling</a>, with dedication to the
-                    cubing community.</p>
-                <p class="hide-sm">
-                    CubingTools.de is using the <a target="_blank"
-                        href="https://wca-rest-api.robiningelbrecht.be/">Unofficial World Cube Association API</a>.
-                </p>
-            </div>
-        </footer>
+        <footer id="footer"></footer>
     </div>
 
-    <script src="../js/loadTools.js"></script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P"></script>
+
+    <script src="../js/setupPage.js"></script>
     <script src="../js/404.js"></script>
 </body>
 

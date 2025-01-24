@@ -1,7 +1,6 @@
 #event-checkboxes {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto;
+    grid-template-columns: repeat(2, minmax(200px, 1fr));
     grid-gap: var(--space-sm);
 }
 
@@ -10,18 +9,18 @@
 }
 
 .event-section-title {
-    font-size: 0.8em;
+    font-size: 1em;
     font-weight: bold;
     margin-top: var(--space-md);
     color: var(--secondary-text);
     padding-bottom: var(--space-xs);
     cursor: pointer;
     user-select: none;
-    grid-column-start: 1;
-    grid-column-end: 3;
+    grid-column: span 2;
 }
 
-.event-checkbox.unchecked {
+.event-checkbox.unchecked,
+.event-checkbox.checked {
     height: fit-content;
     min-height: 50px;
     width: 100%;
@@ -29,22 +28,11 @@
     border: 1px solid var(--input-border);
     border-radius: var(--main-radius);
     padding: var(--space-sm);
-    transition: all 0.2s ease-in-out;
+    transition: transform 0.2s ease-in-out, background-color 0.2s ease-in-out;
 }
 
 .event-checkbox:hover {
-    scale: 1.02;
-}
-
-.event-checkbox.checked {
-    height: fit-content;
-    min-height: 100px;
-    width: 100%;
-    background-color: var(--input-background);
-    border: 1px solid var(--input-border);
-    border-radius: var(--main-radius);
-    padding: var(--space-sm);
-    transition: all 0.2s ease-in-out;
+    transform: scale(1.02);
 }
 
 .checkbox-label {
@@ -61,6 +49,11 @@ input[type="checkbox"] {
     margin-top: var(--space-sm);
 }
 
+li {
+    color: var(--secondary-text);
+    margin-left: var(--space-lg);
+}
+
 
 /* Competitor Assignment Table Styling */
 
@@ -68,6 +61,7 @@ input[type="checkbox"] {
     width: 100%;
     border-collapse: collapse;
     margin-top: var(--space-md);
+    overflow-x: scroll;
 }
 
 .competitor-assignments {
@@ -75,8 +69,19 @@ input[type="checkbox"] {
     border: 1px solid var(--input-border);
 }
 
-.competitor-assignments>h4 {
+.competitor-assignments>div {
+    display: flex;
+    align-items: center;
     padding: 10px 0 0 10px;
+}
+
+.competitor-assignments>div>h4 {
+    margin-right: var(--space-sm);
+}
+
+.competitor-assignments>div>p {
+    font-size: small;
+    margin: 0;
 }
 
 .competitor-table th,
@@ -108,6 +113,7 @@ input[type="checkbox"] {
     width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
+    overflow-y: scroll;
 }
 
 #competitor-list th,
@@ -151,24 +157,28 @@ input[type="checkbox"] {
     background-color: var(--input-background);
     border: 1px solid var(--input-border);
     border-radius: var(--main-radius);
-    padding: var(--space-xs);
+    padding: var(--space-lg);
     margin: var(--space-md) var(--space-sm);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Subtle shadow for depth */
 }
 
 .event-group h3 {
-    margin-bottom: var(--space-sm);
+    margin-bottom: var(--space-md);
     font-size: 1.25rem;
 }
 
 .group {
     border-radius: var(--main-radius);
-    background-color: var(--hover-background);
+    background-color: var(--input-background);
     padding: var(--space-sm);
-    margin-bottom: var(--space-xs)
+    margin-bottom: var(--space-xs);
+    border: 1px solid var(--input-border);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Subtle shadow for depth */
 }
 
 .group ul li {
     margin-left: var(--space-lg);
+    color: var(--main-text);
 }
 
 .group div {
@@ -177,4 +187,89 @@ input[type="checkbox"] {
 
 .group div span {
     color: var(--main-text);
+}
+
+
+/* Modal Styles */
+
+.edit-tag {
+    cursor: pointer;
+}
+
+.modal {
+    display: none; /* Hidden by default */
+    position: fixed; /* Stay in place */
+    z-index: 1000; /* Sit on top */
+    left: 0;
+    top: 0;
+    width: 100%; /* Full width */
+    height: 100%; /* Full height */
+    overflow: auto; /* Enable scroll if needed */
+    background-color: rgba(0, 0, 0, 0.7); /* Darker background with more opacity */
+    backdrop-filter: blur(5px); /* Blur effect for modern look */
+}
+
+.modal-content {
+    background-color: var(--input-background);
+    margin: 10% auto; /* 10% from the top and centered */
+    padding: var(--space-lg);
+    border: none; /* Remove border for cleaner look */
+    border-radius: var(--main-radius);
+    width: 60%; /* Adjusted width for better appearance */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Subtle shadow for depth */
+    animation: fadeIn 0.3s ease-in-out; /* Smooth fade-in animation */
+}
+
+.modal-content h2 {
+    margin-bottom: var(--space-md);
+}
+
+.modal-content h5 {
+    margin-top: var(--space-md);
+    margin-bottom: var(--space-xs);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.close-button {
+    color: var(--main-text);
+    float: right;
+    font-size: 24px; /* Slightly smaller font size */
+    font-weight: bold;
+    transition: color 0.2s ease-in-out; /* Smooth color transition */
+    cursor: pointer;
+}
+
+.close-button:hover,
+.close-button:focus {
+    color: var(--secondary-text);
+    text-decoration: none;
+}
+
+
+/* Custom buttons for adding and removing */
+.add-btn, .remove-btn {
+    background-color: var(--button-background);
+    color: var(--button-text);
+    border: none;
+    padding: var(--space-xs) var(--space-sm);
+    cursor: pointer;
+    border-radius: var(--main-radius);
+    transition: background-color 0.2s ease-in-out;
+    margin: var(--space-xxs);
+}
+
+.add-btn:hover {
+    background-color: var(--button-hover);
+}
+
+.remove-btn {
+    background-color: #e74c3c;
+}
+
+.remove-btn:hover {
+    background-color: #c0392b;
 }
