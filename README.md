@@ -41,6 +41,14 @@ With tools specifically designed for event grouping, performance tracking, and r
    - Fetch real-time average times from WCA profiles, allowing event times to be calculated accurately based on official records.
    - Automatically populates form fields based on WCA IDs, simplifying data entry for competitors.
 
+5. **Result Analysis and Reporting**
+   - Generate detailed reports on event outcomes, participant performance, and overall competition statistics.
+   - Export results in various formats for easy sharing and record-keeping.
+
+6. **Customizable Event Parameters**
+   - Adjust event settings such as time limits, cutoffs, and round formats to suit specific competition needs.
+   - Save and load event configurations for recurring competitions.
+
 ---
 
 ## Highlighted Files
@@ -85,6 +93,14 @@ If you’re setting up a local version for development:
 2. **Using Grouping and Guildford Tools**
    - In the **Event Manager** section, set up events, add competitors, assign groups, and optimize competitor distribution within groups.
    - In the **Guildford Challenge Optimizer**, input competitor times, fetch WCA data, and get an optimized split of events for faster completion.
+
+3. **Result Analysis and Reporting**
+   - Use the reporting tools to generate detailed performance reports and competition statistics.
+   - Export results in preferred formats for documentation and sharing.
+
+4. **Customizing Event Parameters**
+   - Adjust settings for each event to match the specific requirements of your competition.
+   - Save configurations for future use to streamline the setup process for recurring events.
 
 ---
 

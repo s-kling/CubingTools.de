@@ -146,8 +146,8 @@ a::before {
     top: 100%;
     left: 0;
     width: 0;
-    height: 1.75px;
-    background-color: var(--link-underline);
+    height: 1px;
+    background-color: currentColor;
     transition: width 0.2s;
 }
 
@@ -188,6 +188,9 @@ nav .navbar a {
 
 #sidebar {
     grid-area: sidebar;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
 }
 
 #sidebar .tool-tag {
@@ -197,7 +200,19 @@ nav .navbar a {
     background-color: var(--main-lighter);
     border-radius: var(--main-radius);
     padding: var(--main-padding);
-    margin: var(--space-xs) 0;
+    margin: var(--space-xxs) 0;
+}
+
+#sidebar .version-tag {
+    color: var(--secondary-text);
+    font-size: var(--font-size-base);
+    text-align: center;
+    padding: var(--space-xs);
+    margin-top: auto;
+    margin-bottom: var(--space-sm);
+    border-radius: var(--main-radius);
+    background-color: var(--main-lighter);
+    z-index: 2;
 }
 
 
@@ -262,6 +277,29 @@ main label span {
     margin-right: var(--space-xs);
 }
 
+/* Tool Container Styles */
+
+.tool-container {
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--main-radius);
+    padding: var(--main-padding);
+    margin-bottom: var(--space-md);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.tool-container h3 {
+    font-size: var(--font-size-lg);
+    color: var(--main-text);
+    margin-bottom: var(--space-sm);
+}
+
+.tool-container p {
+    color: var(--secondary-text);
+    margin-bottom: var(--space-sm);
+    line-height: 1.5;
+}
+
 
 /* Footer Section Styles */
 
@@ -278,6 +316,7 @@ footer {
     font-size: clamp(5px, 10px, 15px);
     line-height: 1.4;
     overflow-y: hidden;
+    height: 100%;
 }
 
 footer .footer-content {
@@ -285,6 +324,7 @@ footer .footer-content {
     justify-content: space-between;
     flex-wrap: wrap;
     text-align: left;
+    align-items: center; /* Center elements vertically */
 }
 
 footer p {
@@ -339,6 +379,10 @@ footer p {
         align-items: center;
         margin-right: var(--main-margin);
         width: 30%;
+    }
+
+    #sidebar .version-tag {
+        display: none;
     }
 
     .container>* {

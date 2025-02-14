@@ -59,7 +59,7 @@ router.get('/googlea20166777fc211f6.html', (req, res) => {
 // Serve specific tool pages
 router.get('/tools/:toolName', (req, res) => {
     const toolName = req.params.toolName;
-    const filePath = path.join(__dirname, `../../public/html/tools`, `${toolName}.html`);
+    const filePath = path.join(__dirname, `../../public/html/tools`, toolName, `${toolName}.html`);
 
     res.sendFile(filePath, (err) => {
         if (err) {
@@ -70,8 +70,47 @@ router.get('/tools/:toolName', (req, res) => {
             const pathSegments = requestedPath.split('/').filter(Boolean); // Filter out empty strings
 
             // Redirect to the 404 page with the directory as a query parameter
-            res.redirect(`/404?dir=${pathSegments.join('/')}`);
             res.status(404);
+            res.redirect(`/404?dir=${pathSegments.join('/')}`);
+        }
+    });
+});
+
+// Serve specific tool CSS files
+router.get('/css/:cssName', (req, res) => {
+    const cssName = req.params.cssName;
+    const cssFile = path.join(__dirname, `../../public/html/tools`, cssName, `${cssName}.css`);
+
+    res.sendFile(cssFile, (err) => {
+        if (err) {
+            // Extract the directory from the requested path
+            const requestedPath = req.path;
+
+            // Find the directory from the requested path (first segment of the path after '/')
+            const pathSegments = requestedPath.split('/').filter(Boolean); // Filter out empty strings
+
+            // Redirect to the 404 page with the directory as a query parameter
+            res.status(404);
+            res.redirect(`/404?dir=${pathSegments.join('/')}`);
+        }
+    });
+});
+
+router.get('/js/:jsName', (req, res) => {
+    const jsName = req.params.jsName;
+    const jsFile = path.join(__dirname, `../../public/html/tools`, jsName, `${jsName}.js`);
+
+    res.sendFile(jsFile, (err) => {
+        if (err) {
+            // Extract the directory from the requested path
+            const requestedPath = req.path;
+
+            // Find the directory from the requested path (first segment of the path after '/')
+            const pathSegments = requestedPath.split('/').filter(Boolean); // Filter out empty strings
+
+            // Redirect to the 404 page with the directory as a query parameter
+            res.status(404);
+            res.redirect(`/404?dir=${pathSegments.join('/')}`);
         }
     });
 });

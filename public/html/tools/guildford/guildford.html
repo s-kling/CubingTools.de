@@ -13,7 +13,7 @@
     <meta name="author" content="CubingTools">
 
     <link rel="stylesheet" href="../../css/global.css">
-    <link rel="stylesheet" href="../../css/guildford.css">
+    <link rel="stylesheet" href="/css/guildford">
 
     <link rel="icon" href="../../assets/cubingtools.png" type="image/x-icon">
     <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
@@ -54,7 +54,7 @@
                 </p>
 
                 <div class="input-container">
-                    <label><span>Pick Up Time:</span> <input type="number" id="pickup" value="1.5"></label>
+                    <label><span>Pick Up Time:</span> <input type="number" id="pickup" value="1.238"></label>
                     <label><span>Solve count to process:</span> <input type="number" id="solvecount" value="25"></label>
                     <label><span>Relay preset:</span><select name="relay" id="relay">
                             <option value="miniguild">Mini Guildford</option>
@@ -67,14 +67,14 @@
 
                 <form id="timeForm">
                     <div class="competitor">
-                        <h3 id="competitor-1-name">Competitor 1</h3>
+                        <h3 id="c1-name">Competitor 1</h3>
                         <label><span>WCA:</span> <input type="text" id="c1-wca"></label>
                         <button class="globals-btn" type="button" onclick="handleButtons('c1')">Add Globals</button>
                         <div id="c1-times"></div>
                     </div>
 
                     <div class="competitor">
-                        <h3 id="competitor-2-name">Competitor 2</h3>
+                        <h3 id="c2-name">Competitor 2</h3>
                         <label><span>WCA:</span> <input type="text" id="c2-wca"></label>
                         <button class="globals-btn" type="button" onclick="handleButtons('c2')">Add Globals</button>
                         <div id="c2-times"></div>
@@ -95,7 +95,7 @@
 
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P"></script>
     <script src="../../js/setupPage.js"></script>
-    <script src="../../js/guildford.js"></script>
+    <script src="/js/guildford"></script>
 </body>
 
 </html>

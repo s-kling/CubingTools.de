@@ -1,4 +1,11 @@
+# Ignore SSL certificates and private keys
+/backend/credentials
+
+# Ignore log files
+*.log
+
+# Ignore node_modules directory
 node_modules/
-.vscode
-backend/credentials/
+
+# Ignore environment variable files
 .env

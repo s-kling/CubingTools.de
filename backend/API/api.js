@@ -2,8 +2,7 @@ const express = require('express');
 const axios = require('axios');
 const router = express.Router();
 const path = require('path');
-const nodemailer = require('nodemailer');
-const sanitizeHtml = require('sanitize-html');
+const packageJson = require('../../package.json');
 
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') }); // Specify the path to the .env file
 
@@ -78,5 +77,69 @@ router.get('/api/wca/:wcaId/:event', async (req, res) => {
     }
 });
 
-module.exports = router;
+router.get('/api/version', (req, res) => {
+    res.json({ version: packageJson.version });
+});
 
+// Endpoint to handle the request
+router.get('/api/cc/:eventId/:competitors', async (req, res) => {
+    const { eventId, competitors } = req.params;
+    const competitorList = competitors.split(',');
+
+    try {
+        // Fetch data for single and average results
+        const singleResponse = await axios.get(
+            `https://cubingcontests.com/api/results/rankings/${eventId}/single`
+        );
+
+        const singleRankings = singleResponse.data.rankings;
+
+        // Helper to find competitor in rankings
+        const findCompetitor = (inputNameOrId, rankings) => {
+            // Define the regex for a WCA ID (e.g., format like 2023ABCD01)
+            const wcaIdRegex = /^[0-9]{4}[A-Z]{4}[0-9]{2}$/;
+
+            // Check if the input matches the WCA ID regex
+            if (wcaIdRegex.test(inputNameOrId)) {
+                console.log('Searching by WCA ID:', inputNameOrId);
+                // Search by WCA ID
+                return (
+                    rankings.find(
+                        (rank) => rank.persons[0].wcaId === inputNameOrId.toUpperCase()
+                    ) || null
+                );
+            } else {
+                console.log('Searching by name:', inputNameOrId);
+                return rankings.find(
+                    (rank) => rank.persons[0].name.toLowerCase() === inputNameOrId.toLowerCase()
+                );
+            }
+        };
+
+        // Prepare response data
+        const result = competitorList.map((name) => {
+            const singleData = findCompetitor(name, singleRankings);
+
+            return {
+                name,
+                worldRanking: singleData?.ranking || 'N/A',
+                time: singleData?.result || 'N/A',
+            };
+        });
+
+        // Sort the result by world ranking
+        result.sort((a, b) => {
+            if (a.worldRanking === 'N/A') return 1;
+            if (b.worldRanking === 'N/A') return -1;
+            return a.worldRanking - b.worldRanking;
+        });
+
+        // Respond with data
+        res.json(result);
+    } catch (error) {
+        console.error('Error fetching data:', error.message);
+        res.status(500).json({ message: 'Failed to fetch data from CubingContests API' });
+    }
+});
+
+module.exports = router;

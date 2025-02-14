@@ -3,17 +3,17 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const https = require('https');
-const bodyParser = require('body-parser'); // Add body-parser middleware
+const bodyParser = require('body-parser');
 
 const app = express();
 const httpsPort = 443; // Default https port
 const betaPort = 8443; // Port for beta testing
-const betaTest = false; // Set to false to disable beta testing
+const betaTest = true;
 
 // Load the SSL certificate and private key
 const privateKey = fs.readFileSync('./backend/credentials/cubingtools_private_key.key');
 const certificate = fs.readFileSync('./backend/credentials/cubingtools_ssl_certificate.cer');
-const credentials = { key: privateKey, cert: certificate };
+const credentials = privateKey && certificate ? { key: privateKey, cert: certificate } : null;
 
 const logFilePath = path.join(__dirname, 'server.log');
 let requests = 0;

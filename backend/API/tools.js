@@ -20,21 +20,29 @@ function extractMetadata(filePath) {
 router.get('/api/tools', (req, res) => {
     const toolsDir = path.join(__dirname, '../../public/html/tools');
 
-    fs.readdir(toolsDir, (err, files) => {
+    fs.readdir(toolsDir, (err, folders) => {
         if (err) {
             return res.status(500).json({ error: 'Unable to scan directory' });
         }
 
-        const htmlFiles = files
-            .filter((file) => file.endsWith('.html'))
-            .map((file) => {
-                const filePath = path.join(toolsDir, file);
-                const metadata = extractMetadata(filePath);
-                return {
-                    filename: file,
-                    title: metadata.title,
-                    description: metadata.description,
-                };
+        const htmlFiles = folders
+            .filter((folder) => fs.statSync(path.join(toolsDir, folder)).isDirectory())
+            .map((folder) => {
+                const filePath = path.join(toolsDir, folder, `${folder}.html`);
+                if (fs.existsSync(filePath)) {
+                    const metadata = extractMetadata(filePath);
+                    return {
+                        filename: folder,
+                        title: metadata.title,
+                        description: metadata.description,
+                    };
+                } else {
+                    return {
+                        filename: folder,
+                        title: 'No title',
+                        description: 'No description',
+                    };
+                }
             });
 
         res.json(htmlFiles);

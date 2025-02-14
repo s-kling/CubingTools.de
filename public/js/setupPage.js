@@ -27,6 +27,16 @@ document.addEventListener('DOMContentLoaded', () => {
         .getElementById('decline-cookies')
         .addEventListener('click', () => handleConsent('false'));
 
+    // Choose random link color
+    const links = document.querySelectorAll('a');
+    links.forEach((link) => {
+        let randomColor;
+        do {
+            randomColor = `#${Math.floor(Math.random() * 16777215).toString(16)}`;
+        } while (parseInt(randomColor.substring(1), 16) < 0x888888); // Ensure color is not too dark
+        link.style.color = randomColor;
+    });
+
     loadTools();
     setupNavbar();
     setupFooter();
@@ -34,10 +44,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function loadTools() {
     const toolsContainer = document.getElementById('sidebar');
-    toolsContainer.innerHTML = '';
+    toolsContainer.innerHTML = '<h2>Tools</h2>';
 
     try {
         const response = await fetch('/api/tools');
+
         const tools = await response.json();
 
         if (Array.isArray(tools)) {
@@ -59,6 +70,23 @@ async function loadTools() {
     } catch (error) {
         console.error('Error loading tools:', error);
     }
+
+    const versionElement = document.createElement('a');
+    versionElement.className = 'version-tag';
+    versionElement.innerText = 'Loading...';
+    versionElement.href = 'https://github.com/s-kling/cubingtools.de/releases/';
+
+    try {
+        const response = await fetch('/api/version');
+        const version = await response.json();
+
+        versionElement.innerText = `v${version.version}`;
+    } catch (error) {
+        console.error('Error loading version:', error);
+        versionElement.innerText = 'Error loading version';
+    }
+
+    toolsContainer.appendChild(versionElement);
 }
 
 function setupNavbar() {
@@ -68,7 +96,6 @@ function setupNavbar() {
     const logo = document.createElement('a');
     logo.href = '/';
     logo.className = 'logo';
-    logo.innerHTML = 'CubingTools';
 
     const navDiv = document.createElement('div');
     navDiv.className = 'navbar';
@@ -88,17 +115,14 @@ function setupNavbar() {
         betaLink.onclick = () => {
             location.port = 443; // Redirect to release port
         };
-
-        if (document.getElementById('title')) {
-            const title = document.getElementById('title');
-            title.innerText += ' (Beta Version)';
-        }
-        betaLink.innerHTML = 'Release Version';
+        betaLink.innerHTML = 'Full Release';
+        logo.innerHTML = 'CubingTools.BETA';
     } else {
         betaLink.onclick = () => {
             location.port = 8443; // Redirect to beta testing port
         };
-        betaLink.innerHTML = 'Beta Version';
+        betaLink.innerHTML = 'Beta';
+        logo.innerHTML = 'CubingTools';
     }
 
     navDiv.appendChild(homeLink);

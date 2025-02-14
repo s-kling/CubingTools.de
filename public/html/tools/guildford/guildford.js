@@ -127,16 +127,16 @@ function updateURLWithFormData() {
     // Get the main form values
     const pickupTime = document.getElementById('pickup').value;
     const solvecount = document.getElementById('solvecount').value;
-    // const relay = document.getElementById('relay').value;
     const competitor1Id = document.getElementById('c1-wca').value;
     const competitor2Id = document.getElementById('c2-wca').value;
 
     // Add main form values to the query parameters
     if (pickupTime) params.set('pickup', pickupTime);
     if (solvecount) params.set('solvecount', solvecount);
-    // if (relay) params.set('relay', relay);
     if (competitor1Id) params.set('c1', competitor1Id);
     if (competitor2Id) params.set('c2', competitor2Id);
+    if (competitor1Name) params.set('c1name', competitor1Name);
+    if (competitor2Name) params.set('c2name', competitor2Name);
 
     // Add event times for Competitor 1
     events.forEach((event) => {
@@ -163,9 +163,13 @@ function populateFormFromURL() {
     if (params.has('pickup')) document.getElementById('pickup').value = params.get('pickup');
     if (params.has('solvecount'))
         document.getElementById('solvecount').value = params.get('solvecount');
-    // if (params.has('relay')) document.getElementById('relay').value = params.get('relay');
     if (params.has('c1')) document.getElementById('c1-wca').value = params.get('c1');
     if (params.has('c2')) document.getElementById('c2-wca').value = params.get('c2');
+    if (params.has('c1name')) competitor1Name = params.get('c1name');
+    if (params.has('c2name')) competitor2Name = params.get('c2name');
+
+    document.getElementById('c1-name').textContent = competitor1Name;
+    document.getElementById('c2-name').textContent = competitor2Name;
 
     // Populate event times for Competitor 1
     events.forEach((event) => {
@@ -249,8 +253,8 @@ document.addEventListener('DOMContentLoaded', () => {
     populateFormFromURL();
 });
 
-let competitor1Name = '';
-let competitor2Name = '';
+let competitor1Name = 'Competitor 1';
+let competitor2Name = 'Competitor 2';
 
 async function handleButtons(competitor) {
     await getWCAData(competitor);
@@ -295,6 +299,23 @@ async function getCurrentAverage(wcaId, event) {
     } catch (error) {
         console.error(`Error fetching average for event ${event}: ${error.message}`);
         return null;
+    }
+}
+
+// Function to get competitor name
+async function getCompetitorName(wcaId) {
+    const apiUrl = `/api/wca/${wcaId}/name`;
+
+    try {
+        const response = await fetch(apiUrl);
+        if (!response.ok) {
+            throw new Error(`Error fetching data: ${response.statusText}`);
+        }
+        const data = await response.json();
+        return data.name;
+    } catch (error) {
+        console.error(`Error fetching competitor name: ${error.message}`);
+        return 'Competitor Name';
     }
 }
 
@@ -380,6 +401,11 @@ async function getWCAData(competitorId) {
         const times = {};
 
         for (const [eventName, eventId] of Object.entries(events)) {
+            const name = await getCompetitorName(wcaId);
+            const competitorName = document.getElementById(`${competitorId}-name`);
+            competitorId === 'c1' ? (competitor1Name = name) : (competitor2Name = name);
+            competitorName.textContent = name;
+
             const average = await getCurrentAverage(wcaId, eventId);
             times[eventName] = average !== null ? average : null;
 
@@ -457,22 +483,27 @@ async function processCombinationsWithAlphaBetaLive(competitor1, competitor2, pi
     let bestTime = Infinity;
     let combinationsCount = 0;
 
+    const startCalculating = Date.now();
+
     const dfs = async (index, group1, group2, alpha, beta, group1Time, group2Time) => {
         if (index === events.length) {
             const maxTime = Math.max(group1Time, group2Time);
             combinationsCount++;
+
+            const stopCalculating = Date.now();
+            const timeTaken = (stopCalculating - startCalculating) / 1000;
 
             if (maxTime < bestTime) {
                 bestTime = maxTime;
 
                 bestCombinationDiv.innerHTML = `
                     <h3>Best Combination</h3>
-                    <p>Competitor 1 (${formatTime(group1Time)}): ${group1.join(', ')}</p>
-                    <p>Competitor 2 (${formatTime(group2Time)}): ${group2.join(', ')}</p>
+                    <p>${competitor1Name} (${formatTime(group1Time)}): ${group1.join(', ')}</p>
+                    <p>${competitor2Name} (${formatTime(group2Time)}): ${group2.join(', ')}</p>
                     <p>Total Time: ${formatTime(bestTime)}</p>`;
             }
 
-            combinationsCountedDiv.textContent = `Combinations Analyzed: ${combinationsCount}`;
+            combinationsCountedDiv.textContent = `Analyzed ${combinationsCount} combinations in ${timeTaken} seconds`;
             return maxTime;
         }
 
