@@ -27,40 +27,48 @@ document.addEventListener('DOMContentLoaded', () => {
         .getElementById('decline-cookies')
         .addEventListener('click', () => handleConsent('false'));
 
-    // Choose random link color
-    const links = document.querySelectorAll('a');
-    links.forEach((link) => {
-        let randomColor;
-        do {
-            randomColor = `#${Math.floor(Math.random() * 16777215).toString(16)}`;
-        } while (parseInt(randomColor.substring(1), 16) < 0x888888); // Ensure color is not too dark
-        link.style.color = randomColor;
-    });
-
     loadTools();
+    addVersionTag();
     setupNavbar();
     setupFooter();
 });
 
 async function loadTools() {
     const toolsContainer = document.getElementById('sidebar');
-    toolsContainer.innerHTML = '<h2>Tools</h2>';
+    toolsContainer.innerHTML = '';
 
     try {
         const response = await fetch('/api/tools');
-
         const tools = await response.json();
 
         if (Array.isArray(tools)) {
-            tools.forEach((tool) => {
+            const featuredTools = tools.filter((tool) => tool.filename.includes('guildford'));
+            const otherTools = tools.filter((tool) => !tool.filename.includes('guildford'));
+
+            toolsContainer.innerHTML += '<h3 class="big-screen">Featured</h3>';
+            featuredTools.forEach((tool) => {
                 const toolElement = document.createElement('a');
                 toolElement.className = 'tool-tag';
                 toolElement.href = `/tools/${tool.filename.replace('.html', '')}`;
                 toolElement.rel = 'noopener noreferrer';
 
                 toolElement.innerHTML = `
-                    <h3 class="tool-title">${tool.title}</h3>
-                `;
+                        <h3 class="tool-title">${tool.title}</h3>
+                    `;
+
+                toolsContainer.appendChild(toolElement);
+            });
+
+            toolsContainer.innerHTML += '<h3 class="big-screen">Tools</h3>';
+            otherTools.forEach((tool) => {
+                const toolElement = document.createElement('a');
+                toolElement.className = 'tool-tag';
+                toolElement.href = `/tools/${tool.filename.replace('.html', '')}`;
+                toolElement.rel = 'noopener noreferrer';
+
+                toolElement.innerHTML = `
+                        <h3 class="tool-title">${tool.title}</h3>
+                    `;
 
                 toolsContainer.appendChild(toolElement);
             });
@@ -70,7 +78,9 @@ async function loadTools() {
     } catch (error) {
         console.error('Error loading tools:', error);
     }
+}
 
+async function addVersionTag() {
     const versionElement = document.createElement('a');
     versionElement.className = 'version-tag';
     versionElement.innerText = 'Loading...';
@@ -80,13 +90,14 @@ async function loadTools() {
         const response = await fetch('/api/version');
         const version = await response.json();
 
-        versionElement.innerText = `v${version.version}`;
+        versionElement.innerText =
+            window.location.port == 443 ? `v${version.version}` : `BETA ${version.version}`;
     } catch (error) {
         console.error('Error loading version:', error);
         versionElement.innerText = 'Error loading version';
     }
 
-    toolsContainer.appendChild(versionElement);
+    document.getElementById('version').appendChild(versionElement);
 }
 
 function setupNavbar() {
@@ -97,40 +108,74 @@ function setupNavbar() {
     logo.href = '/';
     logo.className = 'logo';
 
-    const navDiv = document.createElement('div');
-    navDiv.className = 'navbar';
+    const hamburger = document.createElement('input');
+    hamburger.type = 'checkbox';
+    hamburger.id = 'check';
 
-    const homeLink = document.createElement('a');
-    homeLink.href = '/';
-    homeLink.innerHTML = 'Home';
+    const label = document.createElement('label');
+    label.htmlFor = 'check';
+    label.className = 'checkbtn';
 
-    const contactLink = document.createElement('a');
-    contactLink.href = 'mailto:info@cubingtools.de';
-    contactLink.innerHTML = 'Contact';
+    const hamburgerIcon = document.createElement('i');
+    hamburgerIcon.className = 'fas fa-bars';
+    label.appendChild(hamburgerIcon);
 
-    const betaLink = document.createElement('a');
-    betaLink.style.cursor = 'pointer';
+    const pages = document.createElement('ul');
+
+    const homeLink = document.createElement('li');
+    homeLink.innerHTML = '<a href="/">Home</a>';
+
+    const contactLink = document.createElement('li');
+    contactLink.innerHTML = '<a href="mailto:info@cubingtools.de">Contact</a>';
+
+    const changeRelease = document.createElement('li');
+    changeRelease.style.cursor = 'pointer';
 
     if (location.port == 8443) {
-        betaLink.onclick = () => {
+        changeRelease.onclick = () => {
             location.port = 443; // Redirect to release port
         };
-        betaLink.innerHTML = 'Full Release';
+        changeRelease.innerHTML = '<a href="#">Full Release</a>';
         logo.innerHTML = 'CubingTools.BETA';
     } else {
-        betaLink.onclick = () => {
+        changeRelease.onclick = () => {
             location.port = 8443; // Redirect to beta testing port
         };
-        betaLink.innerHTML = 'Beta';
+        changeRelease.innerHTML = '<a href="#">Beta</a>';
         logo.innerHTML = 'CubingTools';
     }
 
-    navDiv.appendChild(homeLink);
-    navDiv.appendChild(contactLink);
-    navDiv.appendChild(betaLink);
+    pages.appendChild(homeLink);
+    pages.appendChild(contactLink);
+    pages.appendChild(changeRelease);
 
     navbar.appendChild(logo);
-    navbar.appendChild(navDiv);
+    navbar.appendChild(hamburger);
+    navbar.appendChild(label);
+    navbar.appendChild(pages);
+
+    // Hide navbar when clicking outside of it
+    document.addEventListener('click', (event) => {
+        if (!navbar.contains(event.target) && !label.contains(event.target)) {
+            hamburger.checked = false;
+        }
+    });
+
+    // Swipe to hide navbar
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    document.addEventListener('touchstart', (event) => {
+        touchStartX = event.changedTouches[0].screenX;
+    });
+
+    document.addEventListener('touchend', (event) => {
+        touchEndX = event.changedTouches[0].screenX;
+        if (touchEndX < touchStartX - 50) {
+            // Adding a threshold for swipe
+            hamburger.checked = false;
+        }
+    });
 }
 
 function setupFooter() {

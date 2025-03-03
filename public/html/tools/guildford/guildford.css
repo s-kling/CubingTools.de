@@ -54,3 +54,8 @@ button:not(#accept-cookies):not(#decline-cookies) {
     padding: var(--space-md);
     border-radius: var(--main-radius);
 }
+
+.competitor input[type="text"] {
+    width: 100%;
+    flex-grow: 1; /* Ensures input fields take the same space */
+}

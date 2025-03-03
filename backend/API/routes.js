@@ -14,11 +14,6 @@ router.get('/privacy-policy', (req, res) => {
     res.sendFile(path.join(__dirname, '..', '../public/html', 'privacy.html'));
 });
 
-// Serve the main page
-router.get('/competitions', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', '../public/html', 'competitions.html'));
-});
-
 // Serve the robots txt
 router.get('/robots.txt', (req, res) => {
     res.sendFile(path.join(__dirname, '..', '../public', 'robots.txt'));
@@ -37,18 +32,6 @@ router.get('/apple-touch-icon.png', (req, res) => {
 // Serve the sitemap
 router.get('/sitemap.xml', (req, res) => {
     res.sendFile(path.join(__dirname, '..', '../public', 'sitemap.xml'));
-});
-
-router.get('/comp', (req, res) => {
-    const password = req.query.password;
-    const validPasswords = JSON.parse(process.env.VALID_PASSWORDS); // Parse the JSON string
-
-    const page = validPasswords[password];
-    if (page) {
-        res.sendFile(path.join(__dirname, '..', '../public/html/competitions', page)); // Send the corresponding HTML page
-    } else {
-        res.json({ valid: false });
-    }
 });
 
 // Serve the google.html

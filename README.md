@@ -77,7 +77,7 @@ If you’re setting up a local version for development:
 
 1. Clone the repository:
     ```bash
-    git clone https://github.com/your-repo/cubingtools.de.git
+    git clone https://github.com/s-kling/cubingtools.de.git
     ```
 2. Install dependencies if any are listed.
 3. Use a local server or any HTTP server to serve the HTML/JavaScript files for testing.

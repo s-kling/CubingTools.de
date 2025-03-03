@@ -20,7 +20,7 @@ async function addTime() {
         if (timeValue > 0) {
             times.push(timeValue);
         } else if (timeValue === 0) {
-            times.push(Infiniy);
+            times.push(Infinity);
         }
         times.sort((a, b) => a - b);
         if (times.length === 6) {

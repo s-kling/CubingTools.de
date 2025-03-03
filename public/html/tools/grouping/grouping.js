@@ -247,6 +247,69 @@ const events = [
     { id: 'dino', name: 'Dino Cube', shortName: 'Dino' },
 ];
 
+function storeCompetitionDataInURL() {
+    const url = new URL(window.location.href);
+    const data = {
+        r: competitionData.includeRunners,
+        j: competitionData.includeJudges,
+        c: competitors.map(({ id, name, wcaId, events }) => ({ id, name, wcaId, events })),
+        g: Object.fromEntries(
+            Object.entries(competitionData.groups).map(([eventId, groups]) => [
+                eventId,
+                groups.map(({ competitors, judges, runners, scramblers }) => ({
+                    c: competitors.map(({ id }) => id),
+                    j: judges.map(({ id }) => id),
+                    r: runners.map(({ id }) => id),
+                    s: scramblers.map(({ id }) => id),
+                })),
+            ])
+        ),
+    };
+    const compressedData = btoa(JSON.stringify(data));
+    url.searchParams.set('cd', compressedData);
+    window.history.replaceState({}, '', url);
+}
+
+function loadCompetitionDataFromURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const compressedData = urlParams.get('cd');
+    if (compressedData) {
+        const data = JSON.parse(atob(compressedData));
+        includeRunners = data.r;
+        includeJudges = data.j;
+        competitors = data.c.map(({ id, name, wcaId, events }) => ({
+            id,
+            name,
+            wcaId,
+            events,
+            groupAssignments: {},
+        }));
+        competitionData.groups = Object.fromEntries(
+            Object.entries(data.g).map(([eventId, groups]) => [
+                eventId,
+                groups.map(({ c, j, r, s }) => ({
+                    competitors: c.map((id) => competitors.find((comp) => comp.id === id)),
+                    judges: j.map((id) => competitors.find((comp) => comp.id === id)),
+                    runners: r.map((id) => competitors.find((comp) => comp.id === id)),
+                    scramblers: s.map((id) => competitors.find((comp) => comp.id === id)),
+                })),
+            ])
+        );
+        selectedEvents = Object.keys(competitionData.groups);
+        generateGroupHTML();
+        document.getElementById('competition-setup').style.display = 'none';
+        document.getElementById('event-selection').style.display = 'none';
+        document.getElementById('competitor-setup').style.display = 'none';
+        document.getElementById('grouping-results').style.display = 'block';
+        document.getElementById('do-runners').checked = competitionData.includeRunners;
+        document.getElementById('do-judges').checked = competitionData.includeJudges;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadCompetitionDataFromURL();
+});
+
 let selectedEvents = [];
 let competitors = [];
 let competitionData = {};
@@ -279,14 +342,6 @@ function selectAllUnderLabel(labelId) {
     // Check all checkboxes
     checkboxes.forEach((checkbox) => (checkbox.checked = true));
 }
-
-document.getElementById('do-judges').addEventListener('change', () => {
-    document.getElementById('seated-judges-label').style.display = document.getElementById(
-        'do-judges'
-    ).checked
-        ? 'block'
-        : 'none';
-});
 
 function setupCompetition() {
     const competitionName = document.getElementById('competition-name').value;
@@ -660,6 +715,8 @@ function finalizeCompetitors() {
 
     document.getElementById('competitor-setup').style.display = 'none';
     document.getElementById('grouping-results').style.display = 'block';
+
+    storeCompetitionDataInURL();
 
     generateGroups();
 }
@@ -1322,7 +1379,7 @@ document.addEventListener('keydown', (event) => {
     }
 });
 
-document.addEventListener('keyup', (event) => {
+document.addEventListener('keyup', () => {
     const mockButton = document.querySelector('.mock-button');
     if (mockButton) {
         mockButton.remove();

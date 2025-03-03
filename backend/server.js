@@ -1,51 +1,39 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const http = require('http');
 const https = require('https');
 const bodyParser = require('body-parser');
 
 const app = express();
 const httpsPort = 443; // Default https port
 const betaPort = 8443; // Port for beta testing
-const betaTest = true;
+const betaTest = false;
 
 // Load the SSL certificate and private key
 const privateKey = fs.readFileSync('./backend/credentials/cubingtools_private_key.key');
 const certificate = fs.readFileSync('./backend/credentials/cubingtools_ssl_certificate.cer');
 const credentials = privateKey && certificate ? { key: privateKey, cert: certificate } : null;
 
-const logFilePath = path.join(__dirname, 'server.log');
-let requests = 0;
-
-// Initialize or read the visitor count
-function initializerequests() {
-    if (fs.existsSync(logFilePath)) {
-        const data = fs.readFileSync(logFilePath, 'utf8');
-        const lines = data.split('\n');
-        requests = parseInt(lines[0].trim(), 10) || 0;
-    } else {
-        requests = 0;
-    }
-}
+const logFilePath = path.join(__dirname, 'log', 'server.log');
+const logRetentionPeriod = 14 * 24 * 60 * 60 * 1000; // 2 weeks in milliseconds
 
 // Update the log file with each request
 function updateLogFile(logEntry) {
-    requests++;
+    const now = new Date();
     const data = fs.existsSync(logFilePath) ? fs.readFileSync(logFilePath, 'utf8') : '';
-    const lines = data.split('\n').slice(1);
-    const newContent = `${requests}\n${logEntry}${lines.join('\n')}`;
+    const lines = data.split('\n').filter((line) => {
+        const timestamp = new Date(line.split(' - ')[0]);
+        return now - timestamp <= logRetentionPeriod;
+    });
+    const newContent = `${logEntry}${lines.join('\n')}`;
     fs.writeFileSync(logFilePath, newContent, 'utf8');
 }
-
-initializerequests();
 
 app.use((req, res, next) => {
     if (req.secure) {
         const now = new Date();
         const timestamp = now.toISOString();
         const dayOfWeek = now.toLocaleString('en-US', { weekday: 'long' });
-        const hour = now.getHours(); // New field for peak traffic analysis
         const userAgent = req.headers['user-agent'];
         const method = req.method;
         const path = req.path;
@@ -55,7 +43,7 @@ app.use((req, res, next) => {
             const responseTime = new Date() - now;
 
             // Updated log entry
-            let logEntry = `${timestamp} - ${method} ${path} - User-Agent: ${userAgent} - Status: ${status} - Response Time: ${responseTime}ms - Day: ${dayOfWeek} - Hour: ${hour}\n`;
+            let logEntry = `${timestamp} - ${method} ${path} - User-Agent: ${userAgent} - Status: ${status} - Response Time: ${responseTime}ms - Day: ${dayOfWeek}\n`;
 
             if (path === '/api/send-email') {
                 logEntry += `Body: ${JSON.stringify(req.body)}\n`;

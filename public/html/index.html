@@ -11,6 +11,7 @@
     ">
     <meta name="author" content="CubingTools">
     <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/home.css">
     <link rel="icon" href="../../assets/cubingtools.png" type="image/x-icon">
     <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 </head>
@@ -32,9 +33,57 @@
             <h2>Tools</h2>
         </div>
 
+        <div id="version"></div>
+
         <main>
             <section class="heading">
                 <h1 id="title">Solve Smarter, Not Harder</h1>
+
+                <style>
+                    .main-tool {
+                        background-color: var(--secondary-background);
+                        padding-top: 0;
+                        padding: var(--space-md);
+                        border-radius: var(--main-radius);
+                        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+                        transition: all 0.3s;
+                        cursor: pointer;
+                    }
+
+                    ul {
+                        line-height: 1.6;
+                    }
+
+                    li {
+                        color: var(--secondary-text);
+                        margin-left: var(--space-lg);
+                    }
+
+                    .main-tool h2 {
+                        margin-top: 0;
+                    }
+
+                    .main-tool:hover {
+                        scale: 1.05;
+                    }
+                </style>
+
+                <section class="tool-section main-tool" onclick="window.location.href='/tools/guildford'">
+                    <h2><a href="/tools/guildford">Guildford Optimizer</a></h2>
+                    <p>The Guildford Optimizer is a powerful tool that helps you plan and optimize your events for the
+                        Guildford Challenge. It takes into account various factors such as event duration, competitor
+                        availability, and resource allocation to create the most efficient schedule possible. This tool
+                        ensures that you can complete all events within the given time frame while maximizing the
+                        performance of each competitor.</p>
+                        <ul>
+                            <li>WCA Global input from WCA ID: Easily integrate your official WCA ID to get personalized and accurate data.</li>
+                            <li>Pick up time: This is the only Guildford optimizer that takes the pick up time into account.</li>
+                            <li>Multiple relays: Choose from various relay options like Mini Guildford, Guildford, Mini Guildford + FTO, Guildford + FTO, and 2x2-7x7 Relay to fit your needs.</li>
+                            <li>Quick calculation: Enjoy super-fast calculations with an average processing time of just 0.005 seconds, giving you instant results.</li>
+                            <li>Suggested events in the middle: Receive smart suggestions for events to include in between competitors, enhancing efficiency and performance.</li>
+                        </ul>
+                </section>
+
                 <div class="tool-container">
                     <p>Welcome to CubingTools.de, your ultimate destination for enhancing your cubing performance. Our
                         platform offers a variety of tools designed to help you achieve your best results in competitive
@@ -47,15 +96,6 @@
                             participants, making the competition fair and efficient. By using advanced algorithms, the
                             Groupifier minimizes waiting times and maximizes the use of available resources, providing a
                             seamless experience for both organizers and competitors.</p>
-                    </section>
-
-                    <section class="tool-section">
-                        <h2><a href="/tools/guildford">Guildford Optimizer</a></h2>
-                        <p>The Guildford Optimizer is a powerful tool that helps you plan and optimize your events for the
-                            Guildford Challenge. It takes into account various factors such as event duration, competitor
-                            availability, and resource allocation to create the most efficient schedule possible. This tool
-                            ensures that you can complete all events within the given time frame while maximizing the
-                            performance of each competitor.</p>
                     </section>
 
                     <section class="tool-section">

@@ -1,84 +1,69 @@
-let events = [
-    '2x2',
-    '3x3',
-    '4x4',
-    '5x5',
-    '6x6',
-    '7x7',
-    'OH',
-    'Pyraminx',
-    'Clock',
-    'Skewb',
-    'Megaminx',
-    'Square-1',
-];
-
 const relaySelect = document.getElementById('relay');
+const eventOptions = {
+    miniguild: [
+        '2x2',
+        '3x3',
+        '4x4',
+        '5x5',
+        'OH',
+        'Pyraminx',
+        'Clock',
+        'Skewb',
+        'Megaminx',
+        'Square-1',
+    ],
+    guildford: [
+        '2x2',
+        '3x3',
+        '4x4',
+        '5x5',
+        '6x6',
+        '7x7',
+        'OH',
+        'Pyraminx',
+        'Clock',
+        'Skewb',
+        'Megaminx',
+        'Square-1',
+    ],
+    miniguildfto: [
+        '2x2',
+        '3x3',
+        '4x4',
+        '5x5',
+        'OH',
+        'Pyraminx',
+        'Clock',
+        'FTO',
+        'Skewb',
+        'Megaminx',
+        'Square-1',
+    ],
+    guildfordfto: [
+        '2x2',
+        '3x3',
+        '4x4',
+        '5x5',
+        '6x6',
+        '7x7',
+        'OH',
+        'Pyraminx',
+        'Clock',
+        'FTO',
+        'Skewb',
+        'Megaminx',
+        'Square-1',
+    ],
+    twotoseven: ['2x2', '3x3', '4x4', '5x5', '6x6', '7x7'],
+};
+
 relaySelect.addEventListener('change', () => {
-    if (relaySelect.value == 'miniguild') {
-        events = [
-            '2x2',
-            '3x3',
-            '4x4',
-            '5x5',
-            'OH',
-            'Pyraminx',
-            'Clock',
-            'Skewb',
-            'Megaminx',
-            'Square-1',
-        ];
-    } else if (relaySelect.value == 'guildford') {
-        events = [
-            '2x2',
-            '3x3',
-            '4x4',
-            '5x5',
-            '6x6',
-            '7x7',
-            'OH',
-            'Pyraminx',
-            'Clock',
-            'Skewb',
-            'Megaminx',
-            'Square-1',
-        ];
-    } else if (relaySelect.value == 'miniguildfto') {
-        events = [
-            '2x2',
-            '3x3',
-            '4x4',
-            '5x5',
-            'OH',
-            'Pyraminx',
-            'Clock',
-            'FTO',
-            'Skewb',
-            'Megaminx',
-            'Square-1',
-        ];
-    } else if (relaySelect.value == 'guildfordfto') {
-        events = [
-            '2x2',
-            '3x3',
-            '4x4',
-            '5x5',
-            '6x6',
-            '7x7',
-            'OH',
-            'Pyraminx',
-            'Clock',
-            'FTO',
-            'Skewb',
-            'Megaminx',
-            'Square-1',
-        ];
-    } else if (relaySelect.value == 'twotoseven') {
-        events = ['2x2', '3x3', '4x4', '5x5', '6x6', '7x7'];
-    }
+    events = eventOptions[relaySelect.value] || [];
     addEventInputs();
     populateFormFromURL();
 });
+
+let events = eventOptions[relaySelect.value] || [];
 
 function addEventInputs() {
     const competitor1Events = document.getElementById('c1-times');
@@ -96,6 +81,7 @@ function addEventInputs() {
         input1.type = 'text';
         input1.id = `c1-${event}`;
         input1.required = true;
+        input1.placeholder = '0.00';
 
         label1.appendChild(span1);
         label1.appendChild(input1);
@@ -108,16 +94,57 @@ function addEventInputs() {
         input2.type = 'text';
         input2.id = `c2-${event}`;
         input2.required = true;
+        input2.placeholder = '0.00';
 
         label2.appendChild(span2);
         label2.appendChild(input2);
 
-        input1.addEventListener('input', () => updateURLWithFormData());
-        input2.addEventListener('input', () => updateURLWithFormData());
+        input1.addEventListener('input', () => formatInputField(input1));
+        input2.addEventListener('input', () => formatInputField(input2));
 
         competitor1Events.appendChild(label1);
         competitor2Events.appendChild(label2);
     });
+}
+
+function formatInputField(input) {
+    var currentValue = input.value;
+
+    if (input.value.includes('DNF')) {
+        input.value = '0.00';
+    } else if (/[a-zA-Z]/.test(currentValue)) {
+        input.value = 'DNF';
+        return;
+    }
+
+    var valDigitsOnly = currentValue.replace(/[^0-9]/g, '');
+
+    while (valDigitsOnly.startsWith('0')) {
+        valDigitsOnly = valDigitsOnly.substring(1, valDigitsOnly.length);
+    }
+
+    if (valDigitsOnly.length < 3) {
+        while (valDigitsOnly.length < 3) {
+            valDigitsOnly = '0' + valDigitsOnly;
+        }
+    }
+
+    var currLength = valDigitsOnly.length;
+    var modified = '';
+    if (currLength <= 4) {
+        modified =
+            valDigitsOnly.slice(0, currLength - 2) + '.' + valDigitsOnly.slice(currLength - 2);
+
+        if (modified == '0.00') {
+            modified = '';
+        }
+    } else if (currLength > 4) {
+        modified =
+            valDigitsOnly.slice(0, currLength - 2) + '.' + valDigitsOnly.slice(currLength - 2);
+        modified =
+            modified.slice(0, modified.length - 5) + ':' + modified.slice(modified.length - 5);
+    }
+    input.value = modified;
 }
 
 // Function to update URL with form data (including event times)
@@ -411,23 +438,16 @@ async function getWCAData(competitorId) {
 
             // Update the input field live
             const input = document.getElementById(`${competitorId}-${eventName}`);
-            input.value = times[eventName] !== null ? times[eventName].toFixed(2) : 'DNF';
+            if (times[eventName] !== null) {
+                input.value = formatTime(times[eventName].toFixed(2)).replace(/[^0-9.]/g, '');
+                formatInputField(input);
+            } else {
+                input.value = 'DNF';
+            }
         }
     } catch (error) {
         alert(`Error fetching data: ${error.message}`);
     }
-}
-
-// Function to populate competitor times in the form
-function fillCompetitorTimes(competitorId, times) {
-    Object.keys(times).forEach((event) => {
-        const input = document.getElementById(`${competitorId}-${event}`);
-        if (times[event] !== null) {
-            input.value = times[event].toFixed(2); // Populate with average time
-        } else {
-            input.value = 'DNF'; // Mark as DNF if no average available
-        }
-    });
 }
 
 // Existing function to collect times from the form fields
@@ -435,7 +455,7 @@ function collectCompetitorTimes(competitorId) {
     const times = {};
 
     events.forEach((event) => {
-        const value = document.getElementById(`${competitorId}-${event}`).value;
+        const value = getTimeInSeconds(document.getElementById(`${competitorId}-${event}`).value);
         if (value === 'DNF' || isNaN(value)) {
             times[event] = 10000; // Use 10000 for DNF (did not finish)
         } else {
@@ -443,7 +463,6 @@ function collectCompetitorTimes(competitorId) {
         }
     });
 
-    console.log(times);
     return times;
 }
 
@@ -461,6 +480,19 @@ function formatTime(seconds) {
     let secs = seconds % 60;
     secs = secs < 10 ? '0' + secs.toFixed(2) : secs.toFixed(2);
     return `${minutes}:${secs}`;
+}
+
+function getTimeInSeconds(input) {
+    var currentValue = input;
+    if (currentValue.includes(':')) {
+        var parts = currentValue.split(':');
+        var minutes = parseInt(parts[0]);
+        var seconds = parseFloat(parts[1]);
+        var totalSeconds = minutes * 60 + seconds;
+    } else {
+        var totalSeconds = parseFloat(currentValue);
+    }
+    return totalSeconds;
 }
 
 /**
@@ -495,11 +527,67 @@ async function processCombinationsWithAlphaBetaLive(competitor1, competitor2, pi
 
             if (maxTime < bestTime) {
                 bestTime = maxTime;
+                let diff = Math.abs(group1Time - group2Time);
+                const totalGroup1Time = group1.reduce(
+                    (sum, event) => sum + (competitor1[event] || 0),
+                    0
+                );
+                const totalGroup2Time = group2.reduce(
+                    (sum, event) => sum + (competitor2[event] || 0),
+                    0
+                );
+                const averageTime = (totalGroup1Time + totalGroup2Time) / 2;
+
+                const eventDifference = Math.abs(group1.length - group2.length);
+                const threshold = averageTime / events.length + eventDifference * pickupTime;
+
+                if (diff < threshold) {
+                    const sortedEvents1 = group1
+                        .map((event) => ({
+                            event,
+                            time: competitor1[event] + (competitor2[event] || 0),
+                        }))
+                        .sort((a, b) => a.time - b.time);
+
+                    const sortedEvents2 = group2
+                        .map((event) => ({
+                            event,
+                            time: competitor2[event] + (competitor1[event] || 0),
+                        }))
+                        .sort((a, b) => a.time - b.time);
+
+                    // Selecting the first few events whose total time is under the threshold
+                    let middleEvents = [];
+                    let sum1 = 0,
+                        sum2 = 0;
+
+                    for (let item of sortedEvents1) {
+                        if (sum1 + item.time < threshold) {
+                            sum1 += item.time;
+                            middleEvents.push(item.event);
+                        } else break;
+                    }
+
+                    for (let item of sortedEvents2) {
+                        if (sum2 + item.time < threshold) {
+                            sum2 += item.time;
+                            middleEvents.push(item.event);
+                        } else break;
+                    }
+
+                    diff =
+                        middleEvents.length > 0
+                            ? `<p title="Suggested middle events, should any competitor finish early.">Suggested events in the middle: ${middleEvents.join(
+                                  ', '
+                              )}</p>`
+                            : '';
+                }
 
                 bestCombinationDiv.innerHTML = `
                     <h3>Best Combination</h3>
                     <p>${competitor1Name} (${formatTime(group1Time)}): ${group1.join(', ')}</p>
                     <p>${competitor2Name} (${formatTime(group2Time)}): ${group2.join(', ')}</p>
+                    ${diff}
                     <p>Total Time: ${formatTime(bestTime)}</p>`;
             }
 
