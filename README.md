@@ -24,8 +24,8 @@ With tools specifically designed for event grouping, performance tracking, and r
 ## Key Features
 
 1. **Comprehensive Event Setup and Management**
-   - Select from a list of common cubing events or add custom events.
-   - Define parameters like maximum competitors per group and automatically assign roles such as scramblers, judges, and runners.
+   - Choose from a list of standard cubing events or create custom events.
+   - Set parameters like maximum competitors per group and automatically assign roles such as scramblers, judges, and runners.
 
 2. **Participant Tracking and Grouping**
    - Add competitors by name or WCA ID.
@@ -33,13 +33,13 @@ With tools specifically designed for event grouping, performance tracking, and r
    - Generate group assignments dynamically and visualize participant distribution across events.
 
 3. **Guildford Challenge Optimizer**
-   - A unique tool that calculates optimal event assignment splits between two competitors to minimize the combined time for all events.
-   - Pulls competitors' average times from WCA data, ensuring accurate and efficient event assignments.
-   - Provides a user-friendly interface for configuring event times and instantly displays optimized results.
+   - Calculate optimal event assignment splits between two competitors to minimize the combined time for all events.
+   - Pull competitors' average times from WCA data for accurate and efficient event assignments.
+   - Provide a user-friendly interface for configuring event times and instantly display optimized results.
 
 4. **WCA Integration**
    - Fetch real-time average times from WCA profiles, allowing event times to be calculated accurately based on official records.
-   - Automatically populates form fields based on WCA IDs, simplifying data entry for competitors.
+   - Automatically populate form fields based on WCA IDs, simplifying data entry for competitors.
 
 5. **Result Analysis and Reporting**
    - Generate detailed reports on event outcomes, participant performance, and overall competition statistics.
@@ -55,19 +55,19 @@ With tools specifically designed for event grouping, performance tracking, and r
 
 The following files include some of the most advanced and impactful features on **CubingTools.de**:
 
-### `grouping.js`
-Manages event setup and group assignments, providing:
-   - **Event Selection and Customization:** Choose from standard cubing events or add custom events, each displayed dynamically on the user interface.
-   - **Competitor Grouping and Role Assignment:** Automatically generates groups for each event, assigns competitors, and includes optional helpers (judges, runners).
-   - **Dynamic UI Management:** Seamlessly updates the page with competitor data, group lists, and role assignments, ensuring a real-time setup experience.
-
 ### `guildford.js`
 Facilitates the Guildford Challenge optimization with:
    - **URL Data Management:** Uses URL parameters to manage and retrieve competitor data, ensuring a quick setup for repeated uses.
    - **Time Optimization and Split Calculation:** Analyzes event times and splits events between two competitors to minimize overall time.
    - **WCA Data Integration and Visualization:** Pulls data from WCA for accurate timing and updates UI to display the optimal event division for both competitors.
 
-These two files represent some of the best features on **CubingTools.de**, delivering efficient event setup and advanced performance optimization.
+### `grouping.js`
+Manages event setup and group assignments, providing:
+   - **Event Selection and Customization:** Choose from standard cubing events or add custom events, each displayed dynamically on the user interface.
+   - **Competitor Grouping and Role Assignment:** Automatically generates groups for each event, assigns competitors, and includes optional helpers (judges, runners).
+   - **Dynamic UI Management:** Seamlessly updates the page with competitor data, group lists, and role assignments, ensuring a real-time setup experience.
+
+These two tools represent some of the best features on **CubingTools.de**, delivering efficient event setup and advanced performance optimization.
 
 ---
 
@@ -79,8 +79,20 @@ If you’re setting up a local version for development:
     ```bash
     git clone https://github.com/s-kling/cubingtools.de.git
     ```
-2. Install dependencies if any are listed.
-3. Use a local server or any HTTP server to serve the HTML/JavaScript files for testing.
+2. Navigate to the project directory:
+    ```bash
+    cd cubingtools.de
+    ```
+3. Install dependencies:
+    ```bash
+    npm install
+    ```
+4. Start the development server:
+    ```bash
+    npm run start
+    ```
+
+This will launch the application on a local server, accessible at either `http://localhost` or `http://localhost:8443`, depending on wether or not the `betaTest` is `true` or `false`.
 
 ---
 
@@ -88,7 +100,7 @@ If you’re setting up a local version for development:
 
 1. **Access the Platform**
    - Visit **[CubingTools.de](https://cubingtools.de)** to access the suite of cubing tools directly.
-   - Navigate through the site to find specific tools like the Event Manager or the Guildford Challenge Optimizer.
+   - Navigate through the site to find specific tools like the Groupifier or the Guildford Challenge Optimizer.
 
 2. **Using Grouping and Guildford Tools**
    - In the **Event Manager** section, set up events, add competitors, assign groups, and optimize competitor distribution within groups.
@@ -124,4 +136,4 @@ This project is licensed under the MIT License.
 
 ---
 
-This README provides a quick overview and usage guide for **CubingTools.de** and highlights the primary functionalities in `grouping.js` and `guildford.js`. For more details, please visit [CubingTools.de](https://cubingtools.de).
+This README provides a quick overview and usage guide for **CubingTools.de** and highlights the primary functionalities in `guildford.js` and `grouping.js`. For more details, please visit [CubingTools.de](https://cubingtools.de).
