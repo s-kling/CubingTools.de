@@ -99,8 +99,15 @@ function addEventInputs() {
         label2.appendChild(span2);
         label2.appendChild(input2);
 
-        input1.addEventListener('input', () => formatInputField(input1));
-        input2.addEventListener('input', () => formatInputField(input2));
+        input1.addEventListener('input', () => {
+            formatInputField(input1);
+            updateURLWithFormData();
+        });
+
+        input2.addEventListener('input', () => {
+            formatInputField(input2);
+            updateURLWithFormData();
+        });
 
         competitor1Events.appendChild(label1);
         competitor2Events.appendChild(label2);
@@ -541,6 +548,8 @@ async function processCombinationsWithAlphaBetaLive(competitor1, competitor2, pi
                 const eventDifference = Math.abs(group1.length - group2.length);
                 const threshold = averageTime / events.length + eventDifference * pickupTime;
 
+                var middleEventsText = '';
+
                 if (diff < threshold) {
                     const sortedEvents1 = group1
                         .map((event) => ({
@@ -575,7 +584,7 @@ async function processCombinationsWithAlphaBetaLive(competitor1, competitor2, pi
                         } else break;
                     }
 
-                    diff =
+                    middleEventsText =
                         middleEvents.length > 0
                             ? `<p title="Suggested middle events, should any competitor finish early.">Suggested events in the middle: ${middleEvents.join(
                                   ', '
@@ -587,7 +596,7 @@ async function processCombinationsWithAlphaBetaLive(competitor1, competitor2, pi
                     <h3>Best Combination</h3>
                     <p>${competitor1Name} (${formatTime(group1Time)}): ${group1.join(', ')}</p>
                     <p>${competitor2Name} (${formatTime(group2Time)}): ${group2.join(', ')}</p>
-                    ${diff}
+                    ${middleEventsText}
                     <p>Total Time: ${formatTime(bestTime)}</p>`;
             }
 

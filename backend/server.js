@@ -7,7 +7,7 @@ const bodyParser = require('body-parser');
 const app = express();
 const httpsPort = 443; // Default https port
 const betaPort = 8443; // Port for beta testing
-const betaTest = false;
+const betaTest = true;
 
 // Load the SSL certificate and private key
 const privateKey = fs.readFileSync('./backend/credentials/cubingtools_private_key.key');
@@ -86,4 +86,27 @@ if (betaTest) {
     httpsServer.listen(httpsPort, () => {
         console.log('Listening for https://');
     });
+}
+
+process.on('SIGINT', () => {
+    console.log('Received SIGINT. Shutting down gracefully...');
+    httpsServer.close();
+    process.exit(0);
+});
+
+setInterval(() => statusUpdate(), 24 * 60 * 60 * 1000); // Log status every 24 hours
+
+function statusUpdate() {
+    const memoryUsage = process.memoryUsage();
+    const uptime = process.uptime();
+    const logFileSize = fs.existsSync(logFilePath) ? fs.statSync(logFilePath).size : 0;
+    const statusLog = `
+        Status Update:
+        - Uptime: ${Math.floor(uptime / 60)} minutes
+        - Memory Usage: RSS ${Math.round(memoryUsage.rss / 1024 / 1024)} MB, 
+                        Heap Total ${Math.round(memoryUsage.heapTotal / 1024 / 1024)} MB, 
+                        Heap Used ${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB
+        - Log File Size: ${Math.round(logFileSize / 1024)} KB
+    `;
+    console.log(statusLog);
 }

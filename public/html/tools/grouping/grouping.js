@@ -710,13 +710,11 @@ function deleteCompetitor(id) {
     }
 }
 
-function finalizeCompetitors() {
+async function finalizeCompetitors() {
     competitionData.competitors = competitors;
 
     document.getElementById('competitor-setup').style.display = 'none';
     document.getElementById('grouping-results').style.display = 'block';
-
-    storeCompetitionDataInURL();
 
     generateGroups();
 }
@@ -890,6 +888,7 @@ async function generateGroups() {
     }
 
     generateGroupHTML();
+    storeCompetitionDataInURL();
 }
 
 function generateGroupHTML() {

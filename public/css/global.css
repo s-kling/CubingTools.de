@@ -317,9 +317,16 @@ nav ul li a:hover {
 }
 
 /* Version Section Styles */
-.version-tag {
+#version {
     grid-area: version;
     display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.version-tag {
+    display: flex;
+    width: 100%;
     justify-content: center;
     align-items: center;
     background-color: var(--main-lighter);
