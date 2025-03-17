@@ -8,6 +8,124 @@ window.onload = function () {
     displayTags();
 };
 
+const targetInput = document.getElementById('target');
+const timeInput = document.getElementById('timeInput');
+
+targetInput.addEventListener('input', () => {
+    formatInputField(targetInput);
+    calculateAverage();
+});
+
+timeInput.addEventListener('input', () => {
+    formatInputField(timeInput);
+});
+
+function formatInputField(input) {
+    var currentValue = input.value;
+
+    if (input.value.includes('DNF')) {
+        input.value = '0.00';
+    } else if (/[a-zA-Z]/.test(currentValue)) {
+        input.value = 'DNF';
+        return;
+    }
+
+    var valDigitsOnly = currentValue.replace(/[^0-9]/g, '');
+
+    while (valDigitsOnly.startsWith('0')) {
+        valDigitsOnly = valDigitsOnly.substring(1, valDigitsOnly.length);
+    }
+
+    if (valDigitsOnly.length < 3) {
+        while (valDigitsOnly.length < 3) {
+            valDigitsOnly = '0' + valDigitsOnly;
+        }
+    }
+
+    var currLength = valDigitsOnly.length;
+    var modified = '';
+    if (currLength <= 4) {
+        modified =
+            valDigitsOnly.slice(0, currLength - 2) + '.' + valDigitsOnly.slice(currLength - 2);
+
+        if (modified == '0.00') {
+            modified = '';
+        }
+    } else if (currLength > 4) {
+        modified =
+            valDigitsOnly.slice(0, currLength - 2) + '.' + valDigitsOnly.slice(currLength - 2);
+        modified =
+            modified.slice(0, modified.length - 5) + ':' + modified.slice(modified.length - 5);
+    }
+    input.value = modified;
+}
+
+// Function to update URL with form data (including event times)
+function updateURLWithFormData() {
+    const params = new URLSearchParams();
+
+    // Get the main form values
+    const pickupTime = document.getElementById('pickup').value;
+    const solvecount = document.getElementById('solvecount').value;
+    const competitor1Id = document.getElementById('c1-wca').value;
+    const competitor2Id = document.getElementById('c2-wca').value;
+
+    // Add main form values to the query parameters
+    if (pickupTime) params.set('pickup', pickupTime);
+    if (solvecount) params.set('solvecount', solvecount);
+    if (competitor1Id) params.set('c1', competitor1Id);
+    if (competitor2Id) params.set('c2', competitor2Id);
+    if (competitor1Name) params.set('c1name', competitor1Name);
+    if (competitor2Name) params.set('c2name', competitor2Name);
+
+    // Add event times for Competitor 1
+    events.forEach((event) => {
+        const time = document.getElementById(`c1-${event}`).value;
+        if (time) params.set(`c1-${event}`, time);
+    });
+
+    // Add event times for Competitor 2
+    events.forEach((event) => {
+        const time = document.getElementById(`c2-${event}`).value;
+        if (time) params.set(`c2-${event}`, time);
+    });
+
+    // Update the URL without reloading the page
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState({}, '', newUrl);
+}
+
+// Function to populate form inputs from URL parameters
+function populateFormFromURL() {
+    const params = new URLSearchParams(window.location.search);
+
+    // Populate main form values
+    if (params.has('pickup')) document.getElementById('pickup').value = params.get('pickup');
+    if (params.has('solvecount'))
+        document.getElementById('solvecount').value = params.get('solvecount');
+    if (params.has('c1')) document.getElementById('c1-wca').value = params.get('c1');
+    if (params.has('c2')) document.getElementById('c2-wca').value = params.get('c2');
+    if (params.has('c1name')) competitor1Name = params.get('c1name');
+    if (params.has('c2name')) competitor2Name = params.get('c2name');
+
+    document.getElementById('c1-name').textContent = competitor1Name;
+    document.getElementById('c2-name').textContent = competitor2Name;
+
+    // Populate event times for Competitor 1
+    events.forEach((event) => {
+        if (params.has(`c1-${event}`)) {
+            document.getElementById(`c1-${event}`).value = params.get(`c1-${event}`);
+        }
+    });
+
+    // Populate event times for Competitor 2
+    events.forEach((event) => {
+        if (params.has(`c2-${event}`)) {
+            document.getElementById(`c2-${event}`).value = params.get(`c2-${event}`);
+        }
+    });
+}
+
 // Function to add time to the sorted list
 async function addTime() {
     const wcaId = document.getElementById('wca').value.toUpperCase().trim();

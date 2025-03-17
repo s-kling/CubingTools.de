@@ -68,12 +68,10 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Import and use the API routes
 const toolsRoutes = require('./API/tools');
 const apiRoutes = require('./API/api');
-const submitRegistrationRoute = require('./API/submitRegistration');
 const pagesRoutes = require('./API/routes');
 
 app.use(toolsRoutes);
 app.use(apiRoutes);
-app.use(submitRegistrationRoute);
 app.use(pagesRoutes);
 
 const httpsServer = https.createServer(credentials, app);
@@ -101,7 +99,7 @@ function statusUpdate() {
     const uptime = process.uptime();
     const logFileSize = fs.existsSync(logFilePath) ? fs.statSync(logFilePath).size : 0;
     const statusLog = `
-        Status Update:
+        Status Update ${betaTest ? 'Beta' : ''}:
         - Uptime: ${Math.floor(uptime / 60)} minutes
         - Memory Usage: RSS ${Math.round(memoryUsage.rss / 1024 / 1024)} MB, 
                         Heap Total ${Math.round(memoryUsage.heapTotal / 1024 / 1024)} MB, 
