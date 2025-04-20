@@ -1,17 +1,19 @@
 .results-grid {
     display: grid;
-    height: 280px;
+    height: 350px;
     grid-template-columns: 1fr 1fr;
     grid-template-rows: 1fr 1fr;
     grid-template-areas:
         "solves average"
         "solves saved";
-    padding: var(--main-margin);
     grid-gap: var(--main-margin);
-    background-color: var(--main-backgorund);
     border-radius: var(--main-radius);
-    border: 1px solid var(--input-border);
     margin-top: 10px;
+}
+
+.results-grid>div {
+    padding: 10px;
+    border-radius: var(--main-radius);
 }
 
 .results-grid h3 {
@@ -69,22 +71,46 @@
 
 .tag {
     display: inline-block;
-    width: 98%;
+    width: 100%;
     cursor: pointer;
     padding: var(--space-xs);
-    margin: 5px;
+    margin: 5px auto; /* Center horizontally */
     border-radius: var(--main-radius);
     border: 1px solid var(--input-border);
     background-color: var(--input-background);
     color: var(--main-text);
 }
 
-.warning {
-    color: darkred;
+.result-card {
+    background-color: var(--main-background);
+    border: 1px solid var(--input-border);
+    border-radius: var(--main-radius);
+    padding: var(--space-md) var(--space-lg);
+    max-width: 500px;
+    margin: var(--space-md) auto;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
 }
 
-.success {
-    color: darkgreen;
+.result-line {
+    margin: var(--space-sm) 0;
+    font-size: var(--font-size-md);
+    color: var(--main-text);
+}
+
+.result-line strong {
+    color: var(--main-text-strong);
+}
+
+.rank {
+    color: var(--secondary-text);
+    font-style: italic;
+    font-size: var(--font-size-sm);
+    margin-left: var(--space-xs);
+}
+
+.warning {
+    color: #b30000;
+    font-weight: bold;
 }
 
 #popup {
@@ -94,9 +120,9 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.7);
+    background-color: rgba(0, 0, 0, 0.8);
     color: var(--main-text);
-    font-size: 2rem;
+    font-size: var(--font-size-lg);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -105,15 +131,30 @@
 
 #popup #popupContent {
     border-radius: var(--main-radius);
-    color: black;
-    background-color: white;
-    padding: 20px;
+    color: var(--main-text);
+    background-color: var(--main-background);
+    padding: var(--space-lg);
+    width: 80%;
+    max-width: 600px;
+    text-align: center;
 }
 
 #popup #popupContent p {
-    color: black;
+    color: var(--main-text);
+    font-size: var(--font-size-md);
+    margin-bottom: var(--space-md);
 }
 
 #popup #popupContent button {
     background-color: var(--button-background);
+    color: var(--button-text);
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--main-radius);
+    border: none;
+    cursor: pointer;
+    font-size: var(--font-size-md);
+}
+
+#popup #popupContent button:hover {
+    background-color: var(--button-hover-background);
 }

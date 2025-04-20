@@ -1,5 +1,5 @@
 /* Import Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css');
 
 /* Root Variables */
@@ -17,8 +17,8 @@
     --space-xxl: 84px;
 
     /* Colors */
-    --main-background: #18181B;
-    --secondary-background: #222226;
+    --main-background: #000000;
+    --secondary-background: #191923;
     --main-lighter: #2A2A31;
     --main-text: #F4F4F5;
     --secondary-text: #A1A1AA;
@@ -33,7 +33,7 @@
     --gradient-end: #3731a2;
 
     /* Fonts */
-    --font-main: 'Inter', sans-serif;
+    --font-main: 'Poppins', sans-serif;
     --font-size-base: clamp(14px, 16px, 18px);
     --font-size-lg: clamp(16px, 18px, 20px);
     --font-size-xl: clamp(28px, 32px, 36px);
@@ -45,27 +45,6 @@
     /* Card Dimensions */
     --card-width: 320px;
     --card-height: 200px;
-}
-
-/* Prefers lighter color scheme */
-@media (prefers-color-scheme: light) {
-    :root {
-        /* Colors */
-        --main-background: #EAECEF;
-        --secondary-background: #F8F9FA;
-        --main-lighter: #DEE2E6;
-        --main-text: #1A1A1D;
-        --secondary-text: #4A4A4D;
-        --hover-text: #000000;
-        --hover-background: #D0D5DA;
-        --link-color: #0077B6;
-        --link-underline: #1A1A1D;
-        --input-background: #FFFFFF;
-        --input-border: #B0B8C0;
-        --button-background: #2563EB;
-        --gradient-start: #E0F2FF;
-        --gradient-end: #7AB2FF;
-    }
 }
 
 /* Global Styles */
@@ -181,7 +160,7 @@ a::before {
     transition: width 0.2s;
 }
 
-a:hover::before {
+a:not(.logo):hover::before {
     width: 100%;
 }
 
@@ -314,6 +293,10 @@ nav ul li a:hover {
     border-radius: var(--main-radius);
     padding: var(--main-padding);
     margin: var(--space-xs) 0;
+}
+
+#sidebar h3 {
+    font-weight: 400;
 }
 
 /* Version Section Styles */
@@ -524,6 +507,10 @@ footer p {
 
     .small-screen {
         display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: clamp(10px, 2vw, 20px);
     }
 }
 

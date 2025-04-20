@@ -603,7 +603,8 @@ function updateCompetitorForm() {
 }
 
 function addCompetitor() {
-    const name = document.getElementById('competitor-name').value;
+    const name = document.getElementById('competitor-name').value.trim();
+
     var wcaId = false;
     if (!name) return;
 

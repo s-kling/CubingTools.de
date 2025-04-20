@@ -1,10 +1,12 @@
 {
   "name": "cubingtools",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "backend/server.js",
   "scripts": {
-    "dev": "node inspect backend/server.js",
-    "start": "node backend/server.js"
+    "debug": "node inspect backend/server.js",
+    "start": "node backend/server.js",
+    "beta": "node backend/server.js --beta",
+    "dev": "node backend/server.js --beta --debug"
   },
   "author": "S. Kling",
   "license": "MIT",
@@ -13,7 +15,6 @@
     "axios": "^1.7.9",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "nodemailer": "^6.10.0",
     "npm": "^10.9.2"
   }
 }

@@ -2,22 +2,54 @@
 <html lang="en">
 
 <head>
+    <!-- Basic Metadata -->
+    <title>Guildford Optimizer</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Guildford Optimizer</title>
+    <meta name="description" content="Tool for optimizing Guildford challenge event combinations between two competitors based on their World Cube Association (WCA) average times. The script updates the URL with form data, fetches and displays WCA data for each competitor, and calculates optimal event divisions to minimize total solve time.">
+    <meta name="keywords" content="WCA, world cube association, cubing, speedcubing, tool, tools, cubingtools, cubing tool, cubing tools, mini-guildford, mini guildford challenge, guildford, guildford challenge, challenge, optimizer, guildford optimizer, mini-guildford optimizer, mini guildford optimizer, guildford optimiser, optimiser, mini guildford optimiser, mini-guildford optimiser, guildford optimiser">
+    
+    <!-- Other Fancy Things -->
+    <link rel="icon" href="/assets/favicon.ico" type="image/x-icon">
+    <link rel="apple-touch-icon" href="/assets/logo_no_text.png">
 
-    <meta name="description"
-        content="Tool for optimizing Guildford challenge event combinations between two competitors based on their World Cube Association (WCA) average times. The script updates the URL with form data, fetches and displays WCA data for each competitor, and calculates optimal event divisions to minimize total solve time.">
-    <meta name="keywords" content="WCA, world cube association, cubing, speedcubing, tool, tools, cubingtools, cubing tool, cubing tools, mini-guildford, mini guildford challenge, guildford, guildford challenge, challenge, optimizer, guildford optimizer, mini-guildford optimizer, mini guildford optimizer, guildford optimiser, optimiser, mini guildford optimiser, mini-guildford optimiser, guildford optimiser
-        ">
-    <meta name="author" content="CubingTools">
-
+    <!-- Open Graph Metadata (Facebook, LinkedIn, WhatsApp, Discord, etc.) -->
+    <meta property="og:title" content="CubingTools.de Guildford Optimizer" />
+    <meta property="og:description" content="Tool for optimizing Guildford challenge event combinations between two competitors based on their World Cube Association (WCA) average times. The script updates the URL with form data, fetches and displays WCA data for each competitor, and calculates optimal event divisions to minimize total solve time." />
+    <meta property="og:image" content="/assets/guildford_logo.png" />
+    <meta property="og:image:alt" content="CubingTools.de Logo" />
+    <meta property="og:url" content="https://cubingtools.de/tools/guildford" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="en_US" />
+    
+    <!-- Twitter Card Metadata -->
+    <!-- We boycott Twitter/X -->
+  
+    <!-- Fallback Metadata -->
+    <meta name="robots" content="index, follow">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  
+    <!-- Structured Data (for Google) -->
+    <script type="application/ld+json">
+        {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "CubingTools.de Guildford Optimizer",
+        "description": "Tool for optimizing Guildford challenge event combinations between two competitors based on their World Cube Association (WCA) average times. The script updates the URL with form data, fetches and displays WCA data for each competitor, and calculates optimal event divisions to minimize total solve time.",
+        "image": "https://cubingtools.de/assets/guildford_logo.png",
+        "url": "https://cubingtools.de/tools/guildford"
+        }
+    </script>
+  
+    <!-- CSS Stylesheets -->
     <link rel="stylesheet" href="../../css/global.css">
     <link rel="stylesheet" href="/css/guildford">
 
-    <link rel="icon" href="../../assets/cubingtools.png" type="image/x-icon">
-    <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
-</head>
+    <!-- JS Files -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P" defer></script>
+    <script src="../../js/setupPage.js" defer></script>
+    <script src="/js/guildford" defer></script>
+</head>  
 
 <div id="cookie-consent-banner">
     <p>
@@ -97,10 +129,6 @@
         </main>
         <footer id="footer"></footer>
     </div>
-
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P"></script>
-    <script src="../../js/setupPage.js"></script>
-    <script src="/js/guildford"></script>
 </body>
 
 </html>

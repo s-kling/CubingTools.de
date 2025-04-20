@@ -2,22 +2,54 @@
 <html lang="en">
 
 <head>
+    <!-- Basic Metadata -->
+    <title>Average Calculator</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Average Calculator</title>
+    <meta name="description" content="This tool allows users to track and manage competition times for WCA events. Users can input times, calculate averages, and view their personal ranks against official results via WCA's API. The program also lets users save and view tagged averages, which are stored in cookies for easy access.">
+    <meta name="keywords" content="WCA, world cube association, cubing, speedcubing, tool, tools, cubingtools, cubing tool, cubing tools, ao5, average of 5, mo3, mean of 3, average, mean, calculator, calculate, pr, personal record">
+    
+    <!-- Other Fancy Things -->
+    <link rel="icon" href="/assets/favicon.ico" type="image/x-icon">
+    <link rel="apple-touch-icon" href="/assets/logo_no_text.png">
 
-    <meta name="description"
-        content="This tool allows users to track and manage competition times for WCA events. Users can input times, calculate averages, and view their personal ranks against official results via WCA's API. The program also lets users save and view tagged averages, which are stored in cookies for easy access." />
-    <meta name="keywords"
-        content="WCA, world cube association, cubing, speedcubing, tool, tools, cubingtools, cubing tool, cubing tools, ao5, average of 5, mo3, mean of 3, average, mean, calculator, calculate, pr, personal record" />
-    <meta name="author" content="CubingTools" />
-
+    <!-- Open Graph Metadata (Facebook, LinkedIn, WhatsApp, Discord, etc.) -->
+    <meta property="og:title" content="CubingTools.de Average Calculator" />
+    <meta property="og:description" content="This tool allows users to track and manage competition times for WCA events. Users can input times, calculate averages, and view their personal ranks against official results via WCA's API. The program also lets users save and view tagged averages, which are stored in cookies for easy access." />
+    <meta property="og:image" content="/assets/average_logo.png" />
+    <meta property="og:image:alt" content="CubingTools.de Logo" />
+    <meta property="og:url" content="https://cubingtools.de/tools/average" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="en_US" />
+    
+    <!-- Twitter Card Metadata -->
+    <!-- We boycott Twitter/X -->
+  
+    <!-- Fallback Metadata -->
+    <meta name="robots" content="index, follow">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  
+    <!-- Structured Data (for Google) -->
+    <script type="application/ld+json">
+        {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "CubingTools.de Average Calculator",
+        "description": "This tool allows users to track and manage competition times for WCA events. Users can input times, calculate averages, and view their personal ranks against official results via WCA's API. The program also lets users save and view tagged averages, which are stored in cookies for easy access.",
+        "image": "https://cubingtools.de/assets/average_logo.png",
+        "url": "https://cubingtools.de/tools/average"
+        }
+    </script>
+  
+    <!-- CSS Stylesheets -->
     <link rel="stylesheet" href="../../css/global.css">
     <link rel="stylesheet" href="/css/average">
 
-    <link rel="icon" href="../../assets/cubingtools.png" type="image/x-icon">
-    <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
-</head>
+    <!-- JS Files -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P" defer></script>
+    <script src="../../js/setupPage.js" defer></script>
+    <script src="/js/average" defer></script>
+</head>  
 
 <div id="cookie-consent-banner">
     <p>
@@ -42,45 +74,15 @@
             <section class="heading">
                 <h1>WCA Average Calculator</h1>
                 <p>
-                    This site provides an interactive tool for cubing enthusiasts to track their solve times,
-                    calculate averages, and monitor their personal ranks (PR) for different cubing events. You input
-                    your solve times, which are then processed and displayed in real-time on the site. The tool fetches
-                    personal rank data from the World Cube Association, showing how each solve compares to your
-                    historical results. After five solves, the site calculates the average and saves it as a
-                    "tag" along with the individual times and creation date. This allows you to retain a record of
-                    past averages and view them in a structured list, which can be managed and updated as they continue
-                    to improve.
+                    This tool helps cubing enthusiasts track solve times, calculate averages, and monitor personal ranks (PR) for various events.
                 </p>
-                <label><span>WCA ID:</span><input type="text" id="wca"></label>
-                <label><span>Event:</span>
-                    <select name="event" id="event-type">
-                        <optgroup label="WCA Events">
-                            <option value="333">3x3x3</option>
-                            <option value="222">2x2x2</option>
-                            <option value="444">4x4x4</option>
-                            <option value="555">5x5x5</option>
-                            <option value="666">6x6x6</option>
-                            <option value="777">7x7x7</option>
-                            <option value="333bf">3x3x3 Blindfolded</option>
-                            <option value="333oh">3x3x3 One-Handed</option>
-                            <option value="clock">Clock</option>
-                            <option value="minx">Megaminx</option>
-                            <option value="pyram">Pyraminx</option>
-                            <option value="skewb">Skewb</option>
-                            <option value="sq1">Square-1</option>
-                            <option value="444bf">4x4x4 Blindfolded</option>
-                            <option value="555bf">5x5x5 Blindfolded</option>
-                        <optgroup label="Custom">
-                            <option value="ccc">Custom Cube</option>
-                    </select>
+                <p>
+                    Input your solve times to see real-time results and compare them to your historical data. After five solves, the tool calculates and saves the average as a "tag" for future reference.
+                </p>
+                <label>
+                    <input type="text" id="timeInput" placeholder="0.00" style="margin-right: 20px;" />
+                    <button id="addButton">Add Time</button>
                 </label>
-                <label><span>Target Average:</span>
-                    <input type="text" id="target" placeholder="0.00" />
-                </label>
-                <label><span>Time in seconds:</span>
-                    <input type="text" id="timeInput" placeholder="0.00" />
-                </label>
-                <button id="addButton">Add Time</button>
 
                 <div class="results-grid">
                     <div class="times">
@@ -97,18 +99,44 @@
                     </div>
                 </div>
 
+                <label><span>Target Average:</span>
+                    <input type="text" id="target" placeholder="0.00" />
+                </label>
+
+                <label>
+                    <label style="margin-right: 20px;"><span>WCA ID:</span><input type="text" id="wca" placeholder="2023KLIN02"></label>
+                    <label><span>Event:</span>
+                        <select name="event" id="event-type">
+                            <optgroup label="WCA Events">
+                                <option value="333">3x3x3</option>
+                                <option value="222">2x2x2</option>
+                                <option value="444">4x4x4</option>
+                                <option value="555">5x5x5</option>
+                                <option value="666">6x6x6</option>
+                                <option value="777">7x7x7</option>
+                                <option value="333bf">3x3x3 Blindfolded</option>
+                                <option value="333oh">3x3x3 One-Handed</option>
+                                <option value="clock">Clock</option>
+                                <option value="minx">Megaminx</option>
+                                <option value="pyram">Pyraminx</option>
+                                <option value="skewb">Skewb</option>
+                                <option value="sq1">Square-1</option>
+                                <option value="444bf">4x4x4 Blindfolded</option>
+                                <option value="555bf">5x5x5 Blindfolded</option>
+                            <optgroup label="Custom">
+                                <option value="ccc">Custom Cube</option>
+                        </select>
+                    </label>
+                </label>
+
                 <div id="popup" style="display: none;">
                     <div id="popupContent"></div>
                 </div>
             </section>
         </main>
+        
         <footer id="footer"></footer>
     </div>
-
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P"></script>
-
-    <script src="../../js/setupPage.js"></script>
-    <script src="/js/average"></script>
 </body>
 
 </html>

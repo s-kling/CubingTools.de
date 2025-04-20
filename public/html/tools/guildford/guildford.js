@@ -320,18 +320,39 @@ document.getElementById('timeForm').addEventListener('submit', async function (e
 
 // Function to fetch average times from the API for a given WCA ID and event
 async function getCurrentAverage(wcaId, event) {
-    solvecount = parseInt(document.getElementById('solvecount').value) || 25;
-    const apiUrl = `/api/wca/${wcaId}/${event}?num=${solvecount}`;
+    // Validate and sanitize inputs
+    const sanitizedWcaId = wcaId.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    const sanitizedEvent = event.replace(/[^a-zA-Z0-9]/g, '');
+    const solvecount = parseInt(document.getElementById('solvecount').value) || 25;
+
+    // Construct the API URL
+    const apiUrl = `/api/wca/${encodeURIComponent(sanitizedWcaId)}/${encodeURIComponent(
+        sanitizedEvent
+    )}?num=${solvecount}`;
 
     try {
         const response = await fetch(apiUrl);
+
+        // Check for suspicious responses or errors
         if (!response.ok) {
+            if (response.status === 404) {
+                console.warn(
+                    `API returned 404 for WCA ID: ${sanitizedWcaId}, Event: ${sanitizedEvent}`
+                );
+            }
             throw new Error(`Error fetching data: ${response.statusText}`);
         }
+
         const data = await response.json();
+
+        // Validate the response structure
+        if (!data || typeof data.average !== 'number') {
+            throw new Error('Invalid response format from API');
+        }
+
         return data.average;
     } catch (error) {
-        console.error(`Error fetching average for event ${event}: ${error.message}`);
+        console.error(`Error fetching average for event ${sanitizedEvent}: ${error.message}`);
         return null;
     }
 }

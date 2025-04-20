@@ -3,7 +3,15 @@ const path = require('path');
 const router = express.Router();
 const fs = require('fs');
 
-require('dotenv').config({ path: path.resolve(__dirname, '../.env') }); // Specify the path to the .env file
+router.use((req, res, next) => {
+    try {
+        decodeURIComponent(req.path);
+        next();
+    } catch (err) {
+        console.error('Bad URL detected:', req.url);
+        res.status(400).send('Bad Request');
+    }
+});
 
 // Serve the main page
 router.get('/', (req, res) => {
@@ -115,6 +123,25 @@ router.get('/js/:jsName', (req, res) => {
     const jsFile = path.join(__dirname, `../../public/html/tools`, jsName, `${jsName}.js`);
 
     res.sendFile(jsFile, (err) => {
+        if (err) {
+            // Extract the directory from the requested path
+            const requestedPath = req.path;
+
+            // Find the directory from the requested path (first segment of the path after '/')
+            const pathSegments = requestedPath.split('/').filter(Boolean); // Filter out empty strings
+
+            // Redirect to the 404 page with the directory as a query parameter
+            res.status(404);
+            res.redirect(`/404?dir=${pathSegments.join('/')}`);
+        }
+    });
+});
+
+router.get('/assets/:assetName', (req, res) => {
+    const assetName = req.params.assetName;
+    const assetFile = path.join(__dirname, `../../public/html/tools`, assetName, `${assetName}`);
+
+    res.sendFile(assetFile, (err) => {
         if (err) {
             // Extract the directory from the requested path
             const requestedPath = req.path;

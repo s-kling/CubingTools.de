@@ -91,7 +91,7 @@ async function addVersionTag() {
         const version = await response.json();
 
         versionElement.innerText =
-            window.location.port == 443 ? `v${version.version}` : `BETA ${version.version}`;
+            window.location.port == 8443 ? `BETA ${version.version}` : `v${version.version}`;
     } catch (error) {
         console.error('Error loading version:', error);
         versionElement.innerText = 'Error loading version';
@@ -103,10 +103,19 @@ async function addVersionTag() {
 function setupNavbar() {
     const navbar = document.getElementById('navbar');
     navbar.innerHTML = '';
-
     const logo = document.createElement('a');
     logo.href = '/';
     logo.className = 'logo';
+
+    const logoImage = document.createElement('img');
+    logoImage.src = '/assets/logo_long.png';
+    logoImage.alt = 'CubingTools Logo';
+    logoImage.className = 'logo-image';
+    logoImage.style.maxHeight = '50px'; // Limit the size to match the text logo
+
+    logo.style.display = 'flex';
+    logo.style.alignItems = 'center';
+    logo.appendChild(logoImage);
 
     const hamburger = document.createElement('input');
     hamburger.type = 'checkbox';
@@ -136,13 +145,11 @@ function setupNavbar() {
             location.port = 443; // Redirect to release port
         };
         changeRelease.innerHTML = '<a href="#">Full Release</a>';
-        logo.innerHTML = 'CubingTools.BETA';
     } else {
         changeRelease.onclick = () => {
             location.port = 8443; // Redirect to beta testing port
         };
         changeRelease.innerHTML = '<a href="#">Beta</a>';
-        logo.innerHTML = 'CubingTools';
     }
 
     pages.appendChild(homeLink);
@@ -186,8 +193,9 @@ function setupFooter() {
     footerDiv.className = 'footer-content';
 
     // Copyright
-    const footerText = document.createElement('p');
+    const footerText = document.createElement('a');
     footerText.innerHTML = '© 2025 CubingTools by Sebastian Kling';
+    footerText.href = 'mailto:sebastian@cubingtools.de';
     footerText.className = 'small-screen';
 
     // Credit

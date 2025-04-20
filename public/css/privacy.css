@@ -12,23 +12,13 @@ select {
 }
 
 #policy-content {
-    font-family: 'Inter', sans-serif;
-    /* Matches global font for consistency */
     line-height: 1.6;
-    /* Improves readability */
     color: #333;
-    /* Neutral text color for contrast */
     background-color: #fff;
-    /* Ensure clear contrast with text */
     padding: 20px;
-    /* Add spacing for content */
-    margin-top: 20px;
     border-radius: 5px;
-    /* A subtle rounded corner */
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    /* Subtle shadow for separation */
     overflow: auto;
-    /* Handle overflow for large content */
 }
 
 #policy-content h1,
