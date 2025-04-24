@@ -451,6 +451,25 @@ function addCustomEvent() {
     handleAddingEventDivs(event, eventCheckboxes);
 }
 
+const eventSearchbar = document.getElementById('event-searchbar');
+
+eventSearchbar.addEventListener('input', (e) => {
+    const searchTerm = e.target.value.toLowerCase();
+    const eventCheckboxes = document.getElementById('event-checkboxes');
+    const eventCheckboxDivs = eventCheckboxes.querySelectorAll('.event-checkbox');
+
+    eventCheckboxDivs.forEach((checkbox) => {
+        const pNameTag = checkbox.querySelector('p');
+        const eventName = pNameTag.textContent.toLowerCase();
+        const eventShortName = pNameTag.parentElement.id.toLowerCase();
+        if (eventName.includes(searchTerm) || eventShortName.includes(searchTerm)) {
+            checkbox.style.display = 'block';
+        } else {
+            checkbox.style.display = 'none';
+        }
+    });
+});
+
 function handleAddingEventDivs(event, eventCheckboxes) {
     if (!eventCheckboxes) eventCheckboxes = document.getElementById('event-checkboxes');
 
