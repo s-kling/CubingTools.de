@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const router = express.Router();
 const fs = require('fs');
+const events = require('../events');
 
 router.use((req, res, next) => {
     try {
@@ -48,6 +49,11 @@ router.get('/status', (req, res) => {
     res.json(statusReport);
 });
 
+// Serve the events
+router.get('/events', (req, res) => {
+    res.json({ events: events });
+});
+
 // Serve the main page
 router.get('/privacy-policy', (req, res) => {
     res.sendFile(path.join(__dirname, '..', '../public/html', 'privacy.html'));
@@ -65,7 +71,7 @@ router.get('/404', (req, res) => {
 
 // Serve the apple-touch-icon.png
 router.get('/apple-touch-icon.png', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', '../public/assets', 'apple-touch-icon.png'));
+    res.sendFile(path.join(__dirname, '..', '../public/assets', 'logo_with_text.png'));
 });
 
 // Serve the sitemap
@@ -124,6 +130,7 @@ router.get('/js/:jsName', (req, res) => {
 
     res.sendFile(jsFile, (err) => {
         if (err) {
+            console.error(`Error serving JS file: ${err}`);
             // Extract the directory from the requested path
             const requestedPath = req.path;
 

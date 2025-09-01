@@ -29,8 +29,6 @@
     --input-background: #32323E;
     --input-border: #4A4A5C;
     --button-background: #4F46E5;
-    --gradient-start: #1E1E28;
-    --gradient-end: #3731a2;
 
     /* Fonts */
     --font-main: 'Poppins', sans-serif;
@@ -41,10 +39,6 @@
     /* Padding & Margin */
     --main-padding: 16px;
     --main-margin: 8px;
-
-    /* Card Dimensions */
-    --card-width: 320px;
-    --card-height: 200px;
 }
 
 /* Global Styles */
@@ -56,11 +50,151 @@
     font-size: var(--font-size-base);
 }
 
+/* Body with animated gradient background */
 body {
     background-color: var(--main-background);
     color: var(--main-text);
     max-height: 100vh;
     overflow: hidden;
+}
+
+/* HERO INTRO */
+.hero {
+    position: fixed;
+    top: 0; left: 0;
+    height: 130vh;
+    width: 100%;
+    background: linear-gradient(135deg, #ff007a, #ffcc00, #00e1ff, #7b00ff);
+    background-size: 400% 400%;
+    animation: gradientShift 12s ease infinite;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    z-index: 9999;
+    overflow: hidden;
+    padding: 30px;
+}
+
+.hero h1 {
+    font-size: 3rem;
+    font-weight: 900;
+    color: white;
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
+    margin-bottom: 10px;
+    opacity: 0;
+    transform: translateY(40px);
+    animation: fadeSlideIn 0.8s ease forwards;
+}
+
+.hero p {
+    font-size: 1.5rem;
+    color: #fff;
+    margin-bottom: 30px;
+    opacity: 0;
+    transform: translateY(40px);
+    animation: fadeSlideIn 0.8s ease forwards;
+    animation-delay: 0.3s;
+}
+
+/* THREE INFO CARDS INSIDE HERO */
+.hero .info-section {
+    display: flex;
+    gap: 20px;
+    width: 100%;
+    max-width: 1000px;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.hero .info-card {
+    flex: 1;
+    height: fit-content;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    padding: 20px;
+    color: #fff;
+    cursor: pointer;
+    transition: flex 0.4s ease, transform 0.3s ease, box-shadow 0.3s ease;
+    text-overflow: ellipsis;
+    opacity: 0;
+    transform: translateY(40px);
+    animation: fadeSlideIn 0.8s ease forwards;
+    transition: all 0.3s ease;
+}
+
+.hero .info-card:nth-child(1) { animation-delay: 0.6s; }
+.hero .info-card:nth-child(2) { animation-delay: 0.9s; }
+.hero .info-card:nth-child(3) { animation-delay: 1.2s; }
+
+.hero .info-card:hover {
+    scale: 1.05;
+    transition: all 0.3s ease;
+}
+
+.hero .info-card h2 {
+    margin-bottom: 10px;
+    font-size: 1.3rem;
+    font-weight: bold;
+}
+
+.hero .info-card p {
+    font-size: 0.95rem;
+    line-height: 1.4;
+    text-align: justify;
+    hyphens: auto;
+    max-height: 70px;
+    transition: max-height 0.4s ease;
+}
+
+.hero #what-changed {
+    background: rgba(80, 80, 80, 0.1);
+    border: 2px solid rgba(80, 80, 80, 0.2);
+}
+
+.hero #follow-bluesky {
+    background: rgba(90, 113, 250, 0.1);
+    border: 2px solid rgba(90, 113, 250, 0.2);
+}
+
+/* ANIMATIONS */
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+@keyframes fadeSlideIn {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Mobile Layout */
+@media (max-width: 768px) {
+    .hero {
+        padding: var(--space-md);
+        gap: var(--space-md);
+    }
+
+    .hero .info-cards {
+        flex-direction: column;
+        align-items: center;
+        overflow-y: auto;
+        max-height: 60vh; /* scrollable column */
+    }
+
+    .hero .info-cards > div {
+        width: 100%;
+        flex: none;
+    }
+
+    .hero .info-cards > div:hover {
+        flex: none; /* disable squish expand on mobile */
+    }
 }
 
 /* Scrollbar Styles */
@@ -122,7 +256,7 @@ body {
 
 /* Button Styles */
 button {
-    padding: var(--space-sm) var(--space-md);
+    padding: var(--space-xs) var(--space-md);
     border: none;
     border-radius: var(--main-radius);
     background-color: var(--main-text);

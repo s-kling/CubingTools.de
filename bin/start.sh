@@ -38,7 +38,27 @@ if [[ "$START_BETA" == "n" ]]; then
     fi
     
     echo -e "${GREEN}Starting production server...${NC}"
-    node backend/server.js
+
+    # Loop to allow 'rs' to restart the server
+    while true; do
+        node backend/server.js &
+        SERVER_PID=$!
+
+        echo -e "${CYAN}Type 'rs' and press Enter to restart the server, or 'q' to quit.${NC}"
+        read -r CMD
+        if [[ "$CMD" == "rs" ]]; then
+            echo -e "${YELLOW}Restarting server...${NC}"
+            kill $SERVER_PID
+            wait $SERVER_PID 2>/dev/null
+        elif [[ "$CMD" == "q" ]]; then
+            echo -e "${YELLOW}Quitting...${NC}"
+            kill $SERVER_PID
+            wait $SERVER_PID 2>/dev/null
+            break
+        else
+            echo -e "${RED}Unknown command.${NC}"
+        fi
+    done
 else
     # Check if port 8443 is in use
     if lsof -i:8443 > /dev/null; then
@@ -62,6 +82,26 @@ else
         cd - || exit
     fi
 
-    echo -e "${GREEN}Starting beta server...${NC}"  
-    node backend/server.js --beta
+    echo -e "${GREEN}Starting beta server...${NC}"
+
+    # Loop to allow 'rs' to restart the server
+    while true; do
+        node backend/server.js --beta &
+        SERVER_PID=$!
+
+        echo -e "${CYAN}Type 'rs' and press Enter to restart the server, or 'q' to quit.${NC}"
+        read -r CMD
+        if [[ "$CMD" == "rs" ]]; then
+            echo -e "${YELLOW}Restarting server...${NC}"
+            kill $SERVER_PID
+            wait $SERVER_PID 2>/dev/null
+        elif [[ "$CMD" == "q" ]]; then
+            echo -e "${YELLOW}Quitting...${NC}"
+            kill $SERVER_PID
+            wait $SERVER_PID 2>/dev/null
+            break
+        else
+            echo -e "${RED}Unknown command.${NC}"
+        fi
+    done
 fi
