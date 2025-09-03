@@ -49,7 +49,7 @@
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P" defer></script>
     <script src="../../js/setupPage.js" defer></script>
     <script src="/js/average" defer></script>
-</head>  
+</head>
 
 <div id="cookie-consent-banner">
     <p>
@@ -70,69 +70,46 @@
 
         <div id="version"></div>
 
-        <main>
-            <section class="heading">
-                <h1>WCA Average Calculator</h1>
-                <p>
-                    This tool helps cubing enthusiasts track solve times, calculate averages, and monitor personal ranks (PR) for various events.
-                </p>
-                <p>
-                    Input your solve times to see real-time results and compare them to your historical data. After five solves, the tool calculates and saves the average as a "tag" for future reference.
-                </p>
+        <main id="cstimer-layout">
+            <!-- Top controls -->
+            <div class="controls">
+                <input type="text" id="wca" placeholder="WCA ID (e.g. 2023KLIN02)" />
                 <label>
-                    <input type="text" id="timeInput" placeholder="0.00" style="margin-right: 20px;" />
-                    <button id="addButton">Add Time</button>
+                <input type="checkbox" id="usePrTarget" />
+                Use PR Average as Target
                 </label>
+                <input type="text" id="target" placeholder="Target (0.00)" />
+                <select id="event-type">
+                <option value="333">3x3x3</option>
+                <option value="222">2x2x2</option>
+                <!-- ... rest of events -->
+                </select>
+            </div>
 
-                <div class="results-grid">
-                    <div class="times">
-                        <h3>Times:</h3>
-                        <ol id="timeList"></ol>
+            <!-- Layout grid: sidebar + main area -->
+            <div class="layout">
+                <!-- Left sidebar: averages -->
+                <aside id="averages-list">
+                <h3>Completed Averages</h3>
+                <ul id="tagContainer"></ul>
+                </aside>
+
+                <!-- Main area -->
+                <section class="timer-area">
+                    <!-- Big input -->
+                    <input type="text" id="timeInput" placeholder="0.00" autofocus />
+
+                    <div id="currentTimes" class="time-list"></div>
+
+                    <!-- Stats -->
+                    <div class="stats">
+                        <div><strong>Mean:</strong> <span id="mean">0.00</span></div>
+                        <div><strong>BPA:</strong> <span id="bpa">–</span></div>
+                        <div><strong>WPA:</strong> <span id="wpa">–</span></div>
+                        <div><strong>TFT:</strong> <span id="tft">–</span></div>
                     </div>
-                    <div class="results">
-                        <h3>Results</h3>
-                        <div id="result"></div>
-                    </div>
-                    <div class="saved-averages">
-                        <h3>Saved Averages:</h3>
-                        <div id="tagContainer"></div>
-                    </div>
-                </div>
-
-                <label><span>Target Average:</span>
-                    <input type="text" id="target" placeholder="0.00" />
-                </label>
-
-                <label>
-                    <label style="margin-right: 20px;"><span>WCA ID:</span><input type="text" id="wca" placeholder="2023KLIN02"></label>
-                    <label><span>Event:</span>
-                        <select name="event" id="event-type">
-                            <optgroup label="WCA Events">
-                                <option value="333">3x3x3</option>
-                                <option value="222">2x2x2</option>
-                                <option value="444">4x4x4</option>
-                                <option value="555">5x5x5</option>
-                                <option value="666">6x6x6</option>
-                                <option value="777">7x7x7</option>
-                                <option value="333bf">3x3x3 Blindfolded</option>
-                                <option value="333oh">3x3x3 One-Handed</option>
-                                <option value="clock">Clock</option>
-                                <option value="minx">Megaminx</option>
-                                <option value="pyram">Pyraminx</option>
-                                <option value="skewb">Skewb</option>
-                                <option value="sq1">Square-1</option>
-                                <option value="444bf">4x4x4 Blindfolded</option>
-                                <option value="555bf">5x5x5 Blindfolded</option>
-                            <optgroup label="Custom">
-                                <option value="ccc">Custom Cube</option>
-                        </select>
-                    </label>
-                </label>
-
-                <div id="popup" style="display: none;">
-                    <div id="popupContent"></div>
-                </div>
-            </section>
+                </section>
+            </div>
         </main>
         
         <footer id="footer"></footer>

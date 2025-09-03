@@ -460,6 +460,7 @@ main {
     overflow-x: hidden;
     overflow-y: scroll;
     padding: var(--space-lg);
+    background-color: var(--main-background);
 }
 
 main .heading {

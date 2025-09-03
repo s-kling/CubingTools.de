@@ -39,6 +39,16 @@ if [[ "$START_BETA" == "n" ]]; then
     
     echo -e "${GREEN}Starting production server...${NC}"
 
+    # Open the URL in the default browser
+    URL="https://localhost"
+    if command -v xdg-open > /dev/null; then
+        xdg-open "$URL"
+    elif command -v open > /dev/null; then
+        open "$URL"
+    else
+        echo -e "${YELLOW}Please open $URL in your browser manually.${NC}"
+    fi
+
     # Loop to allow 'rs' to restart the server
     while true; do
         node backend/server.js &
@@ -83,6 +93,16 @@ else
     fi
 
     echo -e "${GREEN}Starting beta server...${NC}"
+
+    # Open the URL in the default browser
+    URL="https://localhost:8443"
+    if command -v xdg-open > /dev/null; then
+        xdg-open "$URL"
+    elif command -v open > /dev/null; then
+        open "$URL"
+    else
+        echo -e "${YELLOW}Please open $URL in your browser manually.${NC}"
+    fi
 
     # Loop to allow 'rs' to restart the server
     while true; do
