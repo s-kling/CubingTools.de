@@ -17,6 +17,7 @@ document.getElementById('event-type').addEventListener('change', async (e) => {
     calculateStats();
 });
 
+// === Recalculate when target time changes ===
 document.getElementById('target').addEventListener('input', calculateStats);
 
 // === Add time ===
@@ -68,10 +69,10 @@ function calculateStats() {
     const target = parseFloat(document.getElementById('target').value) || Infinity;
     const { bpa, wpa, tft } = calculateBpaWpaTft(times, target);
 
-    document.getElementById('bpa').textContent = bpa ? bpa.toFixed(2) : '–';
-    document.getElementById('wpa').textContent = wpa ? wpa.toFixed(2) : '–';
-    document.getElementById('tft').textContent = tft ? tft.toFixed(2) : '–';
-    document.getElementById('mean').textContent = mean ? mean : '0.00';
+    document.getElementById('mean').textContent = mean ? (isFinite(mean) ? mean : 'DNF') : '0.00';
+    document.getElementById('bpa').textContent = bpa === 'DNF' ? 'DNF' : (bpa ? bpa.toFixed(2) : '-');
+    document.getElementById('wpa').textContent = wpa === 'DNF' ? 'DNF' : (wpa ? wpa.toFixed(2) : '-');
+    document.getElementById('tft').textContent = tft ? tft.toFixed(2) : '-';
 
     // When an average of 5 is completed, store it
     if (ao5) {
@@ -82,16 +83,12 @@ function calculateStats() {
 
 // === BPA / WPA / TFT calculation ===
 function calculateBpaWpaTft(times, target) {
-    console.log(times);
     if (times.length !== 4) return { bpa: null, wpa: null, tft: null };
 
-    // Normalize times: convert objects into numbers
+    // Get last 4 times as numbers (handle DNF)
     const last4 = times.slice(-4).map((t) => {
-        if (typeof t === 'object') {
-            if (t.dnf) return 'DNF';
-            return t.time + (t.plus2 ? 2 : 0);
-        }
-        return t; // plain number fallback
+        if (t.penalty === 'dnf' || t.value === Infinity) return 'DNF';
+        return t.value;
     });
 
     // Count DNFs
@@ -119,7 +116,7 @@ function calculateBpaWpaTft(times, target) {
         wpa = (sum - best) / 3;
     }
 
-    // TFT (time for target)
+    // TFT
     let tft = null;
     if (target !== Infinity && dnfCount === 0) {
         const needed = target * 3 - (sum - best - worst);
