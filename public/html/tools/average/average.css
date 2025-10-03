@@ -1,4 +1,4 @@
-#cstimer-layout {
+main {
     display: flex;
     flex-direction: column;
     height: 100%;
@@ -124,44 +124,81 @@
 }
 
 .solve {
+    display: flex;
+    justify-content: center;
+    align-items: center;
     position: relative;
-    border-radius: var(--main-radius);
-    color: var(--main-text);
+    cursor: pointer;
     font-family: var(--font-main);
+    font-size: var(--font-size-lg);
+    color: var(--main-text);
+    text-align: center;
 }
 
-.penalty-buttons {
-    display: none;
+/* Text */
+.solve-text {
+    opacity: 1;
+    transition: opacity 0.3s ease;
     position: absolute;
-    right: var(--space-xs);
-    top: 50%;
-    transform: translateY(-50%);
-    gap: var(--space-xxs);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+/* Buttons */
+.penalty-buttons {
+    display: flex;
+    gap: var(--space-xs);
+    opacity: 0;
+    transform: scale(0.9);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    position: absolute;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+}
+
+/* Swap on hover */
+.solve:hover .solve-text {
+    opacity: 0;
 }
 
 .solve:hover .penalty-buttons {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Modern button styling */
+.penalty-btn {
     display: flex;
-}
-
-.penalty-buttons button {
-    font-size: var(--font-size-base);
-    padding: var(--space-xxs) var(--space-xs);
-    border: none;
-    border-radius: var(--main-radius);
-    cursor: pointer;
-    background: var(--button-background);
-    color: var(--main-text);
+    align-items: center;
+    justify-content: center;
+    background: var(--main-background);
+    border: 3px solid;
+    border-radius: 50%;
+    aspect-ratio: 1 / 1;
+    width: 34px;
+    height: 34px;
     font-family: var(--font-main);
-    transition: background 0.2s ease, transform 0.1s ease;
+    font-size: var(--font-size-lg);
+    font-weight: bold;
+    color: var(--main-text);
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.3s ease, color 0.3s ease;
 }
 
-.penalty-buttons button:hover {
+.penalty-btn:hover {
     background: var(--hover-background);
     color: var(--hover-text);
-    transform: scale(1.05);
+    transform: scale(1.15);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.4);
 }
 
+/* Disabled state */
 .penalty-buttons button:disabled {
-    opacity: 0.5;
+    opacity: 0.4;
     cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }

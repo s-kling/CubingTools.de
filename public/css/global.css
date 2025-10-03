@@ -248,7 +248,7 @@ body {
     grid-gap: var(--main-margin);
 }
 
-.container>* {
+.container>*:not(main) {
     border-radius: var(--main-radius);
     padding: var(--main-padding);
     background-color: var(--secondary-background);
@@ -460,7 +460,6 @@ main {
     overflow-x: hidden;
     overflow-y: scroll;
     padding: var(--space-lg);
-    background-color: var(--main-background);
 }
 
 main .heading {
