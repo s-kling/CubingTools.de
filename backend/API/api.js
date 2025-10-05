@@ -6,84 +6,99 @@ const packageJson = require('../../package.json');
 
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') }); // Specify the path to the .env file
 
-// API endpoint to get WCA data based on competitor ID and event
-router.get('/api/wca/:wcaId/:event', async (req, res) => {
-    const { wcaId, event } = req.params; // Extract WCA ID and event from URL path parameters
-    const { num, getsolves, getaverages } = req.query; // Extract 'num' (number of solves) and 'getsolves' query params
-
-    // Construct the API URL to fetch WCA data based on the competitor ID
-    const apiUrl = `https://raw.githubusercontent.com/robiningelbrecht/wca-rest-api/master/api/persons/${wcaId}.json`;
-
-    let data = {};
-
-    try {
-        // Fetch data from the WCA API
-        const response = await axios.get(apiUrl);
-        data = response.data;
-    } catch (error) {
-        // Handle errors and send appropriate error response
-        res.status(500).json({ error: error.message });
+class WcaApi {
+    constructor() {
+        this.baseUrl =
+            'https://raw.githubusercontent.com/robiningelbrecht/wca-rest-api/master/api/persons';
     }
 
-    // Handle request for competitor's name
-    if (event === 'name') {
-        return res.json({ name: data.name });
-    }
-
-    let allResults = [];
-
-    // Loop through all competition results to find those matching the requested event
-    for (const competition of Object.values(data.results)) {
-        // If the competition contains the specified event, add its results
-        if (competition[event]) {
-            allResults = allResults.concat(competition[event]);
+    async fetchCompetitorData(wcaId) {
+        try {
+            const response = await axios.get(`${this.baseUrl}/${wcaId}.json`);
+            return response.data;
+        } catch (error) {
+            throw new Error(`Failed to fetch data for ${wcaId}: ${error.message}`);
         }
     }
 
-    // Default number of solves to 12 if 'num' is not provided
-    const solvecount = parseInt(num, 10) || 12;
-
-    // Extract and filter valid solves (greater than 0) from the results, reverse the order
-    let solves = allResults.flatMap((result) => result.solves.reverse()); // Reverse to get the latest solves first
-
-    // If 'getsolves' query param is true, return all solves before slicing
-    if (getsolves) {
-        return res.json({ allResults: solves });
-    } else if (getaverages) {
-        let averages = allResults.flatMap((result) => result.average);
-
-        return res.json({ allAverages: averages });
+    getCompetitorName(data) {
+        return { name: data.name };
     }
 
-    // Limit the number of solves to the requested amount
-    solves = solves
-        .filter((result) => result > 0) // Only consider completed solve times
-        .slice(0, solvecount);
-
-    // If no solves exist, return null for average
-    if (solves.length === 0) {
-        return res.status(200).json({ average: null });
+    getAllResultsForEvent(data, event) {
+        let allResults = [];
+        for (const competition of Object.values(data.results)) {
+            if (competition[event]) {
+                allResults = allResults.concat(competition[event]);
+            }
+        }
+        return allResults;
     }
 
-    // Sort the solves in ascending order
-    solves.sort((a, b) => a - b);
+    getSolves(allResults, solvecount) {
+        let solves = allResults.flatMap((result) => result.solves.reverse());
+        solves = solves.filter((result) => result > 0).slice(0, solvecount);
+        return solves;
+    }
 
-    // Remove the fastest and slowest solves to eliminate outliers
-    solves = solves.slice(1, -1);
+    calculateAverage(solves) {
+        if (solves.length === 0) {
+            return null;
+        }
+        solves.sort((a, b) => a - b);
+        solves = solves.slice(1, -1); // drop fastest and slowest
+        const sum = solves.reduce((a, b) => a + b, 0);
+        return sum / solves.length / 100; // convert ms → seconds
+    }
 
-    // Calculate the average solve time (in seconds) and divide by 100 to convert milliseconds to seconds
-    const sum = solves.reduce((a, b) => a + b, 0);
-    const avg = sum / solves.length / 100; // Divide by 100 for correct unit
+    getAverages(allResults) {
+        return allResults.flatMap((result) => result.average);
+    }
 
-    // Get PR for that event
-    const pr = {
-        single: data.rank.singles.find((e) => e.eventId === event).best,
-        average: data.rank.averages.find((e) => e.eventId === event).best,
-    };
+    getPersonalRecords(data, event) {
+        return {
+            single: data.rank.singles.find((e) => e.eventId === event)?.best || null,
+            average: data.rank.averages.find((e) => e.eventId === event)?.best || null,
+        };
+    }
 
-    // Return the calculated average solve time
-    res.status(200).json({ average: avg, records: pr });
-});
+    async handleRequest(req, res) {
+        const { wcaId, event } = req.params;
+        const { num, getsolves, getaverages } = req.query;
+
+        try {
+            const data = await this.fetchCompetitorData(wcaId);
+
+            if (event === 'name') {
+                return res.json(this.getCompetitorName(data));
+            }
+
+            const allResults = this.getAllResultsForEvent(data, event);
+            const solvecount = parseInt(num, 10) || 12;
+
+            if (getsolves) {
+                return res.json({
+                    allResults: allResults.flatMap((result) => result.solves.reverse()),
+                });
+            } else if (getaverages) {
+                return res.json({ allAverages: this.getAverages(allResults) });
+            }
+
+            const solves = this.getSolves(allResults, solvecount);
+            const avg = this.calculateAverage(solves);
+            const pr = this.getPersonalRecords(data, event);
+
+            return res.status(200).json({ average: avg, records: pr });
+        } catch (error) {
+            return res.status(500).json({ error: error.message });
+        }
+    }
+}
+
+const wcaApi = new WcaApi();
+
+// Wire class into router
+router.get('/api/wca/:wcaId/:event', (req, res) => wcaApi.handleRequest(req, res));
 
 router.get('/api/version', (req, res) => {
     res.json({ version: packageJson.version });

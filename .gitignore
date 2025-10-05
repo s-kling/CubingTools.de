@@ -10,6 +10,6 @@ node_modules/
 # Ignore environment variable files
 .env
 .vscode
-*.DS_Store
+.DS_Store
 
 package-lock.json

@@ -1,6 +1,5 @@
 let times = [];
 let averageTags = [];
-let wcaData = {};
 let eventType = document.getElementById('event-type').value;
 let userSolves = [];
 let userAverages = [];
@@ -8,6 +7,7 @@ let userAverages = [];
 // === Format input field on input ===
 document.getElementById('timeInput').addEventListener('input', (e) => {
     formatInputField(e.target);
+    calculateStats();
 });
 
 // === Add a time when Enter pressed ===
@@ -18,12 +18,18 @@ document.getElementById('timeInput').addEventListener('keydown', (e) => {
 // === Handle event type change ===
 document.getElementById('event-type').addEventListener('change', async (e) => {
     eventType = e.target.value;
-    await fetchUserData();
+    const wcaId = document.getElementById('wca').value.trim().toUpperCase();
+    if (!wcaId) return;
+    if (!/\d{4}[a-zA-Z]{4}\d{2}/.test(wcaId)) return;
+    await fetchUserData(wcaId);
     calculateStats();
 });
 
 // === Recalculate when target time changes ===
-document.getElementById('target').addEventListener('input', calculateStats);
+document.getElementById('target').addEventListener('input', (e) => {
+    calculateStats;
+    formatInputField(e.target);
+});
 
 // === Format input field ===
 function formatInputField(input) {
@@ -69,24 +75,23 @@ function formatInputField(input) {
 // === Add time ===
 function addTime() {
     const input = document.getElementById('timeInput');
-    let time = parseFloat(input.value);
+    let time = input.value;
 
-    if (isNaN(time)) {
-        alert('Please enter a valid number or DNF');
-        input.value = '';
-        return;
-    }
+    let penalty = null;
 
     if (times.length >= 5) {
         times = [];
     }
 
     if (time == 'DNF') {
-        time = Infinity;
+        time = -1;
         penalty = 'dnf';
     }
 
-    times.push({ raw: time, penalty: null, value: time });
+    time = parseFloat(time);
+
+    times.push({ raw: time, penalty: penalty, value: time });
+    userSolves.push(time); // add to user solves for ranking
     input.value = '';
 
     calculateStats();
@@ -95,13 +100,9 @@ function addTime() {
 
 // === Calculate stats for current session ===
 function calculateStats() {
-    const resultDiv = document.getElementById('stats');
     const n = times.length;
 
-    if (n === 0) {
-        resultDiv.textContent = '';
-        return;
-    }
+    if (n === 0) return;
 
     let html = '';
     const mean = (times.reduce((a, b) => a + b.value, 0) / n).toFixed(2);
@@ -125,14 +126,23 @@ function calculateStats() {
     // Then test if tft is a number, format to 2 decimals
     tft = !isNaN(tft) ? tft.toFixed(2) : tft;
 
-    document.getElementById('mean').textContent = mean ? (isFinite(mean) ? mean : 'DNF') : '0.00';
-    document.getElementById('bpa').textContent = bpa === 'DNF' ? 'DNF' : bpa ? bpa.toFixed(2) : '-';
-    document.getElementById('wpa').textContent = wpa === 'DNF' ? 'DNF' : wpa ? wpa.toFixed(2) : '-';
-    document.getElementById('tft').textContent = tft;
+    const meanElem = document.getElementById('mean');
+    if (meanElem) meanElem.textContent = mean ? (isFinite(mean) ? mean : 'DNF') : '0.00';
+
+    const bpaElem = document.getElementById('bpa');
+    if (bpaElem) bpaElem.textContent = bpa === 'DNF' ? 'DNF' : bpa ? bpa.toFixed(2) : '-';
+
+    const wpaElem = document.getElementById('wpa');
+    if (wpaElem) wpaElem.textContent = wpa === 'DNF' ? 'DNF' : wpa ? wpa.toFixed(2) : '-';
+
+    const tftElem = document.getElementById('tft');
+    if (tftElem) tftElem.textContent = tft;
 
     // When an average of 5 is completed, store it
     if (ao5) {
         averageTags.push({ average: ao5, times: times.slice(-5) });
+        ao5 = ao5 === 'DNF' ? 'DNF' : parseFloat(ao5);
+        userAverages.push(ao5); // add to user averages for ranking
         displayTags();
     }
 }
@@ -196,11 +206,17 @@ function displayTags() {
         .reverse()
         .forEach((tag) => {
             const li = document.createElement('li');
+            tag.average = !isFinite(tag.average) ? 'DNF' : parseFloat(tag.average).toFixed(2);
             li.textContent = `Avg: ${tag.average}`;
 
             // Add ranking if WCA data available
-            const rank = getAverageRank(parseFloat(tag.average));
-            if (rank) li.textContent += ` (#${rank})`;
+            const rank = getAverageRank(tag.average);
+            if (rank) {
+                const rankSpan = document.createElement('span');
+                rankSpan.textContent = ` PR${rank}`;
+                rankSpan.style.float = 'right';
+                li.appendChild(rankSpan);
+            }
 
             const timesDiv = document.createElement('div');
             timesDiv.classList.add('times');
@@ -229,7 +245,7 @@ function displayTags() {
                 }
 
                 // Add rank
-                const solveRank = getSolveRank(val);
+                const solveRank = getSingleRank(val);
                 if (solveRank) {
                     span.textContent += ` (#${solveRank})`;
                 }
@@ -261,7 +277,7 @@ function displayCurrentTimes() {
             displayText = solve.raw.toFixed(2);
         }
 
-        const rank = getSolveRank(solve.value);
+        const rank = getSingleRank(solve.value);
         if (rank) displayText += ` (PR${rank})`;
 
         const span = document.createElement('span');
@@ -337,6 +353,8 @@ function removePenalty(index) {
     displayCurrentTimes();
 }
 
+// ! WCA DATA
+
 // === Handle WCA ID input ===
 document.getElementById('wca').addEventListener('input', async () => {
     const wcaId = document.getElementById('wca').value.trim().toUpperCase();
@@ -345,14 +363,17 @@ document.getElementById('wca').addEventListener('input', async () => {
     if (!/\d{4}[a-zA-Z]{4}\d{2}/.test(wcaId)) return;
 
     try {
-        const response = await fetch(
-            `/api/wca/${wcaId}/${eventType}?getsolves=true`
-        );
-        if (!response.ok) throw new Error('Failed to fetch WCA data');
-
-        wcaData = await response.json();
         await fetchUserData(wcaId);
         calculateStats();
+
+        // Set the target placeholder to user's PR average if available
+        const prAverage = getUserPRAverage();
+        const targetInput = document.getElementById('target');
+        if (prAverage && isFinite(prAverage)) {
+            targetInput.placeholder = `Target (${prAverage})`;
+        } else {
+            targetInput.placeholder = 'Target (0.00)';
+        }
     } catch (err) {
         console.error(err);
         alert('Could not fetch WCA data. Check the ID.');
@@ -361,45 +382,54 @@ document.getElementById('wca').addEventListener('input', async () => {
 
 // === Fetch solves & averages for ranking ===
 async function fetchUserData(wcaId) {
-    if (!wcaData) return;
-
     try {
         const solvesRes = await fetch(`/api/wca/${wcaId}/${eventType}?getsolves=true`);
         const averagesRes = await fetch(`/api/wca/${wcaId}/${eventType}?getaverages=true`);
 
-        if (solvesRes.ok) userSolves = await solvesRes.json();
-        if (averagesRes.ok) userAverages = await averagesRes.json();
+        if (solvesRes.ok) {
+            const solvesData = await solvesRes.json();
+            userSolves = solvesData.allResults || [];
+        }
+        if (averagesRes.ok) {
+            const averagesData = await averagesRes.json();
+            userAverages = averagesData.allAverages || [];
+        }
+
+        userSolves = userSolves.map((t) => (t <= 0 ? Infinity : t / 100));
+        userAverages = userAverages.map((t) => (t <= 0 ? Infinity : t / 100));
+
+        console.log('Fetched user solves:', userSolves);
+        console.log('Fetched user averages:', userAverages);
     } catch (err) {
-        console.error('Error fetching user solves/averages:', err);
+        throw new Error('Error fetching user solves/averages:', err);
     }
 }
 
 // === Rank helpers ===
-function getSolveRank(time) {
-    if (!userSolves.length) return null;
+function getSingleRank(time) {
     const sorted = [...userSolves, time].sort((a, b) => a - b);
+
     return sorted.indexOf(time) + 1;
 }
 
-function getAverageRank(avg) {
-    if (!userAverages.length) return null;
-    const sorted = [...userAverages, avg].sort((a, b) => a - b);
-    return sorted.indexOf(avg) + 1;
-}
+function getAverageRank(time) {
+    if (time === 'DNF') return userAverages.length;
+    time = parseFloat(time);
 
-// === Get user PR Average (from WCA data) ===
-function getUserPRAverage() {
-    if (!wcaData) return null;
+    const sorted = [...userAverages, time].sort((a, b) => a - b);
 
-    const eventId = document.getElementById('event-type').value;
-    const records = wcaData.personal_records[eventId];
-    if (records && records.average) {
-        return (records.average / 100).toFixed(2);
-    }
-    return null;
+    return sorted.indexOf(time) + 1;
 }
 
 // === Handle PR target checkbox ===
+// Helper to get user's PR average (best non-DNF average)
+function getUserPRAverage() {
+    if (!userAverages.length) return null;
+    const validAverages = userAverages.filter((a) => a !== Infinity && isFinite(a));
+    if (!validAverages.length) return null;
+    return Math.min(...validAverages).toFixed(2);
+}
+
 const usePrCheckbox = document.getElementById('usePrTarget');
 const targetInput = document.getElementById('target');
 
