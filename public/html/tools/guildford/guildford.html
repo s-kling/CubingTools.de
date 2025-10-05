@@ -90,6 +90,85 @@
                     If you cannot solve a puzzle, or simply do not want to, you can input DNF as your time.
                 </p>
 
+                <style>
+                    .pulse-tag {
+                        display: inline-block;
+                        position: absolute;
+                        right: -2.5em;
+                        top: -1em;
+                        transform: rotate(15deg);
+                        padding: 0.5em 1.2em;
+                        font-size: 1.2em;
+                        font-weight: bold;
+                        color: #fff;
+                        background: linear-gradient(90deg, #ff9800 0%, #ffd700 100%);
+                        opacity: 0.75;
+                        border-radius: 2em;
+                        box-shadow: 0 2px 12px rgba(255, 168, 0, 0.15);
+                        animation: pulse-scale 1.2s infinite;
+                        letter-spacing: 0.05em;
+                        margin: 1em 0;
+                        z-index: 2;
+                        cursor: pointer;
+                    }
+
+                    @keyframes pulse-scale {
+                        0% { transform: scale(1) rotate(15deg); }
+                        50% { transform: scale(1.15) rotate(15deg); }
+                        100% { transform: scale(1) rotate(15deg); }
+                    }
+
+                    .heading {
+                        position: relative;
+                    }
+
+                    @media (max-width: 900px) {
+                        .heading {
+                            font-size: 0.95em;
+                            padding: 0.5em;
+                        }
+                        .pulse-tag {
+                            font-size: 1em;
+                            right: -1.2em;
+                            top: -0.8em;
+                            padding: 0.4em 0.8em;
+                        }
+                        .input-container label,
+                        .competitor label {
+                            font-size: 0.95em;
+                        }
+                        h1 {
+                            font-size: 1.5em;
+                        }
+                    }
+
+                    @media (max-width: 600px) {
+                        .heading {
+                            font-size: 0.85em;
+                            padding: 0.3em;
+                        }
+                        .pulse-tag {
+                            font-size: 0.85em;
+                            right: -0.8em;
+                            top: -0.6em;
+                            padding: 0.3em 0.6em;
+                        }
+                        .input-container label,
+                        .competitor label {
+                            font-size: 0.85em;
+                        }
+                        h1 {
+                            font-size: 1.2em;
+                        }
+                    }
+                </style>
+                <div class="pulse-tag" onclick="
+                    const url = `https://github.com/s-kling/CubingTools.de/wiki/Improvement-to-the-Guildford-Optimizer`;
+                    window.location.href = url;
+                    return false;">
+                    14,209% more efficient!
+                </div>
+
                 <div class="input-container">
                     <label><span>Pick Up Time:</span> <input type="number" id="pickup" value="1.238"></label>
                     <label><span>Solve count to process:</span> <input type="number" id="solvecount" value="25"></label>
@@ -116,9 +195,6 @@
                         <button class="globals-btn" type="button" onclick="handleButtons('c2')">Add Globals</button>
                         <div id="c2-times"></div>
                     </div>
-
-                    <button type="submit">Optimize</button>
-
                 </form>
                 <div class="result" id="result">
                     <h2>Results</h2>

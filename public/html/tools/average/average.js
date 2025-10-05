@@ -7,7 +7,6 @@ let userAverages = [];
 // === Format input field on input ===
 document.getElementById('timeInput').addEventListener('input', (e) => {
     formatInputField(e.target);
-    calculateStats();
 });
 
 // === Add a time when Enter pressed ===
@@ -27,7 +26,7 @@ document.getElementById('event-type').addEventListener('change', async (e) => {
 
 // === Recalculate when target time changes ===
 document.getElementById('target').addEventListener('input', (e) => {
-    calculateStats;
+    calculateStats();
     formatInputField(e.target);
 });
 
@@ -88,9 +87,30 @@ function addTime() {
         penalty = 'dnf';
     }
 
-    time = parseFloat(time);
+    // Convert time to seconds
+    if (time.includes(':')) {
+        const parts = time.split(':');
+        if (parts.length !== 2) {
+            alert('Invalid time format');
+            return;
+        }
+        const minutes = parseInt(parts[0], 10);
+        const seconds = parseFloat(parts[1]);
+        if (isNaN(minutes) || isNaN(seconds)) {
+            alert('Invalid time format');
+            return;
+        }
+        time = minutes * 60 + seconds;
+    } else {
+        time = parseFloat(time);
+    }
 
-    times.push({ raw: time, penalty: penalty, value: time });
+    const event = document.getElementById('event-type').value;
+
+    // Generate a custom ID to link each time to an average
+    const averageId = `${event}${averageTags.length > 0 ? averageTags.length : 1}`;
+
+    times.push({ raw: time, penalty: penalty, value: time, event: event, averageId: averageId });
     userSolves.push(time); // add to user solves for ranking
     input.value = '';
 
@@ -140,7 +160,10 @@ function calculateStats() {
 
     // When an average of 5 is completed, store it
     if (ao5) {
-        averageTags.push({ average: ao5, times: times.slice(-5) });
+        const event = document.getElementById('event-type').value;
+        const avgId = times[times.length - 1].averageId;
+
+        averageTags.push({ average: ao5, times: times.slice(-5), event: event, averageId: avgId });
         ao5 = ao5 === 'DNF' ? 'DNF' : parseFloat(ao5);
         userAverages.push(ao5); // add to user averages for ranking
         displayTags();
@@ -337,6 +360,13 @@ function applyPenalty(index, type) {
         solve.value = Infinity;
     }
 
+    // Use average ID to remove the average from the list, then re-add it with the penalty applied
+    const avgId = solve.averageId;
+    // Remove from list
+    averageTags = averageTags.filter((tag) => tag.averageId !== avgId);
+    // Remove from averages
+    userAverages.shift();
+
     calculateStats();
     displayCurrentTimes();
 }
@@ -348,6 +378,13 @@ function removePenalty(index) {
 
     solve.penalty = null;
     solve.value = solve.raw;
+
+    // Use average ID to remove the average from the list, then re-add it with the penalty applied
+    const avgId = solve.averageId;
+    // Remove from list
+    averageTags = averageTags.filter((tag) => tag.averageId !== avgId);
+    // Remove from averages
+    userAverages.shift();
 
     calculateStats();
     displayCurrentTimes();
@@ -397,9 +434,6 @@ async function fetchUserData(wcaId) {
 
         userSolves = userSolves.map((t) => (t <= 0 ? Infinity : t / 100));
         userAverages = userAverages.map((t) => (t <= 0 ? Infinity : t / 100));
-
-        console.log('Fetched user solves:', userSolves);
-        console.log('Fetched user averages:', userAverages);
     } catch (err) {
         throw new Error('Error fetching user solves/averages:', err);
     }
@@ -444,4 +478,179 @@ usePrCheckbox.addEventListener('change', () => {
         targetInput.disabled = false;
         targetInput.value = '';
     }
+});
+
+// === COOKIE HELPERS ===
+function setCookie(name, value, days = 365) {
+    const expires = new Date(Date.now() + days * 86400000).toUTCString();
+    document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(
+        JSON.stringify(value)
+    )}; expires=${expires}; path=/`;
+}
+
+function getCookie(name) {
+    const cookies = document.cookie.split('; ');
+    const cookie = cookies.find((row) => row.startsWith(encodeURIComponent(name) + '='));
+    if (!cookie) return null;
+    try {
+        return JSON.parse(decodeURIComponent(cookie.split('=')[1]));
+    } catch {
+        return null;
+    }
+}
+
+function deleteCookie(name) {
+    document.cookie = `${encodeURIComponent(
+        name
+    )}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+}
+
+// === SAVE & LOAD AVERAGES PER EVENT ===
+function saveAveragesToCookies() {
+    const grouped = {};
+
+    // Group averages by event type
+    averageTags.forEach((avg) => {
+        if (!grouped[avg.event]) grouped[avg.event] = [];
+        grouped[avg.event].push(avg);
+    });
+
+    // Save each event separately
+    Object.keys(grouped).forEach((event) => {
+        setCookie(`averages_${event}`, grouped[event]);
+    });
+}
+
+function loadAveragesFromCookies() {
+    const event = document.getElementById('event-type').value;
+    const saved = getCookie(`averages_${event}`);
+    if (saved && Array.isArray(saved)) {
+        averageTags = saved;
+        displayTags();
+
+        // Rebuild userSolves and userAverages from saved data
+        userSolves = [];
+        userAverages = [];
+        saved.forEach((avg) => {
+            const values = avg.times.map((t) =>
+                t.value === Infinity || t.value <= 0 ? Infinity : t.value
+            );
+            userSolves.push(...values);
+            if (avg.average !== 'DNF' && isFinite(avg.average)) {
+                userAverages.push(parseFloat(avg.average));
+            }
+        });
+    } else {
+        // No stored averages for this event
+        averageTags = [];
+        userSolves = [];
+        userAverages = [];
+        displayTags();
+    }
+}
+
+// === Modify displayTags() to only show averages for current event ===
+const originalDisplayTags = displayTags;
+displayTags = function () {
+    const container = document.getElementById('tagContainer');
+    container.innerHTML = '';
+
+    const currentEvent = document.getElementById('event-type').value;
+    const eventAverages = averageTags.filter((tag) => tag.event === currentEvent);
+
+    eventAverages
+        .slice()
+        .reverse()
+        .forEach((tag) => {
+            const li = document.createElement('li');
+            tag.average = !isFinite(tag.average) ? 'DNF' : parseFloat(tag.average).toFixed(2);
+            li.textContent = `Avg: ${tag.average}`;
+            const rank = getAverageRank(tag.average);
+            if (rank) {
+                const rankSpan = document.createElement('span');
+                rankSpan.textContent = ` PR${rank}`;
+                rankSpan.style.float = 'right';
+                li.appendChild(rankSpan);
+            }
+
+            const timesDiv = document.createElement('div');
+            timesDiv.classList.add('times');
+
+            const values = tag.times.map((t) => t.value);
+            const min = Math.min(...values);
+            const max = Math.max(...values);
+
+            let markedBest = false;
+            let markedWorst = false;
+
+            tag.times.forEach((t) => {
+                let span = document.createElement('span');
+                const val = t.value === Infinity ? 'DNF' : t.value;
+                span.textContent = val === 'DNF' ? 'DNF' : val.toFixed(2);
+
+                if (val === min && !markedBest) {
+                    span.classList.add('best');
+                    span.textContent = `[${span.textContent}]`;
+                    markedBest = true;
+                } else if ((val === max || val === 'DNF') && !markedWorst) {
+                    span.classList.add('worst');
+                    span.textContent = `[${span.textContent}]`;
+                    markedWorst = true;
+                }
+
+                const solveRank = getSingleRank(val);
+                if (solveRank) span.textContent += ` (#${solveRank})`;
+
+                timesDiv.appendChild(span);
+                timesDiv.appendChild(document.createTextNode(' '));
+            });
+
+            li.appendChild(timesDiv);
+            container.appendChild(li);
+        });
+
+    // Save to cookies after updating
+    saveAveragesToCookies();
+};
+
+// === Confirm before switching event mid-solve ===
+const eventSelector = document.getElementById('event-type');
+let lastEventType = eventSelector.value;
+
+eventSelector.addEventListener('change', async (e) => {
+    const newEvent = e.target.value;
+
+    // Warn if user has unsaved solves or averages in current event
+    if (times.length > 0 || userSolves.length > 0 || userAverages.length > 0) {
+        const confirmSwitch = confirm(
+            "⚠️ You're in the middle of a session. Switching events will:\n" +
+                '• Clear all current solves and averages.\n' +
+                '• Reset your WCA-based ranks.\n' +
+                '• Load stored averages for the new event.\n\n' +
+                'Do you want to continue?'
+        );
+        if (!confirmSwitch) {
+            e.target.value = lastEventType;
+            return;
+        }
+
+        // Clear current data before switching
+        times = [];
+        userSolves = [];
+        userAverages = [];
+        calculateStats();
+        displayCurrentTimes();
+    }
+
+    lastEventType = newEvent;
+    eventType = newEvent;
+
+    // Load event-specific averages and rebuild stats
+    loadAveragesFromCookies();
+    calculateStats();
+});
+
+// === Auto-load averages on page load ===
+window.addEventListener('DOMContentLoaded', () => {
+    loadAveragesFromCookies();
 });

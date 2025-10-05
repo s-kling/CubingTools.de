@@ -65,6 +65,11 @@ relaySelect.addEventListener('change', () => {
 
 let events = eventOptions[relaySelect.value] || [];
 
+const DNF_SENTINEL = 1000000; // large number to represent DNF
+function isDNF(value) {
+    return value === 'DNF' || value === null || value === undefined;
+}
+
 function addEventInputs() {
     const competitor1Events = document.getElementById('c1-times');
     const competitor2Events = document.getElementById('c2-times');
@@ -102,11 +107,13 @@ function addEventInputs() {
         input1.addEventListener('input', () => {
             formatInputField(input1);
             updateURLWithFormData();
+            optimizeGuildford();
         });
 
         input2.addEventListener('input', () => {
             formatInputField(input2);
             updateURLWithFormData();
+            optimizeGuildford();
         });
 
         competitor1Events.appendChild(label1);
@@ -218,6 +225,8 @@ function populateFormFromURL() {
             document.getElementById(`c2-${event}`).value = params.get(`c2-${event}`);
         }
     });
+
+    optimizeGuildford();
 }
 
 // Call populateFormFromURL on page load to set inputs
@@ -302,21 +311,38 @@ var pickupTime = parseFloat(document.getElementById('pickup').value) || 1.5;
 var solvecount = parseInt(document.getElementById('solvecount').value) || 25;
 
 // Attach event listener to the time form submit button
-document.getElementById('timeForm').addEventListener('submit', async function (event) {
-    event.preventDefault();
-
-    // Update URL with form data
+function optimizeGuildford() {
     updateURLWithFormData();
 
     const competitor1Id = 'c1';
     const competitor2Id = 'c2';
 
-    // Collect the times after they have been populated by WCA data
     const competitor1 = collectCompetitorTimes(competitor1Id);
     const competitor2 = collectCompetitorTimes(competitor2Id);
 
+    // Validate: ensure not both DNF for any event
+    const invalidEvents = events.filter(
+        (event) =>
+            (competitor1[event] === DNF_SENTINEL || isNaN(competitor1[event])) &&
+            (competitor2[event] === DNF_SENTINEL || isNaN(competitor2[event]))
+    );
+
+    const errorDiv = document.getElementById('bestCombination');
+    const countDiv = document.getElementById('combinationsCounted');
+
+    if (invalidEvents.length > 0) {
+        errorDiv.innerHTML = `
+            <h3>Invalid Guildford configuration</h3>
+            <p>Neither competitor has a valid time for: ${invalidEvents.join(', ')}.</p>
+            <p>Please enter a valid time for at least one competitor in each event before optimizing.</p>
+        `;
+        if (countDiv) countDiv.textContent = '';
+        return; // 🚫 stop before optimization
+    }
+
+    // Otherwise proceed normally
     optimizeAndDisplayLive(competitor1, competitor2);
-});
+}
 
 // Function to fetch average times from the API for a given WCA ID and event
 async function getCurrentAverage(wcaId, event) {
@@ -381,116 +407,121 @@ async function getWCAData(competitorId) {
     // Test if a WCA ID was given
     if (!/\d{4}[a-zA-Z]{4}\d{2}/.test(wcaId)) return;
 
+    let eventMap = {};
+
+    if (relaySelect.value == 'miniguild') {
+        eventMap = {
+            '2x2': '222',
+            '3x3': '333',
+            '4x4': '444',
+            '5x5': '555',
+            'OH': '333oh',
+            'Pyraminx': 'pyram',
+            'Clock': 'clock',
+            'Skewb': 'skewb',
+            'Megaminx': 'minx',
+            'Square-1': 'sq1',
+        };
+    } else if (relaySelect.value == 'guildford') {
+        eventMap = {
+            '2x2': '222',
+            '3x3': '333',
+            '4x4': '444',
+            '5x5': '555',
+            '6x6': '666',
+            '7x7': '777',
+            'OH': '333oh',
+            'Pyraminx': 'pyram',
+            'Clock': 'clock',
+            'Skewb': 'skewb',
+            'Megaminx': 'minx',
+            'Square-1': 'sq1',
+        };
+    } else if (relaySelect.value == 'miniguildfto') {
+        eventMap = {
+            '2x2': '222',
+            '3x3': '333',
+            '4x4': '444',
+            '5x5': '555',
+            'OH': '333oh',
+            'Pyraminx': 'pyram',
+            'Clock': 'clock',
+            'FTO': 'fto',
+            'Skewb': 'skewb',
+            'Megaminx': 'minx',
+            'Square-1': 'sq1',
+        };
+    } else if (relaySelect.value == 'guildfordfto') {
+        eventMap = {
+            '2x2': '222',
+            '3x3': '333',
+            '4x4': '444',
+            '5x5': '555',
+            '6x6': '666',
+            '7x7': '777',
+            'OH': '333oh',
+            'Pyraminx': 'pyram',
+            'Clock': 'clock',
+            'FTO': 'fto',
+            'Skewb': 'skewb',
+            'Megaminx': 'minx',
+            'Square-1': 'sq1',
+        };
+    } else if (relaySelect.value == 'twotoseven') {
+        eventMap = {
+            '2x2': '222',
+            '3x3': '333',
+            '4x4': '444',
+            '5x5': '555',
+            '6x6': '666',
+            '7x7': '777',
+        };
+    }
+
     try {
-        let events = {};
-
-        if (relaySelect.value == 'miniguild') {
-            events = {
-                '2x2': '222',
-                '3x3': '333',
-                '4x4': '444',
-                '5x5': '555',
-                'OH': '333oh',
-                'Pyraminx': 'pyram',
-                'Clock': 'clock',
-                'Skewb': 'skewb',
-                'Megaminx': 'minx',
-                'Square-1': 'sq1',
-            };
-        } else if (relaySelect.value == 'guildford') {
-            events = {
-                '2x2': '222',
-                '3x3': '333',
-                '4x4': '444',
-                '5x5': '555',
-                '6x6': '666',
-                '7x7': '777',
-                'OH': '333oh',
-                'Pyraminx': 'pyram',
-                'Clock': 'clock',
-                'Skewb': 'skewb',
-                'Megaminx': 'minx',
-                'Square-1': 'sq1',
-            };
-        } else if (relaySelect.value == 'miniguildfto') {
-            events = {
-                '2x2': '222',
-                '3x3': '333',
-                '4x4': '444',
-                '5x5': '555',
-                'OH': '333oh',
-                'Pyraminx': 'pyram',
-                'Clock': 'clock',
-                'FTO': 'fto',
-                'Skewb': 'skewb',
-                'Megaminx': 'minx',
-                'Square-1': 'sq1',
-            };
-        } else if (relaySelect.value == 'guildfordfto') {
-            events = {
-                '2x2': '222',
-                '3x3': '333',
-                '4x4': '444',
-                '5x5': '555',
-                '6x6': '666',
-                '7x7': '777',
-                'OH': '333oh',
-                'Pyraminx': 'pyram',
-                'Clock': 'clock',
-                'FTO': 'fto',
-                'Skewb': 'skewb',
-                'Megaminx': 'minx',
-                'Square-1': 'sq1',
-            };
-        } else if (relaySelect.value == 'twotoseven') {
-            events = {
-                '2x2': '222',
-                '3x3': '333',
-                '4x4': '444',
-                '5x5': '555',
-                '6x6': '666',
-                '7x7': '777',
-            };
+        const name = await getCompetitorName(wcaId);
+        if (competitorId === 'c1') {
+            competitor1Name = name;
+        } else {
+            competitor2Name = name;
         }
+        const nameEl = document.getElementById(`${competitorId}-name`);
+        if (nameEl) nameEl.textContent = name;
 
-        const times = {};
-
-        for (const [eventName, eventId] of Object.entries(events)) {
-            const name = await getCompetitorName(wcaId);
-            const competitorName = document.getElementById(`${competitorId}-name`);
-            competitorId === 'c1' ? (competitor1Name = name) : (competitor2Name = name);
-            competitorName.textContent = name;
-
-            const average = await getCurrentAverage(wcaId, eventId);
-            times[eventName] = average !== null ? average : null;
-
-            // Update the input field live
-            const input = document.getElementById(`${competitorId}-${eventName}`);
-            if (times[eventName] !== null) {
-                input.value = formatTime(times[eventName].toFixed(2)).replace(/[^0-9.]/g, '');
+        // Fetch averages in parallel for all events
+        const pairs = Object.entries(eventMap);
+        await Promise.all(
+            pairs.map(async ([eventName, eventId]) => {
+                const avg = await getCurrentAverage(wcaId, eventId);
+                const input = document.getElementById(`${competitorId}-${eventName}`);
+                if (!input) return;
+                if (avg === null || avg === undefined) {
+                    input.value = 'DNF';
+                } else {
+                    // avg is in seconds (float). Put it in "m:ss.ss" format, then set input to that string.
+                    const formatted = formatTime(avg);
+                    input.value = formatted;
+                }
                 formatInputField(input);
-            } else {
-                input.value = 'DNF';
-            }
-        }
-    } catch (error) {
-        alert(`Error fetching data: ${error.message}`);
+            })
+        );
+
+        // After populating, run optimize
+        optimizeGuildford();
+    } catch (err) {
+        console.error(err);
     }
 }
 
 // Existing function to collect times from the form fields
 function collectCompetitorTimes(competitorId) {
     const times = {};
-
     events.forEach((event) => {
-        const value = getTimeInSeconds(document.getElementById(`${competitorId}-${event}`).value);
-        if (value === 'DNF' || isNaN(value)) {
-            times[event] = 10000; // Use 10000 for DNF (did not finish)
-        } else {
-            times[event] = parseFloat(value);
-        }
+        const el = document.getElementById(`${competitorId}-${event}`);
+        const raw = el ? el.value : '';
+        const seconds = getTimeInSeconds(raw);
+        times[event] = isNaN(seconds) ? DNF_SENTINEL : seconds;
     });
-
     return times;
 }
 
@@ -511,173 +542,89 @@ function formatTime(seconds) {
 }
 
 function getTimeInSeconds(input) {
-    var currentValue = input;
-    if (currentValue.includes(':')) {
-        var parts = currentValue.split(':');
-        var minutes = parseInt(parts[0]);
-        var seconds = parseFloat(parts[1]);
-        var totalSeconds = minutes * 60 + seconds;
+    if (typeof input !== 'string') return NaN;
+    const s = input.trim();
+    if (!s) return NaN;
+    if (/^dnf$/i.test(s)) return NaN; // caller will map NaN to DNF sentinel
+    if (s.includes(':')) {
+        const parts = s.split(':');
+        const minutes = parseInt(parts[0], 10);
+        const seconds = parseFloat(parts[1]);
+        if (isNaN(minutes) || isNaN(seconds)) return NaN;
+        return minutes * 60 + seconds;
     } else {
-        var totalSeconds = parseFloat(currentValue);
+        // plain seconds (or formatted like 12.34)
+        const v = parseFloat(s);
+        return isNaN(v) ? NaN : v;
     }
-    return totalSeconds;
 }
 
-/**
- * Depth-First Search (DFS) function to explore all possible combinations of events
- * assigned to two competitors, using alpha-beta pruning to optimize the search.
- *
- * @param {number} index - The current index in the events array.
- * @param {Array<string>} group1 - The list of events assigned to competitor 1.
- * @param {Array<string>} group2 - The list of events assigned to competitor 2.
- * @param {number} alpha - The best time found so far for competitor 1.
- * @param {number} beta - The best time found so far for competitor 2.
- * @param {number} group1Time - The total time for the events assigned to competitor 1.
- * @param {number} group2Time - The total time for the events assigned to competitor 2.
- * @returns {Promise<number>} - The best time found for the current combination of events.
- */
-async function processCombinationsWithAlphaBetaLive(competitor1, competitor2, pickupTime) {
+function processCombinations(competitor1, competitor2, pickup) {
     const bestCombinationDiv = document.getElementById('bestCombination');
     const combinationsCountedDiv = document.getElementById('combinationsCounted');
 
     let bestTime = Infinity;
-    let combinationsCount = 0;
+    let bestGroups = null;
+    let combos = 0;
+    const start = Date.now();
 
-    const startCalculating = Date.now();
+    // Precompute event times (including pickup except for final subtraction)
+    const times1 = events.map((e) => (competitor1[e] || 0) + pickup);
+    const times2 = events.map((e) => (competitor2[e] || 0) + pickup);
 
-    const dfs = async (index, group1, group2, alpha, beta, group1Time, group2Time) => {
+    function dfs(index, group1Idxs, group2Idxs, sum1, sum2) {
+        // Lower bound pruning: if the larger of sums already >= bestTime, prune
+        const currentMax = Math.max(sum1, sum2);
+        if (currentMax >= bestTime) return;
+
         if (index === events.length) {
-            const maxTime = Math.max(group1Time, group2Time);
-            combinationsCount++;
-
-            const stopCalculating = Date.now();
-            const timeTaken = (stopCalculating - startCalculating) / 1000;
-
-            if (maxTime < bestTime) {
-                bestTime = maxTime;
-                let diff = Math.abs(group1Time - group2Time);
-                const totalGroup1Time = group1.reduce(
-                    (sum, event) => sum + (competitor1[event] || 0),
-                    0
-                );
-                const totalGroup2Time = group2.reduce(
-                    (sum, event) => sum + (competitor2[event] || 0),
-                    0
-                );
-                const averageTime = (totalGroup1Time + totalGroup2Time) / 2;
-
-                const eventDifference = Math.abs(group1.length - group2.length);
-                const threshold = averageTime / events.length + eventDifference * pickupTime;
-
-                var middleEventsText = '';
-
-                if (diff < threshold) {
-                    const sortedEvents1 = group1
-                        .map((event) => ({
-                            event,
-                            time: competitor1[event] + (competitor2[event] || 0),
-                        }))
-                        .sort((a, b) => a.time - b.time);
-
-                    const sortedEvents2 = group2
-                        .map((event) => ({
-                            event,
-                            time: competitor2[event] + (competitor1[event] || 0),
-                        }))
-                        .sort((a, b) => a.time - b.time);
-
-                    // Selecting the first few events whose total time is under the threshold
-                    let middleEvents = [];
-                    let sum1 = 0,
-                        sum2 = 0;
-
-                    for (let item of sortedEvents1) {
-                        if (sum1 + item.time < threshold) {
-                            sum1 += item.time;
-                            middleEvents.push(item.event);
-                        } else break;
-                    }
-
-                    for (let item of sortedEvents2) {
-                        if (sum2 + item.time < threshold) {
-                            sum2 += item.time;
-                            middleEvents.push(item.event);
-                        } else break;
-                    }
-
-                    middleEventsText =
-                        middleEvents.length > 0
-                            ? `<p title="Suggested middle events, should any competitor finish early.">Suggested events in the middle: ${middleEvents.join(
-                                  ', '
-                              )}</p>`
-                            : '';
-                }
-
-                bestCombinationDiv.innerHTML = `
-                    <h3>Best Combination</h3>
-                    <p>${competitor1Name} (${formatTime(group1Time)}): ${group1.join(', ')}</p>
-                    <p>${competitor2Name} (${formatTime(group2Time)}): ${group2.join(', ')}</p>
-                    ${middleEventsText}
-                    <p>Total Time: ${formatTime(bestTime)}</p>`;
+            combos++;
+            // subtract last pickup per competitor (because every group sum added pickup per event)
+            const real1 = sum1 - (group1Idxs.length > 0 ? pickup : 0);
+            const real2 = sum2 - (group2Idxs.length > 0 ? pickup : 0);
+            const totalMax = Math.max(real1, real2);
+            if (totalMax < bestTime) {
+                bestTime = totalMax;
+                bestGroups = {
+                    group1: group1Idxs.map((i) => events[i]),
+                    group2: group2Idxs.map((i) => events[i]),
+                    time1: real1,
+                    time2: real2,
+                };
             }
-
-            combinationsCountedDiv.textContent = `Analyzed ${combinationsCount} combinations in ${timeTaken} seconds`;
-            return maxTime;
+            return;
         }
 
-        const currentEvent = events[index];
-        const time1 = (competitor1[currentEvent] || 0) + pickupTime;
-        const time2 = (competitor2[currentEvent] || 0) + pickupTime;
+        // Try assign event index to competitor 1
+        dfs(index + 1, [...group1Idxs, index], group2Idxs, sum1 + times1[index], sum2);
 
-        // Check for DNF in the same event
-        if (competitor1[currentEvent] === 10000 && competitor2[currentEvent] === 10000) {
-            alert(`Guildford is invalid: Both competitors have DNF in ${currentEvent}`);
-            return Infinity;
-        }
+        // Try assign event index to competitor 2
+        dfs(index + 1, group1Idxs, [...group2Idxs, index], sum1, sum2 + times2[index]);
+    }
 
-        let localBest = Infinity;
+    dfs(0, [], [], 0, 0);
 
-        // Assign to Group 1
-        if (group1Time + time1 < beta) {
-            const result = await dfs(
-                index + 1,
-                [...group1, currentEvent],
-                group2,
-                alpha,
-                beta,
-                group1Time + time1,
-                group2Time
-            );
-            localBest = Math.min(localBest, result);
-            alpha = Math.max(alpha, result);
-        }
+    const timeTaken = (Date.now() - start) / 1000;
+    combinationsCountedDiv.textContent = `Analyzed ${combos} combinations in ${timeTaken.toFixed(
+        2
+    )}s`;
 
-        if (alpha >= beta) return localBest;
-
-        // Assign to Group 2
-        if (group2Time + time2 < alpha) {
-            const result = await dfs(
-                index + 1,
-                group1,
-                [...group2, currentEvent],
-                alpha,
-                beta,
-                group1Time,
-                group2Time + time2
-            );
-            localBest = Math.min(localBest, result);
-            beta = Math.min(beta, result);
-        }
-
-        return localBest;
-    };
-
-    await dfs(0, [], [], -Infinity, Infinity, 0, 0);
+    if (bestGroups) {
+        bestCombinationDiv.innerHTML = `
+            <h3>Best Combination</h3>
+            <p>${competitor1Name} (${formatTime(bestGroups.time1)}): ${bestGroups.group1.join(
+            ', '
+        )}</p>
+            <p>${competitor2Name} (${formatTime(bestGroups.time2)}): ${bestGroups.group2.join(
+            ', '
+        )}</p>
+            <p>Total Time: ${formatTime(bestTime)}</p>`;
+    } else {
+        bestCombinationDiv.innerHTML = `<p>No valid combination found.</p>`;
+    }
 }
 
-// Main function to start the optimization and live update
 function optimizeAndDisplayLive(competitor1, competitor2) {
     const pickupTime = parseFloat(document.getElementById('pickup').value) || 0;
-
-    processCombinationsWithAlphaBetaLive(competitor1, competitor2, pickupTime);
+    processCombinations(competitor1, competitor2, pickupTime);
 }
