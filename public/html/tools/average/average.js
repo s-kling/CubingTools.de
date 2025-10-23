@@ -4,6 +4,8 @@ let eventType = document.getElementById('event-type').value;
 let userSolves = [];
 let userAverages = [];
 
+const meanEvents = ['666', '777', '444bf', '555bf', '333bf'];
+
 // === Format input field on input ===
 document.getElementById('timeInput').addEventListener('input', (e) => {
     formatInputField(e.target);
@@ -14,14 +16,55 @@ document.getElementById('timeInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') addTime();
 });
 
-// === Handle event type change ===
+// === Handle event type change (combined logic) ===
 document.getElementById('event-type').addEventListener('change', async (e) => {
-    eventType = e.target.value;
-    const wcaId = document.getElementById('wca').value.trim().toUpperCase();
-    if (!wcaId) return;
-    if (!/\d{4}[a-zA-Z]{4}\d{2}/.test(wcaId)) return;
-    await fetchUserData(wcaId);
+    const newEvent = e.target.value;
+
+    // Warn if user has unsaved solves or averages in current event
+    if (times.length > 0 || userSolves.length > 0 || userAverages.length > 0) {
+        const confirmSwitch = confirm(
+            "⚠️ You're in the middle of a session. Switching events will:\n" +
+                '• Clear all current solves and averages.\n' +
+                '• Reset your WCA-based ranks.\n' +
+                '• Load stored averages for the new event.\n\n' +
+                'Do you want to continue?'
+        );
+        if (!confirmSwitch) {
+            e.target.value = eventType;
+            return;
+        }
+
+        // Clear current data before switching
+        times = [];
+        userSolves = [];
+        userAverages = [];
+        calculateStats();
+        displayCurrentTimes();
+    }
+
+    eventType = newEvent;
+
+    // Load event-specific averages and rebuild stats
+    loadAveragesFromCookies();
     calculateStats();
+
+    // Fetch WCA data if WCA ID is present and valid
+    const wcaId = document.getElementById('wca').value.trim().toUpperCase();
+    if (wcaId && /\d{4}[a-zA-Z]{4}\d{2}/.test(wcaId)) {
+        await fetchUserData(wcaId);
+        calculateStats();
+    }
+
+    // Show/hide BPA/WPA for mean events
+    const bpaDiv = document.getElementById('bpa-div');
+    const wpaDiv = document.getElementById('wpa-div');
+    if (!meanEvents.includes(eventType)) {
+        bpaDiv.style.display = 'block';
+        wpaDiv.style.display = 'block';
+    } else {
+        bpaDiv.style.display = 'none';
+        wpaDiv.style.display = 'none';
+    }
 });
 
 // === Recalculate when target time changes ===
@@ -126,9 +169,10 @@ function calculateStats() {
 
     let html = '';
     const mean = (times.reduce((a, b) => a + b.value, 0) / n).toFixed(2);
-
     let ao5 = null;
-    if (n >= 5) {
+    let mo3 = null;
+
+    if (n >= 5 && !meanEvents.includes(eventType)) {
         const last5 = times
             .slice(-5)
             .map((t) => t.value)
@@ -136,6 +180,14 @@ function calculateStats() {
         const trimmed = last5.slice(1, 4);
         ao5 = (trimmed.reduce((a, b) => a + b, 0) / 3).toFixed(2);
         html += `<div><strong>Average of 5:</strong> ${ao5}</div>`;
+    }
+
+    if (n >= 3 && meanEvents.includes(eventType)) {
+        const last3 = times
+            .slice(-3)
+            .map((t) => t.value)
+            .sort((a, b) => a - b);
+        mo3 = ((last3[0] + last3[1] + last3[2]) / 3).toFixed(2);
     }
 
     const target = parseFloat(document.getElementById('target').value) || Infinity;
@@ -158,9 +210,18 @@ function calculateStats() {
     const tftElem = document.getElementById('tft');
     if (tftElem) tftElem.textContent = tft;
 
-    // When an average of 5 is completed, store it
+    const event = document.getElementById('event-type').value;
+
+    // When a mean of 3 or an average of 5 is completed, store it
+    if (mo3) {
+        const avgId = times[times.length - 1].averageId;
+
+        averageTags.push({ average: mo3, times: times.slice(-3), event: event, averageId: avgId });
+        mo3 = mo3 === 'DNF' ? 'DNF' : parseFloat(mo3);
+        userAverages.push(mo3); // add to user averages for ranking
+        displayTags();
+    }
     if (ao5) {
-        const event = document.getElementById('event-type').value;
         const avgId = times[times.length - 1].averageId;
 
         averageTags.push({ average: ao5, times: times.slice(-5), event: event, averageId: avgId });
@@ -172,51 +233,80 @@ function calculateStats() {
 
 // === BPA / WPA / TFT calculation ===
 function calculateBpaWpaTft(times, target) {
-    if (times.length !== 4) return { bpa: null, wpa: null, tft: null };
+    // For mean events (6x6, 7x7, BLD)
+    if (times.length === 2 && meanEvents.includes(eventType)) {
+        // Get last 2 times as numbers (handle DNF)
+        const times = times.map((t) => {
+            if (t.penalty === 'dnf' || t.value === Infinity) return 'DNF';
+            return t.value;
+        });
 
-    // Get last 4 times as numbers (handle DNF)
-    const last4 = times.slice(-4).map((t) => {
-        if (t.penalty === 'dnf' || t.value === Infinity) return 'DNF';
-        return t.value;
-    });
+        // Count DNFs
+        const dnfCount = times.filter((t) => t === 'DNF').length;
 
-    // Count DNFs
-    const dnfCount = last4.filter((t) => t === 'DNF').length;
+        if (dnfCount > 0) {
+            return { bpa: 'DNF', wpa: 'DNF', tft: 'Not Possible' };
+        }
 
-    if (dnfCount > 1) {
-        return { bpa: 'DNF', wpa: 'DNF', tft: 'Not Possible' };
+        const sum = times.reduce((a, b) => a + b, 0);
+        const avg = sum / 2;
+
+        // time for target
+        let tft = null;
+        if (target !== Infinity) {
+            const needed = target * 2 - sum;
+            tft = needed;
+        }
+
+        // Handle impossible/guaranteed target
+        if (target <= 0 || dnfCount > 0) tft = 'Not Possible';
+
+        return { bpa, wpa, tft };
+    } else if (times.length === 4) {
+        // Get last 4 times as numbers (handle DNF)
+        const last4 = times.slice(-4).map((t) => {
+            if (t.penalty === 'dnf' || t.value === Infinity) return 'DNF';
+            return t.value;
+        });
+
+        // Count DNFs
+        const dnfCount = last4.filter((t) => t === 'DNF').length;
+
+        if (dnfCount > 1) {
+            return { bpa: 'DNF', wpa: 'DNF', tft: 'Not Possible' };
+        }
+
+        // If exactly 1 DNF, exclude it only in WPA (worst) calculation
+        const validTimes = last4.filter((t) => t !== 'DNF');
+
+        const best = Math.min(...validTimes);
+        const worst = Math.max(...validTimes);
+
+        const sum = validTimes.reduce((a, b) => a + b, 0);
+
+        let bpa, wpa;
+        if (dnfCount === 1) {
+            // WPA is impossible if 1 DNF (best+avg), BPA can still be computed
+            bpa = (sum - worst) / 3;
+            wpa = 'DNF';
+        } else {
+            bpa = (sum - worst) / 3;
+            wpa = (sum - best) / 3;
+        }
+
+        // time for target
+        let tft = null;
+        if (target !== Infinity && dnfCount === 0) {
+            const needed = target * 3 - (sum - best - worst);
+            tft = needed;
+        }
+
+        // Handle impossible/guaranteed target
+        if (wpa < target) tft = 'Guaranteed';
+        if (bpa > target) tft = 'Not Possible';
+
+        return { bpa, wpa, tft };
     }
-
-    // If exactly 1 DNF, exclude it only in WPA (worst) calculation
-    const validTimes = last4.filter((t) => t !== 'DNF');
-
-    const best = Math.min(...validTimes);
-    const worst = Math.max(...validTimes);
-
-    const sum = validTimes.reduce((a, b) => a + b, 0);
-
-    let bpa, wpa;
-    if (dnfCount === 1) {
-        // WPA is impossible if 1 DNF (best+avg), BPA can still be computed
-        bpa = (sum - worst) / 3;
-        wpa = 'DNF';
-    } else {
-        bpa = (sum - worst) / 3;
-        wpa = (sum - best) / 3;
-    }
-
-    // time for target
-    let tft = null;
-    if (target !== Infinity && dnfCount === 0) {
-        const needed = target * 3 - (sum - best - worst);
-        tft = needed;
-    }
-
-    // Handle impossible/guaranteed target
-    if (wpa < target) tft = 'Guaranteed';
-    if (bpa > target) tft = 'Not Possible';
-
-    return { bpa, wpa, tft };
 }
 
 // === Sidebar averages display ===

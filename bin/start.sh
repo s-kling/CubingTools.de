@@ -14,10 +14,10 @@ read -p "$(echo -e ${CYAN}Do you want to start the beta? [Y/n]: ${NC})" START_BE
 if [[ "$START_BETA" == "n" ]]; then
     # Check if port 443 is in use
     if lsof -i:443 > /dev/null; then
-        echo -e "${RED}Port 8443 is currently in use.${NC}"
-        echo -e "${YELLOW}Killing process on port 8443...${NC}"
-        lsof -ti:8443 | xargs kill -9
-        echo -e "${GREEN}Process on port 8443 has been terminated.${NC}"
+        echo -e "${RED}Port 8080 is currently in use.${NC}"
+        echo -e "${YELLOW}Killing process on port 8080...${NC}"
+        lsof -ti:8080 | xargs kill -9
+        echo -e "${GREEN}Process on port 8080 has been terminated.${NC}"
     fi
 
     # Start the production server
@@ -70,12 +70,12 @@ if [[ "$START_BETA" == "n" ]]; then
         fi
     done
 else
-    # Check if port 8443 is in use
-    if lsof -i:8443 > /dev/null; then
-        echo -e "${RED}Port 8443 is currently in use.${NC}"
-        echo -e "${YELLOW}Killing process on port 8443...${NC}"
-        lsof -ti:8443 | xargs kill -9
-        echo -e "${GREEN}Process on port 8443 has been terminated.${NC}"
+    # Check if port 8080 is in use
+    if lsof -i:8080 > /dev/null; then
+        echo -e "${RED}Port 8080 is currently in use.${NC}"
+        echo -e "${YELLOW}Killing process on port 8080...${NC}"
+        lsof -ti:8080 | xargs kill -9
+        echo -e "${GREEN}Process on port 8080 has been terminated.${NC}"
     fi
 
     # Check if the folder exists
@@ -95,7 +95,7 @@ else
     echo -e "${GREEN}Starting beta server...${NC}"
 
     # Open the URL in the default browser
-    URL="https://localhost:8443"
+    URL="http://localhost:8080"
     if command -v xdg-open > /dev/null; then
         xdg-open "$URL"
     elif command -v open > /dev/null; then

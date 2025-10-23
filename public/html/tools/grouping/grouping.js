@@ -163,32 +163,6 @@ function setupCompetition() {
                 const titleDiv = document.createElement('div');
                 titleDiv.className = 'event-section-title';
                 titleDiv.textContent = newTitle;
-
-                // Add a click event listener to the titleDiv
-                titleDiv.addEventListener('click', () => {
-                    let nextElement = titleDiv.nextElementSibling;
-                    const checkboxes = [];
-
-                    // Gather all checkboxes under the current title
-                    while (nextElement && !nextElement.classList.contains('event-section-title')) {
-                        const checkbox = nextElement.querySelector('input[type="checkbox"]');
-                        if (checkbox) {
-                            checkboxes.push(checkbox);
-                        }
-                        nextElement = nextElement.nextElementSibling;
-                    }
-
-                    // Determine if all checkboxes are already checked
-                    const allChecked = checkboxes.every((checkbox) => checkbox.checked);
-
-                    // Set all checkboxes to the opposite of allChecked
-                    checkboxes.forEach((checkbox) => {
-                        checkbox.checked = !allChecked;
-                    });
-                });
-
-                eventCheckboxes.appendChild(titleDiv);
-                currentTitle = newTitle;
             }
 
             handleAddingEventDivs(event, eventCheckboxes);

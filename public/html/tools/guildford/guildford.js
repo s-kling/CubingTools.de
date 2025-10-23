@@ -65,10 +65,13 @@ relaySelect.addEventListener('change', () => {
 
 let events = eventOptions[relaySelect.value] || [];
 
-const DNF_SENTINEL = 1000000; // large number to represent DNF
+const DNF_SENTINEL = 1_000_000; // large number to represent DNF
 function isDNF(value) {
     return value === 'DNF' || value === null || value === undefined;
 }
+
+let competitor1Times = {};
+let competitor2Times = {};
 
 function addEventInputs() {
     const competitor1Events = document.getElementById('c1-times');
@@ -344,41 +347,74 @@ function optimizeGuildford() {
     optimizeAndDisplayLive(competitor1, competitor2);
 }
 
-// Function to fetch average times from the API for a given WCA ID and event
-async function getCurrentAverage(wcaId, event) {
+// Function to fetch average times and all solves from the API for a given WCA ID and event
+async function getCurrentAverage(wcaId, event, competitorId) {
     // Validate and sanitize inputs
     const sanitizedWcaId = wcaId.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
     const sanitizedEvent = event.replace(/[^a-zA-Z0-9]/g, '');
     const solvecount = parseInt(document.getElementById('solvecount').value) || 25;
 
-    // Construct the API URL
-    const apiUrl = `/api/wca/${encodeURIComponent(sanitizedWcaId)}/${encodeURIComponent(
+    // Construct the API URLs
+    const avgUrl = `/api/wca/${encodeURIComponent(sanitizedWcaId)}/${encodeURIComponent(
         sanitizedEvent
     )}?num=${solvecount}`;
+    const allSolvesUrl = `/api/wca/${encodeURIComponent(sanitizedWcaId)}/${encodeURIComponent(
+        sanitizedEvent
+    )}?getsolves=true`;
 
     try {
-        const response = await fetch(apiUrl);
+        // Fetch average and all solves in parallel
+        const [avgResponse, allSolvesResponse] = await Promise.all([
+            fetch(avgUrl),
+            fetch(allSolvesUrl),
+        ]);
 
-        // Check for suspicious responses or errors
-        if (!response.ok) {
-            if (response.status === 404) {
+        // Check for errors
+        if (!avgResponse.ok) {
+            if (avgResponse.status === 404) {
                 console.warn(
                     `API returned 404 for WCA ID: ${sanitizedWcaId}, Event: ${sanitizedEvent}`
                 );
             }
-            throw new Error(`Error fetching data: ${response.statusText}`);
+            throw new Error(`Error fetching average: ${avgResponse.statusText}`);
+        }
+        if (!allSolvesResponse.ok) {
+            if (allSolvesResponse.status === 404) {
+                console.warn(
+                    `API returned 404 for all solves for WCA ID: ${sanitizedWcaId}, Event: ${sanitizedEvent}`
+                );
+            }
+            throw new Error(`Error fetching all solves: ${allSolvesResponse.statusText}`);
         }
 
-        const data = await response.json();
+        const avgData = await avgResponse.json();
+        const allSolvesData = await allSolvesResponse.json();
+
+        // Use only the first N solves from allResults (convert -1 and <0 to NaN, remove <0 before trimming)
+        let allResults = Array.isArray(allSolvesData.allResults)
+            ? allSolvesData.allResults
+                  .filter((x) => x > 0) // remove all <0 numbers
+                  .slice(0, solvecount)
+                  .map((x) => (x === -1 ? NaN : x / 100))
+            : [];
+
+        // Store all solves in the correct competitor object
+        if (competitorId === 'c1') {
+            competitor1Times[event] = allResults;
+        } else if (competitorId === 'c2') {
+            competitor2Times[event] = allResults;
+        }
 
         // Validate the response structure
-        if (!data || typeof data.average !== 'number') {
-            throw new Error('Invalid response format from API');
+        if (!avgData || typeof avgData.average !== 'number') {
+            throw new Error('Invalid response format from API (average)');
         }
 
-        return data.average;
+        return avgData.average;
     } catch (error) {
-        console.error(`Error fetching average for event ${sanitizedEvent}: ${error.message}`);
+        console.error(
+            `Error fetching average or all solves for event ${sanitizedEvent}: ${error.message}`
+        );
         return null;
     }
 }
@@ -492,7 +528,7 @@ async function getWCAData(competitorId) {
         const pairs = Object.entries(eventMap);
         await Promise.all(
             pairs.map(async ([eventName, eventId]) => {
-                const avg = await getCurrentAverage(wcaId, eventId);
+                const avg = await getCurrentAverage(wcaId, eventId, competitorId);
                 const input = document.getElementById(`${competitorId}-${eventName}`);
                 if (!input) return;
                 if (avg === null || avg === undefined) {
