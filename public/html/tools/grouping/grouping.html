@@ -87,7 +87,7 @@
                     <button onclick="setupCompetition()">Next</button>
                 </div>
 
-                <div id="event-selection" style="display: none">
+                <div id="event-selection" class="hidden">
                     <h2>Select Events</h2>
                     <p>Check all of the events you plan to host at your unofficial competition. If an event you want to host is not here, add it with the "Add Event" button! The groups for each event will be dynamically created based on the number of competitors and the maximum number of competitors per group you specified earlier.</p>
                     <p>Dynamic groups will be created based on the number of competitors and the maximum number of competitors per group. If unchecked, you will be able to customize the number of groups you want to generate for that event.</p>
@@ -109,7 +109,7 @@
                     <div id="event-checkboxes"></div>
                 </div>
 
-                <div id="competitor-setup" style="display: none">
+                <div id="competitor-setup" class="hidden">
                     <h2>Add Competitors</h2>
                     <p>Add competitors to your competition by entering their name and selecting the events they will compete in. Click "Add Competitor" to add them to the list. Once you have added all competitors, click "Finalize Competitors" to proceed to the grouping results.</p>
                     <p>If your competitor has a WCA ID, you can also enter it to utilize the competitor sorting feature, which arranges competitors by their most recent official Ao25!</p>
@@ -121,7 +121,6 @@
                     </div>
                     <br>
                     <div id="competitor-form"></div>
-                    <button title="Add Competitor" onclick="addCompetitor()">Add Competitor</button>
                     <div id="competitor-list-wrapper">
                         <table id="competitor-list">
                             <thead>
@@ -139,7 +138,7 @@
                     </div>
                 </div>
 
-                <div id="grouping-results" style="display: none">
+                <div id="grouping-results" class="hidden">
                     <h2>Grouping Results</h2>
                     <p>Here are the groups for each event at your unofficial competition. You can edit the groups by clicking on the "Edit" button, which will allow you to move competitors between groups. Once you are satisfied with the groups.</p>
                     <div id="edit-modal" class="modal" style="display: none;">

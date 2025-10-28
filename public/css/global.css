@@ -58,6 +58,53 @@ body {
     overflow: hidden;
 }
 
+/* ---------- Unordered List Styles ---------- */
+ul {
+    list-style: none; /* remove default bullets */
+    margin: var(--space-sm) 0;
+    padding: 0;
+    background: var(--main-lighter);
+    border-radius: var(--main-radius);
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--input-border);
+}
+
+/* each list item */
+ul li {
+    position: relative;
+    color: var(--main-text);
+    font-family: var(--font-main);
+    font-size: var(--font-size-base);
+    padding: var(--space-xs) 0 var(--space-xs) var(--space-lg);
+    line-height: 1.5;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* custom bullet using a pseudo-element */
+ul li::before {
+    content: "•";
+    position: absolute;
+    left: var(--space-sm);
+    color: var(--button-background);
+    font-weight: 600;
+    font-size: 1.2em;
+    line-height: 1;
+}
+
+/* remove border from last item */
+ul li:last-child {
+    border-bottom: none;
+}
+
+/* hover effect for interactive lists */
+ul li:hover {
+    background: var(--hover-background);
+    color: var(--hover-text);
+    border-radius: var(--main-radius);
+    transition: background 0.12s ease, color 0.12s ease;
+}
+
+
 /* HERO INTRO */
 .hero {
     position: fixed;
@@ -321,17 +368,34 @@ nav a.logo {
 }
 
 nav ul {
-    display: flex;
-    align-items: center;
+    list-style: none;           /* remove bullets */
     margin: 0;
     padding: 0;
-    list-style: none;
+    display: flex;              /* flex layout for nav items */
+    flex-direction: row;
+    align-items: center;
+    background: none;
+    border: none;
 }
 
 nav ul li {
     margin: 0 var(--space-xs);
+    padding: 0;
+    border: none;
+    background: none;
 }
 
+/* remove any pseudo-element bullets from nav items */
+nav ul li::before {
+    content: "";
+}
+
+/* hover effect for nav items */
+nav ul li:hover {
+    background: none;
+}
+
+/* links inside nav items */
 nav ul li a {
     color: var(--main-text);
     font-size: 17px;
@@ -340,6 +404,7 @@ nav ul li a {
     transition: background-color 0.5s;
 }
 
+/* active / hover state for links */
 nav ul li a.active,
 nav ul li a:hover {
     background-color: var(--hover-background);
@@ -459,17 +524,27 @@ main {
     grid-area: main;
     overflow-x: hidden;
     overflow-y: scroll;
-    padding: var(--space-lg);
+    background: linear-gradient(180deg, var(--main-background) 0%, var(--secondary-background) 100%);
+    padding: var(--main-padding);
+    display: flex;
+    justify-content: center;
 }
 
 main .heading {
-    margin: 0 13.5%;
+    width: min(1200px, 100%);
+    height: fit-content;
+    margin: var(--main-margin) auto;
+    padding: calc(var(--main-padding) * 1.25);
+    border-radius: var(--main-radius);
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
 }
 
-main h1 {
+main .heading h1 {
     font-size: var(--font-size-xl);
+    margin: 0 0 var(--space-sm) 0;
     color: var(--main-text);
-    margin-bottom: var(--space-sm);
+    letter-spacing: 0.2px;
 }
 
 main h2 {
@@ -479,10 +554,11 @@ main h2 {
     margin-bottom: var(--space-sm);
 }
 
-main p {
-    margin-bottom: var(--space-sm);
+main .heading p {
     color: var(--secondary-text);
-    line-height: 1.5;
+    line-height: 1.45;
+    font-size: var(--font-size-base);
+    margin: 0 0 var(--space-md) 0;
 }
 
 main label {

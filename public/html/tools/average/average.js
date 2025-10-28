@@ -202,10 +202,10 @@ function calculateStats() {
     if (meanElem) meanElem.textContent = mean ? (isFinite(mean) ? mean : 'DNF') : '0.00';
 
     const bpaElem = document.getElementById('bpa');
-    if (bpaElem) bpaElem.textContent = bpa === 'DNF' ? 'DNF' : bpa ? bpa.toFixed(2) : '-';
+    if (bpaElem) bpaElem.textContent = bpa === 'DNF' ? 'DNF' : !isNaN(bpa) ? bpa.toFixed(2) : '-';
 
     const wpaElem = document.getElementById('wpa');
-    if (wpaElem) wpaElem.textContent = wpa === 'DNF' ? 'DNF' : wpa ? wpa.toFixed(2) : '-';
+    if (wpaElem) wpaElem.textContent = wpa === 'DNF' ? 'DNF' : !isNaN(wpa) ? wpa.toFixed(2) : '-';
 
     const tftElem = document.getElementById('tft');
     if (tftElem) tftElem.textContent = tft;
@@ -307,6 +307,8 @@ function calculateBpaWpaTft(times, target) {
 
         return { bpa, wpa, tft };
     }
+
+    return { bpa: '-', wpa: '-', tft: '-' };
 }
 
 // === Sidebar averages display ===

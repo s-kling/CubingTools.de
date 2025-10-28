@@ -1,348 +1,466 @@
-/* === GROUPING TOOL MODERN STYLES === */
-
-/* EVENT SELECTION */
-#event-selection {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-md);
-}
-
-#event-checkboxes {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: var(--space-sm);
-    margin-top: var(--space-md);
-}
-
-.event-checkbox {
-    background-color: var(--input-background);
-    border: 1px solid var(--input-border);
-    border-radius: var(--main-radius);
-    padding: var(--space-sm);
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.25s ease-in-out;
-    box-shadow: 0 0 0 transparent;
-}
-
-.event-checkbox p {
-    font-weight: 500;
-}
-
-.event-checkbox.checked {
-    background-color: var(--button-background);
-    color: white;
-    box-shadow: 0 0 12px rgba(79, 70, 229, 0.5);
-    transform: scale(1.03);
-}
-
-.event-checkbox.unchecked:hover {
-    background-color: var(--hover-background);
-}
-
-.event-section-title {
-    grid-column: 1 / -1;
-    font-size: 1.2rem;
-    color: var(--secondary-text);
-    margin-top: var(--space-md);
-    border-bottom: 1px solid var(--input-border);
-}
-
-/* INLINE BUTTON WRAPPERS */
-.inline-btn {
+/* ---------- Layout & container ---------- */
+main {
+    background: linear-gradient(180deg, var(--main-background) 0%, var(--secondary-background) 100%);
+    padding: var(--main-padding);
+    box-sizing: border-box;
     display: flex;
     justify-content: center;
-    gap: var(--space-sm);
 }
 
-.inline-btn button {
-    background: var(--button-background);
-    color: white;
-    border: none;
+main .heading {
+    width: min(1200px, 100%);
+    height: fit-content;
+    margin: var(--main-margin) auto;
+    padding: calc(var(--main-padding) * 1.25);
     border-radius: var(--main-radius);
-    padding: var(--space-xs) var(--space-md);
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+}
+
+/* ---------- Typography ---------- */
+main .heading h1 {
+    font-size: var(--font-size-xl);
+    margin: 0 0 var(--space-sm) 0;
+    color: var(--main-text);
+    letter-spacing: 0.2px;
+}
+
+main .heading p {
+    color: var(--secondary-text);
+    line-height: 1.45;
     font-size: var(--font-size-base);
+    margin: 0 0 var(--space-md) 0;
+}
+
+
+/* ---------- Cards (setup / selection / results) ---------- */
+#competition-setup,
+#event-selection,
+#competitor-setup,
+#grouping-results {
+    background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+    padding: var(--space-md);
+    border-radius: calc(var(--main-radius) + 2px);
+    margin-bottom: var(--space-lg);
+    border: 1px solid rgba(255,255,255,0.03);
+}
+
+/* Section headings inside cards */
+#competition-setup h2,
+#event-selection h2,
+#competitor-setup h2,
+#grouping-results h2 {
+    font-size: var(--font-size-lg);
+    margin-bottom: var(--space-sm);
+    color: var(--main-text);
+}
+
+/* ---------- Form controls ---------- */
+label {
+    display: block;
+    margin-bottom: var(--space-sm);
+    color: var(--secondary-text);
+    font-size: var(--font-size-base);
+}
+
+input[type="text"],
+input[type="number"],
+select,
+textarea {
+    width: 100%;
+    background: var(--input-background);
+    color: var(--main-text);
+    border: 1px solid var(--input-border);
+    padding: calc(var(--space-xs) + 2px) var(--space-sm);
+    border-radius: var(--main-radius);
+    box-sizing: border-box;
+    font-size: var(--font-size-base);
+    transition: box-shadow 0.12s ease, border-color 0.12s ease;
+    margin-top: var(--space-xxs);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(79,70,229,0.12);
+    border-color: var(--button-background);
+}
+
+/* Inline / checkbox label helper */
+.checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    color: var(--secondary-text);
+}
+
+/* ---------- Buttons ---------- */
+button {
+    background: var(--button-background);
+    color: var(--hover-text);
+    border: none;
+    padding: calc(var(--space-xs)) var(--space-md);
+    border-radius: var(--main-radius);
     cursor: pointer;
-    transition: all 0.2s ease;
+    font-size: var(--font-size-base);
+    transition: background 0.15s ease, transform 0.06s ease;
 }
+button:active { transform: translateY(1px); }
+button:hover { background: var(--hover-background); }
 
-.inline-btn button:hover {
-    background: var(--hover-background);
-}
-
-/* COMPETITOR SETUP */
-#competitor-form {
+.inline-btn {
     display: flex;
-    flex-wrap: wrap;
     gap: var(--space-sm);
     align-items: center;
     margin-bottom: var(--space-md);
 }
-
-#competitor-form input[type="text"] {
-    flex: 1 1 200px;
+.inline-btn button[title] {
+    padding: calc(var(--space-xxs) + 6px) var(--space-sm);
+    min-width: 44px;
 }
 
+/* ---------- Event searchbar ---------- */
+#event-selection #event-searchbar {
+    width: 100%;
+    margin: var(--space-sm) 0 var(--space-md) 0;
+    display: block;
+}
+
+/* ---------- Event tiles ---------- */
+#event-checkboxes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(225px, 1fr));
+    gap: var(--space-sm);
+    align-items: stretch;
+}
+
+.event-checkbox {
+    background: var(--main-lighter);
+    border: 1px solid var(--input-border);
+    padding: var(--space-sm);
+    border-radius: var(--main-radius);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    min-height: 64px;
+    height: 100%; /* stretch to match tallest in row */
+    transition: transform 0.08s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+    color: var(--main-text);
+    user-select: none;
+    min-width: 0;
+}
+
+
+.event-checkbox p {
+    margin: 0;
+    font-weight: 600;
+    color: var(--main-text);
+    font-size: var(--font-size-base);
+}
+
+/* ---------- Full-row section titles + cuts between groups ---------- */
+/* Make titles span the entire grid row inside #event-checkboxes */
+#event-checkboxes .event-section-title {
+    grid-column: 1 / -1;            /* span all columns in the parent grid */
+    display: block;                 /* ensure block-level behavior */
+    width: 100%;                    /* full width */
+    padding: calc(var(--space-xs)) var(--space-sm); /* vertical + horizontal padding */
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--main-text);
+    background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));
+    border-top-left-radius: calc(var(--main-radius) - 2px);
+    border-top-right-radius: calc(var(--main-radius) - 2px);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.01) inset;
+    position: relative;
+    z-index: 2;
+}
+
+/* Strong cut / divider after each section title to separate sections visually.
+   Uses a pseudo-element so it doesn't affect layout flow. */
+#event-checkboxes .event-section-title::after {
+    content: "";
+    display: block;
+    height: 1px;
+    width: 100%;
+    background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+    box-shadow: 0 8px 16px rgba(0,0,0,0.25);
+    opacity: 0.9;
+}
+
+/* Extra visual separation between the title and the first tile of the next row */
+.event-section-title {
+    margin-top: var(--space-sm);
+}
+
+/* Ensure tiles in a section sit visually below the title without breaking the grid */
+#event-checkboxes .event-section-title ~ .event-checkbox {
+    padding-top: calc(var(--space-xs));
+}
+
+/* Optional: make the title slightly dim on hover for affordance if interactive later */
+#event-checkboxes .event-section-title:hover {
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+}
+
+/* Safety: if the event-checkboxes container is nested inside a different width context,
+   ensure the title still spans the full available width */
+#event-checkboxes { align-items: start; }
+#event-checkboxes .event-section-title { min-width: 0; box-sizing: border-box; }
+
+
+.event-checkbox.unchecked { opacity: 0.92; }
+.event-checkbox:hover { transform: translateY(-3px); box-shadow: 0 8px 18px rgba(0,0,0,0.45); }
+.event-checkbox.checked {
+    background: linear-gradient(180deg, rgba(79,70,229,0.08), rgba(79,70,229,0.03));
+    border-color: var(--button-background);
+}
+
+/* inner wrapper for dynamic-group / sort select */
+.event-checkbox > div {
+    margin-top: var(--space-sm);
+    display: flex;
+    gap: var(--space-xs);
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.event-checkbox label {
+    font-size: 0.95rem;
+    color: var(--secondary-text);
+}
+
+/* dynamic group input size */
+.event-checkbox input[type="number"] {
+    max-width: 120px;
+}
+
+/* ---------- Competitor list & form ---------- */
+#competitor-form {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--space-sm);
+    align-items: center;
+    margin-bottom: var(--space-md);
+}
+#competitor-form .inline {
+    display: inline-flex;
+    gap: var(--space-xs);
+    align-items: center;
+}
+
+/* Competitor table */
 #competitor-list-wrapper {
     overflow-x: auto;
-    background: var(--secondary-background);
+    margin-top: var(--space-sm);
     border-radius: var(--main-radius);
-    box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
 }
 
 #competitor-list {
     width: 100%;
     border-collapse: collapse;
+    min-width: 640px;
 }
 
-#competitor-list th, #competitor-list td {
-    padding: var(--space-xs);
+#competitor-list thead th {
     text-align: left;
-    border-bottom: 1px solid var(--input-border);
+    font-weight: 700;
+    color: var(--secondary-text);
+    padding: var(--space-xs) var(--space-sm);
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    font-size: var(--font-size-base);
 }
 
-#competitor-list th {
-    background-color: var(--main-lighter);
-    color: var(--hover-text);
-    font-weight: 600;
+#competitor-list tbody td {
+    padding: calc(var(--space-xs) + 4px) var(--space-sm);
+    border-bottom: 1px dashed rgba(255,255,255,0.02);
+    color: var(--main-text);
+    vertical-align: middle;
 }
 
-#competitor-list tr:hover {
-    background-color: var(--hover-background);
-}
-
+/* delete button */
 .delete-btn {
-    background-color: #dc2626;
-    color: white;
-    padding: var(--space-xxs) var(--space-xs);
-    border: none;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.04);
+    color: var(--link-color);
+    padding: calc(var(--space-xxs) + 6px) var(--space-sm);
     border-radius: var(--main-radius);
-    cursor: pointer;
-    transition: background 0.2s ease;
+}
+.delete-btn:hover { background: rgba(255,255,255,0.02); }
+
+.competitor-name-input {
+    background: transparent;
+    border: 1px dashed rgba(255,255,255,0.04);
+    color: var(--main-text);
+    padding: 4px 6px;
+    border-radius: var(--main-radius);
 }
 
-.delete-btn:hover {
-    background-color: #ef4444;
-}
-
-/* GROUPING RESULTS */
+/* ---------- Grouping results ---------- */
+/* keep grouping output responsive and prevent overflow by using minmax(0,1fr) */
 #grouping-output {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-lg);
-    margin-top: var(--space-md);
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+    min-width: 0;
 }
 
 .event-group {
-    background: var(--secondary-background);
     border-radius: var(--main-radius);
-    padding: var(--space-md);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    padding: var(--space-sm);
+    background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));
+    border: 1px solid rgba(255,255,255,0.03);
+    min-width: 0;
 }
 
-.event-group h3 {
-    font-size: 1.5rem;
-    color: var(--hover-text);
-    margin-bottom: var(--space-xs);
+/* groups default to single column; on wide screens allow 2-column group layout */
+.event-group .group {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-xs);
+    align-items: start;
+    padding: var(--space-sm);
+    margin: var(--space-sm) 0;
+    border-radius: calc(var(--main-radius) - 1px);
+    background: rgba(0,0,0,0.03);
+    border: 1px solid rgba(0,0,0,0.05);
+    min-width: 0;
 }
 
-.copy-tag {
-    font-size: 0.85rem;
+@media (min-width: 900px) {
+    #grouping-output { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .event-group .group { grid-template-columns: 1fr auto; }
+}
+@media (min-width: 1400px) {
+    #grouping-output { grid-template-columns: repeat(3, minmax(0,1fr)); }
+}
+
+.event-group h3 { margin: 0 0 var(--space-xs) 0; font-size: var(--font-size-lg); color: var(--main-text); }
+.event-group h4 { margin: 0 0 var(--space-xxs) 0; font-size: var(--font-size-base); color: var(--main-text); }
+
+/* compact inline tags */
+.copy-tag, .edit-tag,
+.event-group button.copy-tag,
+.event-group button.edit-tag {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.03);
+    padding: 6px 8px;
+    border-radius: calc(var(--main-radius) - 2px);
+    font-size: 0.82rem;
     color: var(--link-color);
     cursor: pointer;
-    margin-bottom: var(--space-sm);
-    transition: color 0.2s ease;
-}
-.copy-tag:hover {
-    color: var(--hover-text);
-    text-decoration: underline;
+    margin: 0 6px 6px 0;
+    white-space: nowrap;
+    line-height: 1;
 }
 
-.group {
-    margin-top: var(--space-sm);
-    padding: var(--space-sm);
-    background: var(--main-lighter);
-    border-radius: var(--main-radius);
-    transition: background 0.2s ease;
-}
-
-.group h4 {
-    font-size: 1.1rem;
+/* Ensure content doesn't force width growth */
+.event-group .group > * { min-width: 0; }
+.event-group ul {
+    margin: 0;
+    padding-left: calc(var(--space-md) - 6px);
     color: var(--main-text);
-    margin-bottom: var(--space-xs);
 }
-
-.group ul {
-    list-style: none;
-    margin-top: var(--space-xs);
-    padding-left: var(--space-md);
-}
-
-.group ul li {
-    padding: 2px 0;
-}
-
-.edit-tag {
-    font-size: 0.9rem;
-    color: var(--link-color);
-    cursor: pointer;
-    margin-bottom: var(--space-xs);
-    transition: all 0.2s ease;
-}
-.edit-tag:hover {
-    color: var(--hover-text);
-    text-decoration: underline;
-}
-
-/* COMPETITOR ASSIGNMENTS */
-.competitor-assignments {
-    background: var(--main-lighter);
-    border-radius: var(--main-radius);
-    padding: var(--space-sm);
-    margin-top: var(--space-md);
-    overflow-x: auto;
-}
-
-.competitor-title {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: var(--hover-text);
-    margin-bottom: var(--space-xs);
-}
-
-.competitor-title h4 {
-    font-size: 1.1rem;
-}
-
-.competitor-title p {
+.event-group div {
+    font-size: 0.95rem;
     color: var(--secondary-text);
+    margin-top: 6px;
 }
 
-.competitor-table {
+/* competitor assignment cards */
+.competitor-assignments {
+    margin-top: var(--space-md);
+    background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+    padding: var(--space-sm);
+    border-radius: var(--main-radius);
+    border: 1px solid rgba(255,255,255,0.02);
+    overflow-x: scroll;
+    grid-column: 1 / -1;
     width: 100%;
-    border-collapse: collapse;
 }
 
-.competitor-table th, .competitor-table td {
-    border: 1px solid var(--input-border);
-    padding: var(--space-xxs);
-    text-align: center;
+.competitor-title h4 { margin: 0; font-size: var(--font-size-base); }
+.competitor-title p { margin: 0; color: var(--secondary-text); font-size: 0.9rem; }
+
+.competitor-table { width: 100%; border-collapse: collapse; margin-top: var(--space-xs); }
+.competitor-table tr th, .competitor-table tr td {
+    padding: var(--space-xxs) var(--space-sm);
+    text-align: left;
+    font-size: 0.95rem;
+    border-bottom: 1px dashed rgba(255,255,255,0.02);
 }
 
-.competitor-table th {
-    background: var(--main-lighter);
-    color: var(--hover-text);
-}
-
-/* MODAL EDIT WINDOW */
+/* ---------- Modal ---------- */
 .modal {
     position: fixed;
-    top: 0; left: 0;
-    width: 100vw; height: 100vh;
-    background: rgba(0, 0, 0, 0.7);
+    inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 99999;
-    backdrop-filter: blur(8px);
+    background: rgba(0,0,0,0.5);
+    z-index: 3000;
 }
-
 .modal-content {
     background: var(--secondary-background);
-    border-radius: var(--main-radius);
-    padding: var(--space-lg);
-    max-width: 600px;
-    width: 90%;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
-    position: relative;
-    animation: modalIn 0.3s ease;
-}
-
-.modal-content h2 {
-    color: var(--hover-text);
-    margin-bottom: var(--space-md);
-}
-
-.modal-content h5 {
-    margin: var(--space-sm) 0 var(--space-xs);
+    padding: var(--space-md);
+    width: min(900px, 96%);
+    border-radius: calc(var(--main-radius) + 2px);
     color: var(--main-text);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.75);
 }
+.close-button { float: right; cursor: pointer; font-size: 1.5rem; color: var(--secondary-text); }
 
-.modal-content select {
-    width: 100%;
+/* ---------- Custom checkbox visuals (consistent across the app) ---------- */
+main input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 2px solid var(--input-border);
     background: var(--input-background);
-    border: 1px solid var(--input-border);
-    border-radius: var(--main-radius);
-    color: var(--main-text);
-    padding: var(--space-xs);
-    margin-bottom: var(--space-xs);
-}
-
-.add-btn, .remove-btn {
-    background-color: var(--button-background);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 28px;
-    height: 28px;
-    margin-right: 6px;
+    vertical-align: middle;
     cursor: pointer;
-    transition: background 0.2s ease;
-}
-.add-btn:hover, .remove-btn:hover {
-    background-color: var(--hover-background);
-}
-
-.close-button {
-    position: absolute;
-    top: 12px;
-    right: 18px;
-    font-size: 1.4rem;
-    color: var(--secondary-text);
-    cursor: pointer;
-    transition: color 0.2s ease;
-}
-.close-button:hover {
-    color: var(--hover-text);
+    margin: 0 0.5rem 0 0;
+    box-sizing: border-box;
+    position: relative;
+    transition: background .12s ease, border-color .12s ease, box-shadow .12s ease, transform .06s ease;
 }
 
-#done-button {
-    display: block;
-    margin: var(--space-md) auto 0;
-    background: var(--button-background);
-    color: white;
-    border: none;
-    border-radius: var(--main-radius);
-    padding: var(--space-xs) var(--space-lg);
-    cursor: pointer;
-    transition: background 0.2s ease;
-}
-#done-button:hover {
-    background: var(--hover-background);
+/* accent on checked */
+main input[type="checkbox"]:checked {
+    background: linear-gradient(90deg, var(--button-background), rgba(79,70,229,0.9));
+    border-color: var(--button-background);
+    box-shadow: 0 0 0 4px rgba(79,70,229,0.08);
+    transform: translateY(-1px);
 }
 
-/* Animations */
-@keyframes modalIn {
-    from {
-        opacity: 0;
-        transform: scale(0.9);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
+/* focus ring */
+main input[type="checkbox"]:focus {
+    outline: none;
+    box-shadow: 0 0 0 5px rgba(63,167,214,0.10);
 }
 
-/* RESPONSIVE */
-@media (max-width: 768px) {
-    #event-checkboxes {
-        grid-template-columns: 1fr 1fr;
-    }
-    .modal-content {
-        max-width: 90%;
-    }
-    .competitor-title h4 {
-        font-size: 1rem;
-    }
+/* show small checkmark using an overlay pseudo element on the input's sibling label — works regardless of browser.
+   Important: keep labels next to inputs for consistent layout. */
+main input[type="checkbox"] + label::before {
+    content: "";
+    display: inline-block;
+    width: 0;
+    height: 0;
+    margin-right: 0;
 }
+
+/* ---------- Accessibility & small helpers ---------- */
+button:focus, a:focus, input:focus, select:focus {
+    outline: 3px solid rgba(63,167,214,0.12);
+    outline-offset: 2px;
+}
+
+.hidden { display: none !important; }
+.small { font-size: 0.85rem; }
+
+/* final protective rules (prevent accidental overflow) */
+* { box-sizing: border-box; }
