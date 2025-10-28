@@ -2,12 +2,11 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
-const http = require('http');
 const bodyParser = require('body-parser');
 
 const app = express();
 const httpsPort = 443;
-const betaPort = 8080;
+const betaPort = 8443;
 const betaTest = process.argv.includes('--beta');
 const debug = process.argv.includes('--debug');
 
@@ -75,16 +74,16 @@ app.use(toolsRoutes);
 app.use(apiRoutes);
 app.use(pagesRoutes);
 
-// === Start Server ===r
+// === Start Server ===
 if (betaTest) {
-    const httpServer = http.createServer(app);
-    httpServer.listen(betaPort, () => {
-        console.log(`Listening for http:// on port ${betaPort}`);
+    const betaServer = https.createServer(credentials, app);
+    betaServer.listen(betaPort, () => {
+        console.log(`Listening for https:// on port ${betaPort}`);
     });
 
     process.on('SIGINT', () => {
         console.log('Received SIGINT. Shutting down gracefully...');
-        httpServer.close();
+        betaServer.close();
         process.exit(0);
     });
 } else {

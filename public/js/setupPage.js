@@ -154,7 +154,7 @@ async function addVersionTag() {
         const version = await response.json();
 
         versionElement.innerText =
-            window.location.port == 8080 ? `BETA ${version.version}` : `v${version.version}`;
+            window.location.port == 8443 ? `BETA ${version.version}` : `v${version.version}`;
     } catch (error) {
         console.error('Error loading version:', error);
         versionElement.innerText = 'Error loading version';
@@ -203,14 +203,14 @@ function setupNavbar() {
     const changeRelease = document.createElement('li');
     changeRelease.style.cursor = 'pointer';
 
-    if (location.port == 8080) {
+    if (location.port == 8443) {
         changeRelease.onclick = () => {
             location.port = 443; // Redirect to release port
         };
         changeRelease.innerHTML = '<a href="#">Full Release</a>';
     } else {
         changeRelease.onclick = () => {
-            location.port = 8080; // Redirect to beta testing port
+            location.port = 8443; // Redirect to beta testing port
         };
         changeRelease.innerHTML = '<a href="#">Beta</a>';
     }
