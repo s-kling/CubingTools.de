@@ -5,6 +5,10 @@ main {
     background: var(--main-background);
 }
 
+ul li::before {
+    content: "";
+}
+
 .controls {
     display: flex;
     gap: 10px;
