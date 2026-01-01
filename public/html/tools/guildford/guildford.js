@@ -34,10 +34,10 @@ const eventOptions = {
         'OH',
         'Pyraminx',
         'Clock',
-        'FTO',
         'Skewb',
         'Megaminx',
         'Square-1',
+        'FTO',
     ],
     guildfordfto: [
         '2x2',
@@ -49,21 +49,116 @@ const eventOptions = {
         'OH',
         'Pyraminx',
         'Clock',
-        'FTO',
         'Skewb',
         'Megaminx',
         'Square-1',
+        'FTO',
     ],
     twotoseven: ['2x2', '3x3', '4x4', '5x5', '6x6', '7x7'],
+    customEventOptions: [
+        '2x2',
+        '3x3',
+        '4x4',
+        '5x5',
+        '6x6',
+        '7x7',
+        'OH',
+        '3x3 Blind',
+        'Pyraminx',
+        'Clock',
+        'Skewb',
+        'Megaminx',
+        'Square-1',
+        '4x4 Blind',
+        '5x5 Blind',
+        'FTO',
+    ],
 };
 
-relaySelect.addEventListener('change', () => {
-    events = eventOptions[relaySelect.value] || [];
-    addEventInputs();
-    populateFormFromURL();
-});
+function eventNameToWcaId(eventName) {
+    const map = {
+        '2x2': '222',
+        '3x3': '333',
+        '4x4': '444',
+        '5x5': '555',
+        '6x6': '666',
+        '7x7': '777',
+        'OH': '333oh',
+        '3x3 Blind': '333bf',
+        'Pyraminx': 'pyram',
+        'Clock': 'clock',
+        'FTO': 'fto',
+        'Skewb': 'skewb',
+        'Megaminx': 'minx',
+        'Square-1': 'sq1',
+        '4x4 Blind': '444bf',
+        '5x5 Blind': '555bf',
+    };
+
+    return map[eventName];
+}
 
 let events = eventOptions[relaySelect.value] || [];
+
+relaySelect.addEventListener('change', handleAddingEvents);
+
+function handleAddingEvents() {
+    events = eventOptions[relaySelect.value] || [];
+
+    const eventSpan = document.getElementById('events');
+    eventSpan.innerHTML = '';
+
+    let customRelay = [];
+
+    eventOptions.customEventOptions.forEach((event) => {
+        const eventTag = document.createElement('span');
+        const eventWcaId = eventNameToWcaId(event);
+
+        // Apply both event and unofficial classes because its too much work to differentiate between WCA events
+        eventTag.classList += `cubing-icon event-${eventWcaId} unofficial-${eventWcaId}`;
+
+        if (events.includes(event)) {
+            eventTag.classList.add('selected');
+            customRelay.push(event);
+        }
+
+        eventTag.addEventListener('click', () => {
+            if (!eventTag.classList.contains('selected')) {
+                eventTag.classList.add('selected');
+                customRelay.push(event);
+            } else {
+                eventTag.classList.remove('selected');
+                let index = customRelay.indexOf(event);
+                customRelay.splice(index, 1);
+            }
+
+            // Make sure customRelay is the order of eventOptions.customEventOptions
+            customRelay = eventOptions.customEventOptions.filter((event) =>
+                customRelay.includes(event)
+            );
+
+            // Check if customRelay matches any preset and update relaySelect if it does
+            const presetKey = Object.keys(eventOptions).find(
+                (key) =>
+                    key !== 'customEventOptions' &&
+                    JSON.stringify(eventOptions[key]) === JSON.stringify(customRelay)
+            );
+            if (presetKey) {
+                relaySelect.value = presetKey;
+            } else {
+                relaySelect.value = 'custom';
+            }
+
+            events = customRelay;
+            addEventInputs();
+            populateFormFromURL();
+        });
+
+        eventSpan.appendChild(eventTag);
+    });
+
+    addEventInputs();
+}
 
 const DNF_SENTINEL = 1_000_000; // large number to represent DNF
 function isDNF(value) {
@@ -234,6 +329,7 @@ function populateFormFromURL() {
 
 // Call populateFormFromURL on page load to set inputs
 document.addEventListener('DOMContentLoaded', () => {
+    handleAddingEvents();
     if (relaySelect.value == 'miniguild') {
         events = [
             '2x2',
@@ -443,77 +539,6 @@ async function getWCAData(competitorId) {
     // Test if a WCA ID was given
     if (!/\d{4}[a-zA-Z]{4}\d{2}/.test(wcaId)) return;
 
-    let eventMap = {};
-
-    if (relaySelect.value == 'miniguild') {
-        eventMap = {
-            '2x2': '222',
-            '3x3': '333',
-            '4x4': '444',
-            '5x5': '555',
-            'OH': '333oh',
-            'Pyraminx': 'pyram',
-            'Clock': 'clock',
-            'Skewb': 'skewb',
-            'Megaminx': 'minx',
-            'Square-1': 'sq1',
-        };
-    } else if (relaySelect.value == 'guildford') {
-        eventMap = {
-            '2x2': '222',
-            '3x3': '333',
-            '4x4': '444',
-            '5x5': '555',
-            '6x6': '666',
-            '7x7': '777',
-            'OH': '333oh',
-            'Pyraminx': 'pyram',
-            'Clock': 'clock',
-            'Skewb': 'skewb',
-            'Megaminx': 'minx',
-            'Square-1': 'sq1',
-        };
-    } else if (relaySelect.value == 'miniguildfto') {
-        eventMap = {
-            '2x2': '222',
-            '3x3': '333',
-            '4x4': '444',
-            '5x5': '555',
-            'OH': '333oh',
-            'Pyraminx': 'pyram',
-            'Clock': 'clock',
-            'FTO': 'fto',
-            'Skewb': 'skewb',
-            'Megaminx': 'minx',
-            'Square-1': 'sq1',
-        };
-    } else if (relaySelect.value == 'guildfordfto') {
-        eventMap = {
-            '2x2': '222',
-            '3x3': '333',
-            '4x4': '444',
-            '5x5': '555',
-            '6x6': '666',
-            '7x7': '777',
-            'OH': '333oh',
-            'Pyraminx': 'pyram',
-            'Clock': 'clock',
-            'FTO': 'fto',
-            'Skewb': 'skewb',
-            'Megaminx': 'minx',
-            'Square-1': 'sq1',
-        };
-    } else if (relaySelect.value == 'twotoseven') {
-        eventMap = {
-            '2x2': '222',
-            '3x3': '333',
-            '4x4': '444',
-            '5x5': '555',
-            '6x6': '666',
-            '7x7': '777',
-        };
-    }
-
     try {
         const name = await getCompetitorName(wcaId);
         if (competitorId === 'c1') {
@@ -525,16 +550,15 @@ async function getWCAData(competitorId) {
         if (nameEl) nameEl.textContent = name;
 
         // Fetch averages in parallel for all events
-        const pairs = Object.entries(eventMap);
         await Promise.all(
-            pairs.map(async ([eventName, eventId]) => {
+            events.map(async (eventName) => {
+                const eventId = eventNameToWcaId(eventName);
                 const avg = await getCurrentAverage(wcaId, eventId, competitorId);
                 const input = document.getElementById(`${competitorId}-${eventName}`);
                 if (!input) return;
                 if (avg === null || avg === undefined) {
                     input.value = 'DNF';
                 } else {
-                    // avg is in seconds (float). Put it in "m:ss.ss" format, then set input to that string.
                     const formatted = formatTime(avg);
                     input.value = formatted;
                 }
@@ -549,7 +573,7 @@ async function getWCAData(competitorId) {
     }
 }
 
-// Existing function to collect times from the form fields
+// Collect times from the form fields
 function collectCompetitorTimes(competitorId) {
     const times = {};
     events.forEach((event) => {
