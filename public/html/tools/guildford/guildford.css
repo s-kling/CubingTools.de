@@ -70,6 +70,7 @@ button:not(#accept-cookies):not(#decline-cookies) {
     color: gray;
     margin-top: 5px;
     font-size: calc(var(--font-size-base) + 7px);
+    cursor: pointer;
 }
 
 .selected {

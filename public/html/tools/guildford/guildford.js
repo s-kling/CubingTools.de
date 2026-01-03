@@ -63,14 +63,14 @@ const eventOptions = {
         '6x6',
         '7x7',
         'OH',
-        '3x3 Blind',
+        '3x3-Blind',
         'Pyraminx',
         'Clock',
         'Skewb',
         'Megaminx',
         'Square-1',
-        '4x4 Blind',
-        '5x5 Blind',
+        '4x4-Blind',
+        '5x5-Blind',
         'FTO',
     ],
 };
@@ -84,21 +84,23 @@ function eventNameToWcaId(eventName) {
         '6x6': '666',
         '7x7': '777',
         'OH': '333oh',
-        '3x3 Blind': '333bf',
+        '3x3-Blind': '333bf',
         'Pyraminx': 'pyram',
         'Clock': 'clock',
         'FTO': 'fto',
         'Skewb': 'skewb',
         'Megaminx': 'minx',
         'Square-1': 'sq1',
-        '4x4 Blind': '444bf',
-        '5x5 Blind': '555bf',
+        '4x4-Blind': '444bf',
+        '5x5-Blind': '555bf',
     };
 
     return map[eventName];
 }
 
 let events = eventOptions[relaySelect.value] || [];
+let competitor1AllEventTimes = {};
+let competitor2AllEventTimes = {};
 
 relaySelect.addEventListener('change', handleAddingEvents);
 
@@ -151,7 +153,9 @@ function handleAddingEvents() {
 
             events = customRelay;
             addEventInputs();
-            populateFormFromURL();
+
+            document.getElementById(`c1-${event}`).value = competitor1AllEventTimes[event] || '';
+            document.getElementById(`c2-${event}`).value = competitor2AllEventTimes[event] || '';
         });
 
         eventSpan.appendChild(eventTag);
@@ -185,6 +189,7 @@ function addEventInputs() {
         input1.id = `c1-${event}`;
         input1.required = true;
         input1.placeholder = '0.00';
+        input1.value = competitor1AllEventTimes[event] || '';
 
         label1.appendChild(span1);
         label1.appendChild(input1);
@@ -198,17 +203,20 @@ function addEventInputs() {
         input2.id = `c2-${event}`;
         input2.required = true;
         input2.placeholder = '0.00';
+        input2.value = competitor2AllEventTimes[event] || '';
 
         label2.appendChild(span2);
         label2.appendChild(input2);
 
         input1.addEventListener('input', () => {
+            competitor1AllEventTimes[event] = input1.value;
             formatInputField(input1);
             updateURLWithFormData();
             optimizeGuildford();
         });
 
         input2.addEventListener('input', () => {
+            competitor2AllEventTimes[event] = input2.value;
             formatInputField(input2);
             updateURLWithFormData();
             optimizeGuildford();
@@ -277,16 +285,17 @@ function updateURLWithFormData() {
     if (competitor1Name) params.set('c1name', competitor1Name);
     if (competitor2Name) params.set('c2name', competitor2Name);
 
-    // Add event times for Competitor 1
+    // Add event times from the stored objects
     events.forEach((event) => {
-        const time = document.getElementById(`c1-${event}`).value;
-        if (time) params.set(`c1-${event}`, time);
-    });
+        const c1Input = document.getElementById(`c1-${event}`);
+        const c2Input = document.getElementById(`c2-${event}`);
+        if (c1Input) competitor1AllEventTimes[event] = c1Input.value;
+        if (c2Input) competitor2AllEventTimes[event] = c2Input.value;
 
-    // Add event times for Competitor 2
-    events.forEach((event) => {
-        const time = document.getElementById(`c2-${event}`).value;
-        if (time) params.set(`c2-${event}`, time);
+        if (competitor1AllEventTimes[event])
+            params.set(`c1-${event}`, `${competitor1AllEventTimes[event]}`);
+        if (competitor2AllEventTimes[event])
+            params.set(`c2-${event}`, `${competitor2AllEventTimes[event]}`);
     });
 
     // Update the URL without reloading the page
@@ -310,17 +319,54 @@ function populateFormFromURL() {
     document.getElementById('c1-name').textContent = competitor1Name;
     document.getElementById('c2-name').textContent = competitor2Name;
 
-    // Populate event times for Competitor 1
-    events.forEach((event) => {
-        if (params.has(`c1-${event}`)) {
-            document.getElementById(`c1-${event}`).value = params.get(`c1-${event}`);
+    events = [];
+    // First, deselect all event icons
+    document.querySelectorAll('.cubing-icon.selected').forEach((icon) => {
+        icon.classList.remove('selected');
+    });
+
+    eventOptions.customEventOptions.forEach((event) => {
+        if (params.has(`c1-${event}`) || params.has(`c2-${event}`)) {
+            events.push(event);
+            // Set the icon to selected
+            const eventWcaId = eventNameToWcaId(event);
+            const eventSpan = document.querySelector(
+                `.cubing-icon.event-${eventWcaId}.unofficial-${eventWcaId}`
+            );
+            if (eventSpan) {
+                eventSpan.classList.add('selected');
+            }
+        }
+
+        // Check if events matches any preset and update relaySelect if it does
+        const presetKey = Object.keys(eventOptions).find(
+            (key) =>
+                key !== 'customEventOptions' &&
+                JSON.stringify(eventOptions[key]) === JSON.stringify(events)
+        );
+        if (presetKey) {
+            relaySelect.value = presetKey;
+        } else {
+            relaySelect.value = 'custom';
         }
     });
 
-    // Populate event times for Competitor 2
+    if (events.length == 0) {
+        relaySelect.value = 'miniguild';
+        events = eventOptions[relaySelect.value] || [];
+    }
+
+    addEventInputs();
+
+    // Populate event times from stored objects
     events.forEach((event) => {
+        if (params.has(`c1-${event}`)) {
+            competitor1AllEventTimes[event] = params.get(`c1-${event}`);
+            document.getElementById(`c1-${event}`).value = competitor1AllEventTimes[event];
+        }
         if (params.has(`c2-${event}`)) {
-            document.getElementById(`c2-${event}`).value = params.get(`c2-${event}`);
+            competitor2AllEventTimes[event] = params.get(`c2-${event}`);
+            document.getElementById(`c2-${event}`).value = competitor2AllEventTimes[event];
         }
     });
 
@@ -329,70 +375,70 @@ function populateFormFromURL() {
 
 // Call populateFormFromURL on page load to set inputs
 document.addEventListener('DOMContentLoaded', () => {
-    handleAddingEvents();
-    if (relaySelect.value == 'miniguild') {
-        events = [
-            '2x2',
-            '3x3',
-            '4x4',
-            '5x5',
-            'OH',
-            'Pyraminx',
-            'Clock',
-            'Skewb',
-            'Megaminx',
-            'Square-1',
-        ];
-    } else if (relaySelect.value == 'guildford') {
-        events = [
-            '2x2',
-            '3x3',
-            '4x4',
-            '5x5',
-            '6x6',
-            '7x7',
-            'OH',
-            'Pyraminx',
-            'Clock',
-            'Skewb',
-            'Megaminx',
-            'Square-1',
-        ];
-    } else if (relaySelect.value == 'miniguildfto') {
-        events = [
-            '2x2',
-            '3x3',
-            '4x4',
-            '5x5',
-            'OH',
-            'Pyraminx',
-            'Clock',
-            'FTO',
-            'Skewb',
-            'Megaminx',
-            'Square-1',
-        ];
-    } else if (relaySelect.value == 'guildfordfto') {
-        events = [
-            '2x2',
-            '3x3',
-            '4x4',
-            '5x5',
-            '6x6',
-            '7x7',
-            'OH',
-            'Pyraminx',
-            'Clock',
-            'FTO',
-            'Skewb',
-            'Megaminx',
-            'Square-1',
-        ];
-    } else if (relaySelect.value == 'twotoseven') {
-        events = ['2x2', '3x3', '4x4', '5x5', '6x6', '7x7'];
-    }
+    // if (relaySelect.value == 'miniguild') {
+    //     events = [
+    //         '2x2',
+    //         '3x3',
+    //         '4x4',
+    //         '5x5',
+    //         'OH',
+    //         'Pyraminx',
+    //         'Clock',
+    //         'Skewb',
+    //         'Megaminx',
+    //         'Square-1',
+    //     ];
+    // } else if (relaySelect.value == 'guildford') {
+    //     events = [
+    //         '2x2',
+    //         '3x3',
+    //         '4x4',
+    //         '5x5',
+    //         '6x6',
+    //         '7x7',
+    //         'OH',
+    //         'Pyraminx',
+    //         'Clock',
+    //         'Skewb',
+    //         'Megaminx',
+    //         'Square-1',
+    //     ];
+    // } else if (relaySelect.value == 'miniguildfto') {
+    //     events = [
+    //         '2x2',
+    //         '3x3',
+    //         '4x4',
+    //         '5x5',
+    //         'OH',
+    //         'Pyraminx',
+    //         'Clock',
+    //         'FTO',
+    //         'Skewb',
+    //         'Megaminx',
+    //         'Square-1',
+    //     ];
+    // } else if (relaySelect.value == 'guildfordfto') {
+    //     events = [
+    //         '2x2',
+    //         '3x3',
+    //         '4x4',
+    //         '5x5',
+    //         '6x6',
+    //         '7x7',
+    //         'OH',
+    //         'Pyraminx',
+    //         'Clock',
+    //         'FTO',
+    //         'Skewb',
+    //         'Megaminx',
+    //         'Square-1',
+    //     ];
+    // } else if (relaySelect.value == 'twotoseven') {
+    //     events = ['2x2', '3x3', '4x4', '5x5', '6x6', '7x7'];
+    // }
     addEventInputs();
     populateFormFromURL();
+    handleAddingEvents();
 });
 
 let competitor1Name = 'Competitor 1';
@@ -436,7 +482,7 @@ function optimizeGuildford() {
             <p>Please enter a valid time for at least one competitor in each event before optimizing.</p>
         `;
         if (countDiv) countDiv.textContent = '';
-        return; // 🚫 stop before optimization
+        return; // stop before optimization
     }
 
     // Otherwise proceed normally
