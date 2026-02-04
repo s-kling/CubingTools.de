@@ -136,14 +136,14 @@ function handleAddingEvents() {
 
             // Make sure customRelay is the order of eventOptions.customEventOptions
             customRelay = eventOptions.customEventOptions.filter((event) =>
-                customRelay.includes(event)
+                customRelay.includes(event),
             );
 
             // Check if customRelay matches any preset and update relaySelect if it does
             const presetKey = Object.keys(eventOptions).find(
                 (key) =>
                     key !== 'customEventOptions' &&
-                    JSON.stringify(eventOptions[key]) === JSON.stringify(customRelay)
+                    JSON.stringify(eventOptions[key]) === JSON.stringify(customRelay),
             );
             if (presetKey) {
                 relaySelect.value = presetKey;
@@ -331,7 +331,7 @@ function populateFormFromURL() {
             // Set the icon to selected
             const eventWcaId = eventNameToWcaId(event);
             const eventSpan = document.querySelector(
-                `.cubing-icon.event-${eventWcaId}.unofficial-${eventWcaId}`
+                `.cubing-icon.event-${eventWcaId}.unofficial-${eventWcaId}`,
             );
             if (eventSpan) {
                 eventSpan.classList.add('selected');
@@ -342,7 +342,7 @@ function populateFormFromURL() {
         const presetKey = Object.keys(eventOptions).find(
             (key) =>
                 key !== 'customEventOptions' &&
-                JSON.stringify(eventOptions[key]) === JSON.stringify(events)
+                JSON.stringify(eventOptions[key]) === JSON.stringify(events),
         );
         if (presetKey) {
             relaySelect.value = presetKey;
@@ -469,7 +469,7 @@ function optimizeGuildford() {
     const invalidEvents = events.filter(
         (event) =>
             (competitor1[event] === DNF_SENTINEL || isNaN(competitor1[event])) &&
-            (competitor2[event] === DNF_SENTINEL || isNaN(competitor2[event]))
+            (competitor2[event] === DNF_SENTINEL || isNaN(competitor2[event])),
     );
 
     const errorDiv = document.getElementById('bestCombination');
@@ -498,10 +498,10 @@ async function getCurrentAverage(wcaId, event, competitorId) {
 
     // Construct the API URLs
     const avgUrl = `/api/wca/${encodeURIComponent(sanitizedWcaId)}/${encodeURIComponent(
-        sanitizedEvent
+        sanitizedEvent,
     )}?num=${solvecount}`;
     const allSolvesUrl = `/api/wca/${encodeURIComponent(sanitizedWcaId)}/${encodeURIComponent(
-        sanitizedEvent
+        sanitizedEvent,
     )}?getsolves=true`;
 
     try {
@@ -515,7 +515,7 @@ async function getCurrentAverage(wcaId, event, competitorId) {
         if (!avgResponse.ok) {
             if (avgResponse.status === 404) {
                 console.warn(
-                    `API returned 404 for WCA ID: ${sanitizedWcaId}, Event: ${sanitizedEvent}`
+                    `API returned 404 for WCA ID: ${sanitizedWcaId}, Event: ${sanitizedEvent}`,
                 );
             }
             throw new Error(`Error fetching average: ${avgResponse.statusText}`);
@@ -523,7 +523,7 @@ async function getCurrentAverage(wcaId, event, competitorId) {
         if (!allSolvesResponse.ok) {
             if (allSolvesResponse.status === 404) {
                 console.warn(
-                    `API returned 404 for all solves for WCA ID: ${sanitizedWcaId}, Event: ${sanitizedEvent}`
+                    `API returned 404 for all solves for WCA ID: ${sanitizedWcaId}, Event: ${sanitizedEvent}`,
                 );
             }
             throw new Error(`Error fetching all solves: ${allSolvesResponse.statusText}`);
@@ -555,7 +555,7 @@ async function getCurrentAverage(wcaId, event, competitorId) {
         return avgData.average;
     } catch (error) {
         console.error(
-            `Error fetching average or all solves for event ${sanitizedEvent}: ${error.message}`
+            `Error fetching average or all solves for event ${sanitizedEvent}: ${error.message}`,
         );
         return null;
     }
@@ -609,7 +609,7 @@ async function getWCAData(competitorId) {
                     input.value = formatted;
                 }
                 formatInputField(input);
-            })
+            }),
         );
 
         // After populating, run optimize
@@ -672,7 +672,8 @@ function processCombinations(competitor1, competitor2, pickup) {
     let bestTime = Infinity;
     let bestGroups = null;
     let combos = 0;
-    const start = Date.now();
+    let combinations = [];
+    var stop = isPerformanceSupported ? performance.now() : Date.now();
 
     // Precompute event times (including pickup except for final subtraction)
     const times1 = events.map((e) => (competitor1[e] || 0) + pickup);
@@ -689,6 +690,16 @@ function processCombinations(competitor1, competitor2, pickup) {
             const real1 = sum1 - (group1Idxs.length > 0 ? pickup : 0);
             const real2 = sum2 - (group2Idxs.length > 0 ? pickup : 0);
             const totalMax = Math.max(real1, real2);
+
+            // Store the combination
+            combinations.push({
+                group1: group1Idxs.map((i) => events[i]),
+                group2: group2Idxs.map((i) => events[i]),
+                time1: real1,
+                time2: real2,
+                totalTime: totalMax,
+            });
+
             if (totalMax < bestTime) {
                 bestTime = totalMax;
                 bestGroups = {
@@ -710,21 +721,56 @@ function processCombinations(competitor1, competitor2, pickup) {
 
     dfs(0, [], [], 0, 0);
 
-    const timeTaken = (Date.now() - start) / 1000;
-    combinationsCountedDiv.textContent = `Analyzed ${combos} combinations in ${timeTaken.toFixed(
-        2
-    )}s`;
+    var start = isPerformanceSupported ? performance.now() : Date.now();
+
+    var stop = isPerformanceSupported
+        ? window.performance.now() + window.performance.timing.navigationStart
+        : Date.now();
+    console.log(start, stop, stop - start);
+
+    const timeTaken = (stop - start) / 1000;
+    combinationsCountedDiv.textContent = `Analyzed ${combos} combinations in ${timeTaken}s`;
 
     if (bestGroups) {
         bestCombinationDiv.innerHTML = `
             <h3>Best Combination</h3>
             <p>${competitor1Name} (${formatTime(bestGroups.time1)}): ${bestGroups.group1.join(
-            ', '
-        )}</p>
+                ', ',
+            )}</p>
             <p>${competitor2Name} (${formatTime(bestGroups.time2)}): ${bestGroups.group2.join(
-            ', '
-        )}</p>
+                ', ',
+            )}</p>
             <p>Total Time: ${formatTime(bestTime)}</p>`;
+
+        document.getElementById('combination-history').innerHTML = `
+            <h3>Combination History</h3>
+            <table>
+            <thead>
+                <tr>
+                <th>${competitor1Name}</th>
+                <th>Time</th>
+                <th>${competitor2Name}</th>
+                <th>Time</th>
+                <th>Total Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${combinations
+                    .map(
+                        (combo) => `
+                <tr>
+                    <td>${combo.group1.join(', ')}</td>
+                    <td>${formatTime(combo.time1)}</td>
+                    <td>${combo.group2.join(', ')}</td>
+                    <td>${formatTime(combo.time2)}</td>
+                    <td>${formatTime(combo.totalTime)}</td>
+                </tr>
+                `,
+                    )
+                    .join('')}
+            </tbody>
+            </table>
+        `;
     } else {
         bestCombinationDiv.innerHTML = `<p>No valid combination found.</p>`;
     }
