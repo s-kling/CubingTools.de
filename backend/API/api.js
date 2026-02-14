@@ -3,7 +3,6 @@ const axios = require('axios');
 const router = express.Router();
 const path = require('path');
 const packageJson = require('../../package.json');
-const config = require('../config');
 const crypto = require('crypto');
 const fs = require('fs');
 
@@ -118,7 +117,7 @@ class StatusApi {
         const logStats = this.analyzeLogs(req);
 
         return res.json({
-            uptime: `${uptime.toFixed(2)} seconds`,
+            uptime: uptime.toFixed(2),
             memoryUsage: `${memoryUsage} MB`,
             logFileSize: `${logFileSize} MB`,
             logs: logStats,
@@ -126,7 +125,8 @@ class StatusApi {
     }
 
     analyzeLogs(req) {
-        const betaTest = req.get('host').includes(':8001');
+        const betaTest =
+            req.get('host').includes(':8001') || req.get('host').includes('beta.cubingtools.de');
 
         const logPath = path.join(__dirname, '../log', betaTest ? 'beta.log' : 'server.log');
 
@@ -143,7 +143,6 @@ class StatusApi {
             statusCodes: {},
             statusCodeUrls: {},
             userAgents: {},
-            ips: {},
             avgResponseTimeMs: {},
             errorRate: 0,
             peakHours: {},

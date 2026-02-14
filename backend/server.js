@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
+const sanitizeHtml = require('sanitize-html');
 
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
 
@@ -61,6 +62,17 @@ app.use(express.urlencoded({ extended: true, limit: config.body_parser_limit }))
 /* =========================
    Routes
 ========================= */
+
+app.use((req, res, next) => {
+    if (req.body && typeof req.body === 'object') {
+        Object.keys(req.body).forEach((key) => {
+            if (typeof req.body[key] === 'string') {
+                req.body[key] = sanitizeHtml(req.body[key], { allowedTags: [] });
+            }
+        });
+    }
+    next();
+});
 
 app.use(require('./API/tools'));
 app.use(require('./API/api'));

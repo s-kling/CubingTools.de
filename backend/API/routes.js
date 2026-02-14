@@ -21,7 +21,7 @@ router.get('/', (req, res) => {
 
 // Serve the status report
 router.get('/status', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', '../public/html', 'stauts.html'));
+    res.sendFile(path.join(__dirname, '..', '../public/html', 'status.html'));
 });
 
 // Serve the events

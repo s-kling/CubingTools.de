@@ -59,6 +59,8 @@ function renderStatus(data) {
         ${renderKeyValueSection('HTTP Methods', logs.methods)}
         ${renderKeyValueSection('Top Endpoints', logs.endpoints, 10)}
         ${renderExpandableStatusCodes(logs.statusCodes, logs.statusCodeUrls)}
+        ${renderKeyValueSection('User Agents', logs.userAgents, 10)}
+        ${renderTopWcaIds('Top WCA IDs', logs.endpoints, 10)}
         ${renderKeyValueSection('Peak Traffic (UTC Hour)', logs.peakHours)}
     `;
 }
@@ -106,6 +108,29 @@ function renderKeyValueSection(title, obj, limit = null) {
     if (!obj || Object.keys(obj).length === 0) return '';
 
     const entries = Object.entries(obj)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit ?? undefined);
+
+    return `
+        <h4>${title}</h4>
+        <ul>
+            ${entries.map(([key, value]) => `<li>${value} — ${key}</li>`).join('')}
+        </ul>
+    `;
+}
+
+function renderTopWcaIds(title, obj, limit = null) {
+    if (!obj || Object.keys(obj).length === 0) return '';
+
+    const wcaIds = {};
+    Object.entries(obj)
+        .filter(([key]) => key.includes('/api/wca/'))
+        .forEach(([key, value]) => {
+            const wcaId = key.split('/')[3];
+            wcaIds[wcaId] = (wcaIds[wcaId] || 0) + value;
+        });
+
+    const entries = Object.entries(wcaIds)
         .sort((a, b) => b[1] - a[1])
         .slice(0, limit ?? undefined);
 
