@@ -257,29 +257,70 @@ ul li:hover {
     cursor: pointer;
 }
 
-/* Cookie Consent Banner */
+/* Cookie Consent Modal */
 #cookie-consent-banner {
-    background-color: #333 !important;
-    color: white !important;
-    padding: 10px !important;
+    background-color: var(--secondary-background) !important;
+    color: var(--main-text) !important;
+    padding: var(--space-lg) !important;
     text-align: center !important;
-    position: fixed !important; 
-    bottom: 0 !important;
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 90% !important;
+    max-width: 500px !important;
+    display: flex;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 9000 !important;
+    border-radius: var(--main-radius) !important;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7) !important;
+    border: 1px solid var(--input-border) !important;
+    gap: var(--space-md) !important;
+}
+
+body:has(#cookie-consent-banner) {
+    filter: blur(0) !important;
+    transition: filter 0.3s ease !important;
+}
+
+body:has(#cookie-consent-banner) > *:not(#cookie-consent-banner) {
+    filter: blur(5px) !important;
+    pointer-events: none !important;
+    transition: filter 0.3s ease !important;
+}
+
+#cookie-consent-banner::before {
+    content: '' !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
     width: 100% !important;
-    display: none;
-    z-index: 99999 !important;
+    height: 100% !important;
+    background-color: rgba(0, 0, 0, 0.5) !important;
+    z-index: -1 !important;
+}
+
+#cookie-consent-banner > div:last-child {
+    display: flex !important;
+    gap: var(--space-sm) !important;
+    justify-content: center !important;
+    width: 100% !important;
+    flex-wrap: wrap !important;
 }
 
 #accept-cookies {
-    background-color: #ffd700 !important;
-    color: #333 !important;
-    padding: 5px 10px !important;
+    background-color: var(--button-background) !important;
+    color: var(--main-text) !important;
+    padding: var(--space-xs) var(--space-md) !important;
 }
 
 #decline-cookies {
-    background-color: #ff0000 !important;
-    color: #333 !important;
-    padding: 5px 10px !important;
+    background-color: transparent !important;
+    color: var(--main-text) !important;
+    padding: var(--space-xs) var(--space-md) !important;
+    border: 1px solid var(--input-border) !important;
 }
 
 /* Container Styles */

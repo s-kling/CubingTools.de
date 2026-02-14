@@ -1,5 +1,5 @@
 const policyFolder = '../html/privacy-policies/'; // Path to the folder containing policies
-const policies = ['2025-02-27', '2024-12-24', '2024-12-01']; // List of policy versions (filenames without .md)
+const policies = ['2026-02-14', '2025-02-27', '2024-12-24', '2024-12-01']; // List of policy versions (filenames without .md)
 
 // Populate the dropdown with versions
 const dropdown = document.getElementById('policy-version-dropdown');

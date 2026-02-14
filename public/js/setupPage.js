@@ -7,7 +7,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // COOKIE CONSENT
-    const consentBanner = document.getElementById('cookie-consent-banner');
     const cookiesAccepted = localStorage.getItem('cookies_accepted');
 
     if (cookiesAccepted === 'true') {
@@ -17,19 +16,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         gtag('js', new Date());
         gtag('config', 'G-7FDCB5928P');
-    } else if (!cookiesAccepted) {
-        consentBanner.style.display = 'block';
+    } else if (cookiesAccepted === null) {
+        addCookieConsentBanner();
     }
 
-    // Event listeners for accept and decline buttons
-    document
-        .getElementById('accept-cookies')
-        .addEventListener('click', () => handleConsent('true'));
-    document
-        .getElementById('decline-cookies')
-        .addEventListener('click', () => handleConsent('false'));
-
-    // LOAD TOOLS
     loadTools();
     addVersionTag();
     setupNavbar();
@@ -90,10 +80,34 @@ function showHero() {
     });
 }
 
-// Function to handle cookie consent
+function addCookieConsentBanner() {
+    const banner = document.createElement('div');
+    banner.id = 'cookie-consent-banner';
+    banner.className = 'cookie-consent-banner';
+    banner.innerHTML = `
+        <div id="cookie-consent-banner">
+            <p>
+                We use cookies to improve your experience. By accepting these cookies, you agree to our <a href="/privacy-policy"
+                    style="color: #ffd700;">privacy policy</a>.
+            </p>
+            <div class="inline-buttons">
+                <button id="accept-cookies" onclick="handleConsent('true')">Accept</button>
+                <button id="decline-cookies" onclick="handleConsent('false')">Decline</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(banner);
+}
+
 function handleConsent(isAccepted) {
     localStorage.setItem('cookies_accepted', isAccepted);
-    consentBanner.style.display = 'none';
+    const consentBanner = document.getElementById('cookie-consent-banner');
+    consentBanner.style.transition = 'opacity 0.3s ease';
+    consentBanner.style.opacity = '0';
+
+    setTimeout(() => {
+        consentBanner.remove();
+    }, 300);
 }
 
 async function loadTools() {
@@ -154,7 +168,9 @@ async function addVersionTag() {
         const version = await response.json();
 
         versionElement.innerText =
-            window.location.port == 8001 ? `BETA ${version.version}` : `v${version.version}`;
+            window.location.port == 8001 || window.location.hostname === 'beta.cubingtools.de'
+                ? `BETA ${version.version}`
+                : `v${version.version}`;
     } catch (error) {
         console.error('Error loading version:', error);
         versionElement.innerText = 'Error loading version';
