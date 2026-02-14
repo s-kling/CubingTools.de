@@ -673,7 +673,7 @@ function processCombinations(competitor1, competitor2, pickup) {
     let bestGroups = null;
     let combos = 0;
     let combinations = [];
-    var stop = isPerformanceSupported ? performance.now() : Date.now();
+    var start = Date.now();
 
     // Precompute event times (including pickup except for final subtraction)
     const times1 = events.map((e) => (competitor1[e] || 0) + pickup);
@@ -721,12 +721,7 @@ function processCombinations(competitor1, competitor2, pickup) {
 
     dfs(0, [], [], 0, 0);
 
-    var start = isPerformanceSupported ? performance.now() : Date.now();
-
-    var stop = isPerformanceSupported
-        ? window.performance.now() + window.performance.timing.navigationStart
-        : Date.now();
-    console.log(start, stop, stop - start);
+    var stop = Date.now();
 
     const timeTaken = (stop - start) / 1000;
     combinationsCountedDiv.textContent = `Analyzed ${combos} combinations in ${timeTaken}s`;

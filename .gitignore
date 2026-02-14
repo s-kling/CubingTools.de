@@ -1,6 +1,3 @@
-# Ignore SSL certificates and private keys
-/backend/credentials
-
 # Ignore log files
 *.log
 

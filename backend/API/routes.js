@@ -21,32 +21,7 @@ router.get('/', (req, res) => {
 
 // Serve the status report
 router.get('/status', (req, res) => {
-    const logFilePath = path.join(__dirname, '..', 'log', 'server.log');
-
-    const memoryUsage = process.memoryUsage();
-    const uptime = process.uptime();
-    const logFileSize = fs.existsSync(logFilePath) ? fs.statSync(logFilePath).size : 0;
-
-    const statusLog = `
-        Status Update:
-        - Uptime: ${Math.floor(uptime / 60)} minutes
-        - Memory Usage: RSS ${Math.round(memoryUsage.rss / 1024 / 1024)} MB, 
-                        Heap Total ${Math.round(memoryUsage.heapTotal / 1024 / 1024)} MB, 
-                        Heap Used ${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB
-        - Log File Size: ${Math.round(logFileSize / 1024)} KB
-    `;
-    console.log(statusLog);
-
-    const statusReport = {
-        uptime: `${Math.floor(uptime / 60)} minutes`,
-        memoryUsage: {
-            rss: `${Math.round(memoryUsage.rss / 1024 / 1024)} MB`,
-            heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)} MB`,
-            heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB`,
-        },
-        logFileSize: `${Math.round(logFileSize / 1024)} KB`,
-    };
-    res.json(statusReport);
+    res.sendFile(path.join(__dirname, '..', '../public/html', 'stauts.html'));
 });
 
 // Serve the events

@@ -1,0 +1,7 @@
+{
+    "prod_port": 8000,
+    "beta_port": 8001,
+    "dev_port": 8002,
+    "log_retention_days": 14,
+    "body_parser_limit": "1mb"
+}

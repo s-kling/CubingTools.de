@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <!-- Basic Metadata -->
+    <title>CubingTools.de</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="CubingTools.de is a hub for competitive cubing, providing tools to track solve times, analyze competitors, and optimize event performance with features like grouping, average calculators, and event algorithms.">
+    <meta name="keywords" content="WCA, world cube association, cubing, speedcubing, tool, tools, cubingtools, cubing tool, cubing tools">
+  
+    <!-- CSS Stylesheets -->
+    <link rel="stylesheet" href="../css/global.css">
+
+    <!-- JS Files -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P" defer></script>
+    <script src="../js/setupPage.js" defer></script>
+    <script src="../js/status.js" defer></script>
+</head>
+
+<div id="cookie-consent-banner">
+    <p>
+        We use cookies to improve your experience. By accepting these cookies, you agree to our <a href="/privacy-policy"
+            style="color: #ffd700;">privacy policy</a>.
+        <button id="accept-cookies">Accept</button>
+        <button id="decline-cookies">Decline</button>
+    </p>
+</div>
+
+<body>
+    <div class="container">
+        <nav id="navbar"></nav>
+
+        <div id="sidebar">
+            <h2>Tools</h2>
+        </div>
+
+        <div id="version"></div>
+
+        <main>
+            <section class="heading">
+                <h1>Server Status</h1>
+                <p>
+                    Check the current status of our servers, including uptime,
+                    memory usage, and log statistics.
+                </p>
+
+                <div id="status-auth">
+                    <label>
+                        Enter Admin Password:
+                        <input type="password" id="admin-password" />
+                    </label>
+                    <p id="status-error" style="color: red; display: none;"></p>
+                </div>
+
+                <div id="status-report" style="display: none;"></div>
+            </section>
+        </main>
+        <footer id="footer"></footer>
+    </div>
+</body>
+
+</html>

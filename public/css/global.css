@@ -571,6 +571,7 @@ main label {
 }
 
 main input[type="text"],
+main input[type="password"],
 main input[type="number"],
 main input[type="email"],
 main input[type="file"],
@@ -732,6 +733,7 @@ footer p {
     }
 
     main input[type="text"],
+    main input[type="password"],
     main input[type="number"],
     select {
         width: 100%;

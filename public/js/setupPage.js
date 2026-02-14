@@ -154,7 +154,7 @@ async function addVersionTag() {
         const version = await response.json();
 
         versionElement.innerText =
-            window.location.port == 8443 ? `BETA ${version.version}` : `v${version.version}`;
+            window.location.port == 8001 ? `BETA ${version.version}` : `v${version.version}`;
     } catch (error) {
         console.error('Error loading version:', error);
         versionElement.innerText = 'Error loading version';
@@ -203,14 +203,20 @@ function setupNavbar() {
     const changeRelease = document.createElement('li');
     changeRelease.style.cursor = 'pointer';
 
-    if (location.port == 8443) {
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
         changeRelease.onclick = () => {
-            location.port = 443; // Redirect to release port
+            location.port = location.port === '8001' ? '8000' : '8001';
+        };
+        changeRelease.innerHTML =
+            '<a href="#">' + (location.port === '8001' ? 'Full Release' : 'Beta') + '</a>';
+    } else if (location.hostname === 'beta.cubingtools.de') {
+        changeRelease.onclick = () => {
+            location.hostname = 'cubingtools.de';
         };
         changeRelease.innerHTML = '<a href="#">Full Release</a>';
     } else {
         changeRelease.onclick = () => {
-            location.port = 8443; // Redirect to beta testing port
+            location.hostname = 'beta.cubingtools.de';
         };
         changeRelease.innerHTML = '<a href="#">Beta</a>';
     }

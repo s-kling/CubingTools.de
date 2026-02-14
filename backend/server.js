@@ -1,100 +1,86 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const https = require('https');
-const bodyParser = require('body-parser');
+const http = require('http');
+
+const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
 
 const app = express();
-const httpsPort = 443;
-const betaPort = 8443;
+const prodPort = config.prod_port;
+const betaPort = config.beta_port;
 const betaTest = process.argv.includes('--beta');
 const debug = process.argv.includes('--debug');
 
-// Load SSL certificate and private key
-const privateKey = fs.readFileSync('./backend/credentials/cubingtools_private_key.key');
-const certificate = fs.readFileSync('./backend/credentials/cubingtools_ssl_certificate.cer');
-const credentials = { key: privateKey, cert: certificate };
+/* =========================
+   Logging
+========================= */
 
-const logFilePath = betaTest
-    ? path.join(__dirname, 'log', 'beta.log')
-    : path.join(__dirname, 'log', 'server.log');
-const logRetentionPeriod = 14 * 24 * 60 * 60 * 1000; // 2 weeks
+const logDir = path.join(__dirname, 'log');
+const logFilePath = betaTest ? path.join(logDir, 'beta.log') : path.join(logDir, 'server.log');
 
-function updateLogFile(logEntry) {
-    const now = new Date();
-    const data = fs.existsSync(logFilePath) ? fs.readFileSync(logFilePath, 'utf8') : '';
-    const lines = data.split('\n').filter((line) => {
-        const timestamp = new Date(line.split(' - ')[0]);
-        return now - timestamp <= logRetentionPeriod;
-    });
-    const newContent = `${logEntry}${lines.join('\n')}`;
-    fs.writeFileSync(logFilePath, newContent, 'utf8');
+if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, { recursive: true });
 }
 
-// === Middleware ===
-if (!betaTest) {
-    app.use((req, res, next) => {
-        if (req.secure) {
-            const now = new Date();
-            const timestamp = now.toISOString();
-            const userAgent = req.headers['user-agent'] || 'Unknown';
-            const method = req.method;
-            const pathUrl = req.path;
+const logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
 
-            res.on('finish', () => {
-                const status = res.statusCode;
-                const responseTime = new Date() - now;
-                const logEntry = `${timestamp} - ${method} ${pathUrl} - User-Agent: ${userAgent} - Status: ${status} - Response Time: ${responseTime}ms\n`;
+function logRequest(req, res, startTime) {
+    const entry = {
+        time: new Date().toISOString(),
+        method: req.method,
+        url: req.originalUrl,
+        status: res.statusCode,
+        durationMs: Date.now() - startTime,
+        userAgent: req.headers['user-agent'] || null,
+    };
 
-                if (debug) {
-                    console.log(
-                        `${timestamp} - ${method} ${pathUrl} - Status: ${status} - Response Time: ${responseTime}ms`
-                    );
-                }
+    const line = JSON.stringify(entry) + '\n';
 
-                updateLogFile(logEntry);
-            });
-
-            next();
-        } else {
-            res.redirect(`https://${req.headers.host}${req.url}`);
-        }
-    });
+    if (debug) console.log(line.trim());
+    logStream.write(line);
 }
 
-// === Routes ===
+/* =========================
+   Middleware
+========================= */
+
+app.use((req, res, next) => {
+    const start = Date.now();
+
+    res.on('finish', () => {
+        logRequest(req, res, start);
+    });
+
+    next();
+});
+
 app.use(express.static(path.join(__dirname, '../public')));
-app.use(bodyParser.json({ limit: '1mb' }));
-app.use(bodyParser.urlencoded({ extended: true, limit: '1mb' }));
+app.use(express.json({ limit: config.body_parser_limit }));
+app.use(express.urlencoded({ extended: true, limit: config.body_parser_limit }));
 
-const toolsRoutes = require('./API/tools');
-const apiRoutes = require('./API/api');
-const pagesRoutes = require('./API/routes');
-app.use(toolsRoutes);
-app.use(apiRoutes);
-app.use(pagesRoutes);
+/* =========================
+   Routes
+========================= */
 
-// === Start Server ===
-if (betaTest) {
-    const betaServer = https.createServer(credentials, app);
-    betaServer.listen(betaPort, () => {
-        console.log(`Listening for https:// on port ${betaPort}`);
-    });
+app.use(require('./API/tools'));
+app.use(require('./API/api'));
+app.use(require('./API/routes'));
 
-    process.on('SIGINT', () => {
-        console.log('Received SIGINT. Shutting down gracefully...');
-        betaServer.close();
+/* =========================
+   Server
+========================= */
+
+const port = betaTest ? betaPort : prodPort;
+const server = http.createServer(app);
+
+server.listen(port, () => {
+    console.log(`Listening on port ${port}`);
+});
+
+process.on('SIGINT', () => {
+    console.log('Received SIGINT. Shutting down gracefully...');
+    server.close(() => {
+        logStream.end();
         process.exit(0);
     });
-} else {
-    const httpsServer = https.createServer(credentials, app);
-    httpsServer.listen(httpsPort, () => {
-        console.log('Listening for https://');
-    });
-
-    process.on('SIGINT', () => {
-        console.log('Received SIGINT. Shutting down gracefully...');
-        httpsServer.close();
-        process.exit(0);
-    });
-}
+});
