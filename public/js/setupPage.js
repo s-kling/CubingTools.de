@@ -1,3 +1,5 @@
+let currentPricacyPolicyVersion = '2026-02-14';
+
 document.addEventListener('DOMContentLoaded', () => {
     // HERO
     const hasSeenHero = localStorage.getItem('hero_seen');
@@ -9,14 +11,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // COOKIE CONSENT
     const cookiesAccepted = localStorage.getItem('cookies_accepted');
 
-    if (cookiesAccepted === 'true') {
+    if (cookiesAccepted === currentPricacyPolicyVersion) {
         window.dataLayer = window.dataLayer || [];
         function gtag() {
             dataLayer.push(arguments);
         }
         gtag('js', new Date());
         gtag('config', 'G-7FDCB5928P');
-    } else if (cookiesAccepted === null) {
+    } else if (cookiesAccepted === null || cookiesAccepted !== currentPricacyPolicyVersion) {
         addCookieConsentBanner();
     }
 
@@ -84,15 +86,18 @@ function addCookieConsentBanner() {
     const banner = document.createElement('div');
     banner.id = 'cookie-consent-banner';
     banner.className = 'cookie-consent-banner';
+
+    const cookiesAccepted = localStorage.getItem('cookies_accepted');
+    const message = !cookiesAccepted
+        ? 'We use cookies to improve your experience. By accepting these cookies, you agree to our <a href="/privacy-policy" style="color: #ffd700;">privacy policy</a>.'
+        : 'Our <a href="/privacy-policy" style="color: #ffd700;">privacy policies</a> have changed. Please review and accept again.';
+
     banner.innerHTML = `
         <div id="cookie-consent-banner">
-            <p>
-                We use cookies to improve your experience. By accepting these cookies, you agree to our <a href="/privacy-policy"
-                    style="color: #ffd700;">privacy policy</a>.
-            </p>
+            <p>${message}</p>
             <div class="inline-buttons">
-                <button id="accept-cookies" onclick="handleConsent('true')">Accept</button>
-                <button id="decline-cookies" onclick="handleConsent('false')">Decline</button>
+                <button id="accept-cookies" onclick="handleConsent(true)">Accept</button>
+                <button id="decline-cookies" onclick="handleConsent(false)">Decline</button>
             </div>
         </div>
     `;
@@ -100,7 +105,8 @@ function addCookieConsentBanner() {
 }
 
 function handleConsent(isAccepted) {
-    localStorage.setItem('cookies_accepted', isAccepted);
+    let acceptedVersion = isAccepted ? currentPricacyPolicyVersion : 'false';
+    localStorage.setItem('cookies_accepted', acceptedVersion);
     const consentBanner = document.getElementById('cookie-consent-banner');
     consentBanner.style.transition = 'opacity 0.3s ease';
     consentBanner.style.opacity = '0';
