@@ -11,14 +11,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // COOKIE CONSENT
     const cookiesAccepted = localStorage.getItem('cookies_accepted');
 
-    if (cookiesAccepted === currentPricacyPolicyVersion) {
+    if (cookiesAccepted === currentPrivacyPolicyVersion) {
         window.dataLayer = window.dataLayer || [];
         function gtag() {
             dataLayer.push(arguments);
         }
         gtag('js', new Date());
         gtag('config', 'G-7FDCB5928P');
-    } else if (cookiesAccepted === null || cookiesAccepted !== currentPricacyPolicyVersion) {
+    } else if (cookiesAccepted === null || cookiesAccepted !== currentPrivacyPolicyVersion) {
         addCookieConsentBanner();
     }
 
@@ -105,7 +105,7 @@ function addCookieConsentBanner() {
 }
 
 function handleConsent(isAccepted) {
-    let acceptedVersion = isAccepted ? currentPricacyPolicyVersion : 'false';
+    let acceptedVersion = isAccepted ? currentPrivacyPolicyVersion : 'false';
     localStorage.setItem('cookies_accepted', acceptedVersion);
     const consentBanner = document.getElementById('cookie-consent-banner');
     consentBanner.style.transition = 'opacity 0.3s ease';
