@@ -1,4 +1,4 @@
-let currentPricacyPolicyVersion = '2026-02-14';
+let currentPrivacyPolicyVersion = '2026-02-14';
 
 document.addEventListener('DOMContentLoaded', () => {
     // HERO

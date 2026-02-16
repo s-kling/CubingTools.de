@@ -49,6 +49,11 @@ router.get('/apple-touch-icon.png', (req, res) => {
     res.sendFile(path.join(__dirname, '..', '../public/assets', 'logo_with_text.png'));
 });
 
+// Serve the apple-touch-icon.png
+router.get('/apple-touch-icon-precomposed.png', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', '../public/assets', 'logo_with_text.png'));
+});
+
 // Serve the sitemap
 router.get('/sitemap.xml', (req, res) => {
     res.sendFile(path.join(__dirname, '..', '../public', 'sitemap.xml'));

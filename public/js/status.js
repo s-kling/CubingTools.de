@@ -61,7 +61,8 @@ function renderStatus(data) {
         ${renderExpandableStatusCodes(logs.statusCodes, logs.statusCodeUrls)}
         ${renderKeyValueSection('User Agents', logs.userAgents, 10)}
         ${renderTopWcaIds('Top WCA IDs', logs.endpoints, 10)}
-        ${renderKeyValueSection('Peak Traffic (UTC Hour)', logs.peakHours)}
+        ${renderTopTools('Top Tools', logs.endpoints, 10)}
+        ${renderPeakTimeTraffic('Peak Traffic (UTC Hour)', logs.peakHours)}
     `;
 }
 
@@ -96,18 +97,66 @@ function renderExpandableStatusCodes(statusCodes, statusCodeUrls) {
 
 function renderStatusUrls(code, statusCodeUrls) {
     const urls = statusCodeUrls?.[code];
+
     if (!urls) return '<li>No data</li>';
 
+    // Ensure no /404 entries are shown in the details to avoid cluttering the report with missing page requests
     return Object.entries(urls)
+        .filter(([url]) => !url.includes('/404'))
         .sort((a, b) => b[1] - a[1])
-        .map(([url, count]) => `<li>${url} — ${count}</li>`)
+        .map(([url, count]) => `<li>${count}: ${url}</li>`)
         .join('');
 }
 
 function renderKeyValueSection(title, obj, limit = null) {
     if (!obj || Object.keys(obj).length === 0) return '';
 
+    // Sort by value, remove trailing "/" if present, and limit results
     const entries = Object.entries(obj)
+        .sort((a, b) => b[1] - a[1])
+        .map(([key, value]) => [key.endsWith('/') ? key.slice(0, -1) : key, value])
+        .slice(0, limit ?? undefined);
+
+    return `
+        <h4>${title}</h4>
+        <ul>
+            ${entries.map(([key, value]) => `<li>${value} (${((value / entries.reduce((sum, [_, val]) => sum + val, 0)) * 100).toFixed(2)}%) — ${key}</li>`).join('')}
+        </ul>
+    `;
+}
+
+function renderPeakTimeTraffic(title, obj, limit = null) {
+    if (!obj || Object.keys(obj).length === 0) return '';
+
+    // Sort by hour (key) instead of value
+    const entries = Object.entries(obj)
+        .sort((a, b) => a[0] - b[0])
+        .slice(0, limit ?? undefined);
+
+    const counts = entries.map(([_, value]) => value);
+    const minTraffic = Math.min(...counts);
+    const maxTraffic = Math.max(...counts);
+
+    return `
+        <h4>${title}</h4>
+        <ul>
+            ${entries.map(([key, value]) => `<li style="color: hsl(${((value - minTraffic) / (maxTraffic - minTraffic || 1)) * 120}, 100%, 50%);">${key}: ${value} (${((value / entries.reduce((sum, [_, val]) => sum + val, 0)) * 100).toFixed(2)}%)</li>`).join('')}
+        </ul>
+    `;
+}
+
+function renderTopTools(title, obj, limit = null) {
+    if (!obj || Object.keys(obj).length === 0) return '';
+
+    const tools = {};
+    Object.entries(obj)
+        .filter(([key]) => key.toLowerCase().includes('/tools/'))
+        .forEach(([key, value]) => {
+            const toolName = key.split('/')[2].split('?')[0];
+            tools[toolName] = (tools[toolName] || 0) + value;
+        });
+
+    const entries = Object.entries(tools)
         .sort((a, b) => b[1] - a[1])
         .slice(0, limit ?? undefined);
 
@@ -124,7 +173,7 @@ function renderTopWcaIds(title, obj, limit = null) {
 
     const wcaIds = {};
     Object.entries(obj)
-        .filter(([key]) => key.includes('/api/wca/'))
+        .filter(([key]) => key.toLowerCase().includes('/api/wca/'))
         .forEach(([key, value]) => {
             const wcaId = key.split('/')[3];
             wcaIds[wcaId] = (wcaIds[wcaId] || 0) + value;

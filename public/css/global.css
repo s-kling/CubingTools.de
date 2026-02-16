@@ -120,6 +120,7 @@ ul li:hover {
     justify-content: center;
     text-align: center;
     z-index: 9999;
+    filter: blur(0) !important;
     overflow: hidden;
     padding: 30px;
 }
@@ -286,7 +287,7 @@ body:has(#cookie-consent-banner) {
 }
 
 body:has(#cookie-consent-banner) > *:not(#cookie-consent-banner) {
-    filter: blur(5px) !important;
+    filter: blur(5px);
     pointer-events: none !important;
     transition: filter 0.3s ease !important;
 }
@@ -630,6 +631,47 @@ select {
 main label span {
     white-space: nowrap;
     margin-right: var(--space-xs);
+}
+
+/* Custom Checkbox Styles */
+main input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 2px solid var(--input-border);
+    background: var(--input-background);
+    vertical-align: middle;
+    cursor: pointer;
+    margin: 0 0.5rem 0 0;
+    box-sizing: border-box;
+    position: relative;
+    transition: background .12s ease, border-color .12s ease, box-shadow .12s ease, transform .06s ease;
+}
+
+/* accent on checked */
+main input[type="checkbox"]:checked {
+    background: linear-gradient(90deg, var(--button-background), rgba(79,70,229,0.9));
+    border-color: var(--button-background);
+    box-shadow: 0 0 0 4px rgba(79,70,229,0.08);
+    transform: translateY(-1px);
+}
+
+/* focus ring */
+main input[type="checkbox"]:focus {
+    outline: none;
+    box-shadow: 0 0 0 5px rgba(63,167,214,0.10);
+}
+
+/* show small checkmark using an overlay pseudo element on the input's sibling label — works regardless of browser.
+   Important: keep labels next to inputs for consistent layout. */
+main input[type="checkbox"] + label::before {
+    content: "";
+    display: inline-block;
+    width: 0;
+    height: 0;
+    margin-right: 0;
 }
 
 /* Tool Container Styles */

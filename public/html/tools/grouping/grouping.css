@@ -93,6 +93,7 @@ textarea:focus {
     align-items: center;
     gap: var(--space-xs);
     color: var(--secondary-text);
+    justify-content: left;
 }
 
 /* ---------- Buttons ---------- */
@@ -240,15 +241,46 @@ button:hover { background: var(--hover-background); }
 /* ---------- Competitor list & form ---------- */
 #competitor-form {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: var(--space-sm);
     align-items: center;
     margin-bottom: var(--space-md);
 }
+
 #competitor-form .inline {
     display: inline-flex;
-    gap: var(--space-xs);
+    gap: 10px;
     align-items: center;
+    width: auto;
+    height: 40px;
+    border-radius: var(--main-radius);
+    justify-content: center;
+    background-color: var(--input-background);
+    transition: scale 0.1s ease;
+}
+
+#competitor-form .inline:hover {
+    scale: 1.02;
+}
+
+#competitor-form .inline input[type="checkbox"] {
+    margin: 0;
+}
+
+#competitor-form .inline label {
+    margin: 0;
+}
+
+#competitor-form > :first-child {
+    grid-column: 1 / -1;
+}
+
+#competitor-form > :nth-child(2) {
+    grid-column: 1 / -1;
+}
+
+#competitor-form > :last-child {
+    grid-column: 1 / -1;
 }
 
 /* Competitor table */
@@ -411,47 +443,6 @@ button:hover { background: var(--hover-background); }
     box-shadow: 0 20px 40px rgba(0,0,0,0.75);
 }
 .close-button { float: right; cursor: pointer; font-size: 1.5rem; color: var(--secondary-text); }
-
-/* ---------- Custom checkbox visuals (consistent across the app) ---------- */
-main input[type="checkbox"] {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 18px;
-    height: 18px;
-    border-radius: 4px;
-    border: 2px solid var(--input-border);
-    background: var(--input-background);
-    vertical-align: middle;
-    cursor: pointer;
-    margin: 0 0.5rem 0 0;
-    box-sizing: border-box;
-    position: relative;
-    transition: background .12s ease, border-color .12s ease, box-shadow .12s ease, transform .06s ease;
-}
-
-/* accent on checked */
-main input[type="checkbox"]:checked {
-    background: linear-gradient(90deg, var(--button-background), rgba(79,70,229,0.9));
-    border-color: var(--button-background);
-    box-shadow: 0 0 0 4px rgba(79,70,229,0.08);
-    transform: translateY(-1px);
-}
-
-/* focus ring */
-main input[type="checkbox"]:focus {
-    outline: none;
-    box-shadow: 0 0 0 5px rgba(63,167,214,0.10);
-}
-
-/* show small checkmark using an overlay pseudo element on the input's sibling label — works regardless of browser.
-   Important: keep labels next to inputs for consistent layout. */
-main input[type="checkbox"] + label::before {
-    content: "";
-    display: inline-block;
-    width: 0;
-    height: 0;
-    margin-right: 0;
-}
 
 /* ---------- Accessibility & small helpers ---------- */
 button:focus, a:focus, input:focus, select:focus {

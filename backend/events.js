@@ -54,8 +54,8 @@ const events = [
     { id: 'gigaminx', name: 'Gigaminx', shortName: 'Giga' },
 
     // Skewb
-    { id: 'redi', name: 'Redi Cube', shortName: 'Redi' },
     { id: 'skewb', name: 'Skewb', shortName: 'Skewb' },
+    { id: 'redi', name: 'Redi Cube', shortName: 'Redi' },
     { id: 'ivy_cube', name: 'Ivy Cube', shortName: 'Ivy' },
 
     // Square-1

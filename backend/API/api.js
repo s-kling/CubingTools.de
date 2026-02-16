@@ -99,12 +99,12 @@ class WcaApi {
 
 class StatusApi {
     constructor() {
-        this.password = sha256Hash(process.env.STATUS_PAGE_PASSWORD || '');
+        this.password = process.env.STATUS_PAGE_PASSWORD || '';
     }
 
     handleRequest(req, res) {
         const { password } = req.body || {};
-        const hashedPassword = sha256Hash(password || '');
+        const hashedPassword = sha256Hash(password) || '';
 
         if (hashedPassword !== this.password) {
             return res.status(401).json({ error: 'Unauthorized' });
@@ -119,7 +119,7 @@ class StatusApi {
         return res.json({
             uptime: uptime.toFixed(2),
             memoryUsage: `${memoryUsage} MB`,
-            logFileSize: `${logFileSize} MB`,
+            logFileSize: `${logFileSize} KB`,
             logs: logStats,
         });
     }
@@ -186,11 +186,6 @@ class StatusApi {
                 stats.userAgents[entry.userAgent] = (stats.userAgents[entry.userAgent] || 0) + 1;
             }
 
-            // IPs
-            if (entry.ip) {
-                stats.ips[entry.ip] = (stats.ips[entry.ip] || 0) + 1;
-            }
-
             // Avg response time per endpoint
             if (!responseTimesByEndpoint[entry.url]) {
                 responseTimesByEndpoint[entry.url] = [];
@@ -228,7 +223,8 @@ class StatusApi {
                 this.betaTest ? 'beta.log' : 'server.log',
             );
             const stats = fs.statSync(logPath);
-            return (stats.size / 1024 / 1024).toFixed(2);
+            // Return size in kilo Bytes with 2 decimal places
+            return (stats.size / 1024).toFixed(2);
         } catch {
             return '0.00';
         }

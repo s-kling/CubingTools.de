@@ -111,7 +111,7 @@ function loadCompetitionDataFromURL() {
                     runners: r.map((id) => competitors.find((comp) => comp.id === id)),
                     scramblers: s.map((id) => competitors.find((comp) => comp.id === id)),
                 })),
-            ])
+            ]),
         );
         selectedEvents = Object.keys(competitionData.groups);
         generateGroupHTML();
@@ -380,18 +380,18 @@ function handleAddingEventDivs(event, eventCheckboxes) {
 }
 
 function goToSetupCompetition() {
-    document.getElementById('event-selection').style.display = 'none';
-    document.getElementById('competition-setup').style.display = 'block';
+    document.getElementById('event-selection').classList.add('hidden');
+    document.getElementById('competition-setup').classList.remove('hidden');
 }
 
 function goToEventSelection() {
-    document.getElementById('competitor-setup').style.display = 'none';
-    document.getElementById('event-selection').style.display = 'block';
+    document.getElementById('competitor-setup').classList.add('hidden');
+    document.getElementById('event-selection').classList.remove('hidden');
 }
 
 function selectEvents() {
     selectedEvents = Array.from(document.querySelectorAll('.event-checkbox.checked')).map(
-        (checkbox) => checkbox.id
+        (checkbox) => checkbox.id,
     );
 
     if (selectedEvents.length === 0) {
@@ -401,7 +401,6 @@ function selectEvents() {
 
     document.getElementById('event-selection').classList.add('hidden');
     document.getElementById('competitor-setup').classList.remove('hidden');
-    document.getElementById('competitor-setup').style.display = 'block';
 
     // build competitor form now that we have selectedEvents
     updateCompetitorForm();
@@ -423,19 +422,16 @@ function updateCompetitorForm() {
     wcaInput.placeholder = 'WCA ID (optional)';
 
     competitorForm.appendChild(nameInput);
+    competitorForm.appendChild(wcaInput);
 
     // Build event checkboxes with label BEFORE the checkbox input
     selectedEvents.forEach((eventId) => {
-        const event = events.find((e) => e.id === eventId) || { id: eventId, shortName: eventId };
         const label = document.createElement('label');
+        const event = events.find((e) => e.id === eventId) || { id: eventId, shortName: eventId };
         label.htmlFor = `event-${event.id}`;
         label.className = 'inline';
 
-        // label text first
-        const textNode = document.createTextNode(event.shortName || event.name || event.id);
-        label.appendChild(textNode);
-
-        // then the checkbox input
+        // checkbox input first
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.id = `event-${event.id}`;
@@ -444,13 +440,19 @@ function updateCompetitorForm() {
 
         label.appendChild(checkbox);
 
+        // then the label text
+        const textNode = document.createTextNode(event.shortName || event.name || event.id);
+        label.appendChild(textNode);
+
         competitorForm.appendChild(label);
     });
 
     const addBtn = document.createElement('button');
     addBtn.type = 'button';
     addBtn.textContent = 'Add Competitor';
-    addBtn.onclick = addCompetitor;
+    addBtn.onclick = () => {
+        addCompetitor();
+    };
 
     competitorForm.appendChild(addBtn);
 }
@@ -459,11 +461,11 @@ function addCompetitor() {
     const nameInput = document.getElementById('competitor-name');
     const wcaInput = document.getElementById('competitor-wca');
 
-    const name = nameInput ? nameInput.value.trim() : '';
+    let name = nameInput ? nameInput.value.trim() : '';
     let wcaId = wcaInput ? wcaInput.value.trim().toUpperCase() : '';
 
-    if (!name) {
-        alert('Please provide a competitor name.');
+    if (!name && !wcaId) {
+        alert('Please provide a competitor name or WCA ID.');
         return;
     }
 
@@ -475,7 +477,7 @@ function addCompetitor() {
     }
 
     const eventCheckboxes = document.querySelectorAll(
-        '#competitor-form input[type="checkbox"]:checked'
+        '#competitor-form input[type="checkbox"]:checked',
     );
     const evts = Array.from(eventCheckboxes).map((cb) => cb.value);
 
@@ -615,47 +617,61 @@ function deleteCompetitor(id) {
     // re-render
     displayCompetitors();
     selectedEvents = selectedEvents.filter((eventId) =>
-        competitors.some((competitor) => competitor.events.includes(eventId))
+        competitors.some((competitor) => competitor.events.includes(eventId)),
     );
 }
 
 async function finalizeCompetitors() {
     competitionData.competitors = competitors;
 
-    document.getElementById('competitor-setup').style.display = 'none';
-    document.getElementById('grouping-results').style.display = 'block';
+    document.getElementById('competitor-setup').classList.add('hidden');
+    document.getElementById('grouping-results').classList.remove('hidden');
 
     generateGroups();
 }
 
 async function sortArray(array, eventId) {
-    // Store the average times for each competitor
-    const averages = {};
+    // Attach original index to guarantee stability
+    const competitorsWithIndex = array.map((competitor, index) => ({
+        competitor,
+        index,
+        average: null,
+    }));
 
-    for (let i = 0; i < array.length; i++) {
-        const competitor = array[i];
-        if (competitor.wcaId) {
-            try {
-                const response = await fetch(`/api/WCA/${competitor.wcaId}/${eventId}`);
-                const data = await response.json();
-                averages[competitor.wcaId] = data.average || null;
-            } catch (error) {
-                console.error(`Failed to fetch data for ${competitor.wcaId}:`, error);
-                averages[competitor.wcaId] = null;
-            }
-        } else {
-            averages[competitor.wcaId] = null;
+    // Fetch averages
+    for (const item of competitorsWithIndex) {
+        const { competitor } = item;
+
+        if (!competitor.wcaId) {
+            item.average = null;
+            continue;
+        }
+
+        try {
+            const response = await fetch(`/api/wca/${competitor.wcaId}/${eventId}`);
+            const data = await response.json();
+            item.average = data?.average ?? null;
+        } catch (error) {
+            console.error(`Failed to fetch data for ${competitor.wcaId}:`, error);
+            item.average = null;
         }
     }
 
-    // Sort the array based on the average times
-    array.sort((a, b) => {
-        const avgA = averages[a.wcaId] !== null ? averages[a.wcaId] : Number.MAX_VALUE;
-        const avgB = averages[b.wcaId] !== null ? averages[b.wcaId] : Number.MAX_VALUE;
-        return avgA - avgB;
+    // Stable sort
+    competitorsWithIndex.sort((a, b) => {
+        const avgA = a.average ?? Number.MAX_VALUE;
+        const avgB = b.average ?? Number.MAX_VALUE;
+
+        if (avgA !== avgB) {
+            return avgA - avgB; // slower → faster or vice versa per your intent
+        }
+
+        // Tie-breaker: original order
+        return a.index - b.index;
     });
 
-    return array;
+    // Return sorted competitors only
+    return competitorsWithIndex.map((item) => item.competitor);
 }
 
 function shuffleArray(array) {
@@ -667,27 +683,34 @@ function shuffleArray(array) {
 }
 
 async function generateGroups() {
-    const maxCompetitors = competitionData.maxCompetitors;
     competitionData.groups = {}; // Reset groups data
 
     for (const eventId of selectedEvents) {
-        let eventCompetitors = competitors.filter((competitor) =>
-            competitor.events.includes(eventId)
-        );
+        const maxCompetitors = competitionData.maxCompetitors;
 
-        // Sort the competitors by their average times using the updated sortArray function
+        // Competitors in this event
+        let eventCompetitors = competitors.filter((c) => c.events.includes(eventId));
+
+        // Sort by slowest time first
         eventCompetitors = await sortArray(eventCompetitors, eventId);
 
-        // Determine the number of groups
-        const dynamicGroupCheckbox = document.getElementById(`dynamic-group-${eventId}`);
+        const dynamicCheckbox = document.getElementById(`dynamic-group-${eventId}`);
         let numGroups;
 
-        if (dynamicGroupCheckbox && !dynamicGroupCheckbox.checked) {
+        // Trust me, I thought about this. If something is broken, this is not it
+        if (eventCompetitors.length === 1) {
+            numGroups = 1;
+        } else if (dynamicCheckbox && !dynamicCheckbox.checked) {
             const groupInput = document.getElementById(`group-input-${eventId}`);
-            numGroups = parseInt(Math.abs(groupInput.value), 10);
+            const rawValue = Number(groupInput?.value);
+
+            numGroups = Number.isFinite(rawValue) && rawValue > 0 ? Math.floor(rawValue) : 1;
         } else {
-            const ratio = eventCompetitors.length / maxCompetitors;
-            numGroups = ratio < 1 ? Math.ceil(ratio + 1) : Math.ceil(ratio);
+            if (maxCompetitors < eventCompetitors.length) {
+                numGroups = Math.ceil(eventCompetitors.length / maxCompetitors);
+            } else {
+                numGroups = 2;
+            }
         }
 
         const eventGroups = Array.from({ length: numGroups }, () => ({
@@ -699,100 +722,123 @@ async function generateGroups() {
 
         // Get the sorting type for the event
         const sortTypeSelect = document.getElementById(`competitor-sort-type-${eventId}`);
-        const sortType = sortTypeSelect ? sortTypeSelect.value : 'Round Robin';
+        const sortType = sortTypeSelect?.value ?? 'Round Robin';
 
-        // Sort competitors based on the selected sort type
+        console.log(eventCompetitors);
+
         if (sortType === 'Round Robin') {
-            // Distribute competitors evenly among the groups, starting with the last group
             eventCompetitors.forEach((competitor, index) => {
                 const groupIndex = numGroups - 1 - (index % numGroups);
                 eventGroups[groupIndex].competitors.push(competitor);
-                competitor.groupAssignments[eventId] = groupIndex + 1; // Groups are 1-indexed
+                competitor.groupAssignments ??= {};
+                competitor.groupAssignments[eventId] = groupIndex + 1;
             });
         } else if (sortType === 'Linear') {
             eventCompetitors.reverse();
+            // slowest → fastest, straight fill
+            let numPerGroup = Math.ceil(eventCompetitors.length / numGroups);
 
-            // Distribute competitors linearly among the groups
-            eventCompetitors.forEach((competitor, index) => {
-                const groupIndex = index % numGroups;
-                eventGroups[groupIndex].competitors.push(competitor);
-                competitor.groupAssignments[eventId] = groupIndex + 1; // Groups are 1-indexed
-            });
-
-            eventCompetitors = await sortArray(eventCompetitors, eventId);
+            for (let i = 0; i < numGroups; i++) {
+                for (let j = 0; j < numPerGroup; j++) {
+                    const competitorIndex = i * numPerGroup + j;
+                    if (competitorIndex >= eventCompetitors.length) break;
+                    const competitor = eventCompetitors[competitorIndex];
+                    eventGroups[i].competitors.push(competitor);
+                    competitor.groupAssignments ??= {};
+                    competitor.groupAssignments[eventId] = i + 1;
+                }
+            }
         } else if (sortType === 'Random') {
-            // Shuffle competitors and distribute randomly among the groups
-            const shuffledCompetitors = shuffleArray(eventCompetitors);
-            shuffledCompetitors.forEach((competitor, index) => {
+            const shuffled = shuffleArray([...eventCompetitors]);
+            shuffled.forEach((competitor, index) => {
                 const groupIndex = index % numGroups;
                 eventGroups[groupIndex].competitors.push(competitor);
-                competitor.groupAssignments[eventId] = groupIndex + 1; // Groups are 1-indexed
+                competitor.groupAssignments ??= {};
+                competitor.groupAssignments[eventId] = groupIndex + 1;
             });
         }
 
-        // Assign runners, judges, and scramblers ensuring no overlap
-        for (let groupIndex = 0; groupIndex < eventGroups.length; groupIndex++) {
-            const shuffledCompetitors = shuffleArray(competitors);
+        // Global role tracking (official-style behavior)
+        const usedAsScrambler = new Set();
+        const usedAsJudge = new Set();
+        const usedAsRunner = new Set();
 
-            const group = eventGroups[groupIndex];
+        // Precompute scrambler top pool once (not per group)
+        const totalScramblersNeeded = eventGroups.reduce(
+            (sum, g) => sum + Math.ceil(g.competitors.length / 6),
+            0,
+        );
 
-            // Number of Scramblers per group
-            const numOfScramblers = Math.ceil(Math.ceil(group.competitors.length) / 5.7);
+        const topPoolSize = totalScramblersNeeded;
+        const topCompetitors = eventCompetitors.slice(0, topPoolSize);
 
-            // Number of Runners per group
-            const numOfRunners = Math.ceil(Math.ceil(group.competitors.length) ** 0.5);
+        // Shared shuffled fallback pool
+        const shuffledAll = shuffleArray([...competitors]);
 
-            // Assign scramblers: top n * numOfScramblers competitors sorted by speed
-            const topCompetitors = eventCompetitors.slice(0, numOfScramblers * eventGroups.length);
-            const availableScramblers = topCompetitors.filter(
-                (competitor) =>
-                    competitor.events.includes(eventId) && !group.competitors.includes(competitor)
+        eventGroups.forEach((group) => {
+            const numScramblers = Math.ceil(group.competitors.length / 6);
+            const numRunners = Math.ceil(Math.sqrt(group.competitors.length));
+
+            const groupCompetitorSet = new Set(group.competitors);
+
+            /* ================= SCRAMBLERS ================= */
+
+            let availableScramblers = topCompetitors.filter(
+                (c) =>
+                    c.wcaId && // <-- NEW
+                    c.events.includes(eventId) &&
+                    !groupCompetitorSet.has(c) &&
+                    !usedAsScrambler.has(c),
             );
 
-            if (availableScramblers.length > 0) {
-                const scramblers = [];
-                for (let i = 0; i < numOfScramblers; i++) {
-                    if (availableScramblers[i]) {
-                        scramblers.push(availableScramblers[i]);
-                    }
-                }
-                group.scramblers = scramblers;
-            } else {
-                // If there are no available scramblers, assign numOfScramblers random competitors that aren't in that event
-                const availableCompetitors = shuffledCompetitors.filter(
-                    (competitor) => !eventCompetitors.includes(competitor)
+            if (availableScramblers.length < numScramblers) {
+                const fallback = shuffledAll.filter(
+                    (c) =>
+                        c.wcaId && // <-- NEW
+                        !groupCompetitorSet.has(c) &&
+                        !usedAsScrambler.has(c),
                 );
-                group.scramblers = availableCompetitors.slice(0, numOfScramblers);
+
+                availableScramblers = availableScramblers.concat(fallback);
             }
 
-            // Assign judges if applicable
+            group.scramblers = availableScramblers.slice(0, numScramblers);
+            group.scramblers.forEach((c) => usedAsScrambler.add(c));
+
+            /* ================= JUDGES ================= */
+
             if (includeJudges) {
-                const availableJudges = shuffledCompetitors.filter(
-                    (competitor) =>
-                        !group.competitors.includes(competitor) &&
-                        !group.judges.includes(competitor) &&
-                        !group.runners.includes(competitor) &&
-                        !group.scramblers.includes(competitor)
+                const availableJudges = shuffledAll.filter(
+                    (c) =>
+                        !groupCompetitorSet.has(c) &&
+                        !usedAsScrambler.has(c) &&
+                        !usedAsJudge.has(c),
                 );
+
                 group.judges = availableJudges.slice(0, group.competitors.length);
+                group.judges.forEach((c) => usedAsJudge.add(c));
+            } else {
+                group.judges = [];
             }
 
-            // Assign runners if applicable
+            /* ================= RUNNERS ================= */
+
             if (includeRunners) {
-                const availableRunners = shuffledCompetitors.filter(
-                    (competitor) =>
-                        !group.competitors.includes(competitor) &&
-                        !group.judges.includes(competitor) &&
-                        !group.runners.includes(competitor) &&
-                        !group.scramblers.includes(competitor)
+                const availableRunners = shuffledAll.filter(
+                    (c) =>
+                        !groupCompetitorSet.has(c) &&
+                        !usedAsScrambler.has(c) &&
+                        !usedAsJudge.has(c) &&
+                        !usedAsRunner.has(c),
                 );
-                if (availableRunners.length > 0) {
-                    group.runners = availableRunners.slice(0, numOfRunners);
-                }
-            }
-        }
 
-        // Store groups in competitionData
+                group.runners = availableRunners.slice(0, numRunners);
+                group.runners.forEach((c) => usedAsRunner.add(c));
+            } else {
+                group.runners = [];
+            }
+        });
+
         competitionData.groups[eventId] = eventGroups;
     }
 
@@ -838,7 +884,7 @@ function generateGroupHTML() {
             eventGroups.forEach((group, gIdx) => {
                 group.competitors.forEach((c) => {
                     csvLines.push(
-                        [eventId, `Group ${gIdx + 1}`, c.id, c.name, c.wcaId || ''].join(',')
+                        [eventId, `Group ${gIdx + 1}`, c.id, c.name, c.wcaId || ''].join(','),
                     );
                 });
             });
@@ -951,7 +997,7 @@ function generateGroupHTML() {
             const competitorTable = createEl('table', { className: 'competitor-table' });
             const headerRow = createEl('tr', {});
             ['Event', 'Compete', 'Judge', 'Run', 'Scramble'].forEach((t) =>
-                headerRow.appendChild(createEl('th', { text: t }))
+                headerRow.appendChild(createEl('th', { text: t })),
             );
             competitorTable.appendChild(headerRow);
 
@@ -962,7 +1008,7 @@ function generateGroupHTML() {
 
                 const competeGroups = (competitionData.groups[eventId] || [])
                     .map((group, index) =>
-                        group.competitors.includes(competitor) ? index + 1 : null
+                        group.competitors.includes(competitor) ? index + 1 : null,
                     )
                     .filter((x) => x !== null)
                     .join(', ');
@@ -970,7 +1016,7 @@ function generateGroupHTML() {
 
                 const judgeGroups = (competitionData.groups[eventId] || [])
                     .map((group, index) =>
-                        group.judges && group.judges.includes(competitor) ? index + 1 : null
+                        group.judges && group.judges.includes(competitor) ? index + 1 : null,
                     )
                     .filter((x) => x !== null)
                     .join(', ');
@@ -978,7 +1024,7 @@ function generateGroupHTML() {
 
                 const runGroups = (competitionData.groups[eventId] || [])
                     .map((group, index) =>
-                        group.runners && group.runners.includes(competitor) ? index + 1 : null
+                        group.runners && group.runners.includes(competitor) ? index + 1 : null,
                     )
                     .filter((x) => x !== null)
                     .join(', ');
@@ -986,7 +1032,9 @@ function generateGroupHTML() {
 
                 const scrambleGroups = (competitionData.groups[eventId] || [])
                     .map((group, index) =>
-                        group.scramblers && group.scramblers.includes(competitor) ? index + 1 : null
+                        group.scramblers && group.scramblers.includes(competitor)
+                            ? index + 1
+                            : null,
                     )
                     .filter((x) => x !== null)
                     .join(', ');
@@ -1019,7 +1067,7 @@ function copyGroup(group, groupIndex) {
         },
         (err) => {
             console.error('Could not copy text: ', err);
-        }
+        },
     );
 }
 
@@ -1058,7 +1106,7 @@ function copyEvent(eventId) {
         },
         (err) => {
             console.error('Could not copy text: ', err);
-        }
+        },
     );
 }
 
@@ -1211,7 +1259,7 @@ function editGroup(group, eventId, groupIndex) {
             selects.forEach((select) => {
                 const index = select.dataset.index;
                 const selectedCompetitor = competitors.find(
-                    (competitor) => competitor.id == select.value
+                    (competitor) => competitor.id == select.value,
                 );
 
                 if (selectedCompetitors.has(selectedCompetitor.id)) {
@@ -1276,7 +1324,7 @@ function editGroup(group, eventId, groupIndex) {
 }
 
 document.addEventListener('keydown', (event) => {
-    if (event.shiftKey && location.port === '8443') {
+    if (event.shiftKey && location.port === '8001') {
         const mockButton = document.createElement('button');
         mockButton.textContent = 'Add Mock Data';
         mockButton.className = 'mock-button';
@@ -1298,12 +1346,12 @@ function addMockData() {
         document.getElementById('event-selection').style.display === 'block'
             ? 'events'
             : document.getElementById('competitor-setup').style.display === 'block'
-            ? 'competitors'
-            : 'setup';
+              ? 'competitors'
+              : 'setup';
 
     if (currentStep === 'setup') {
         document.getElementById('competition-name').value = 'Mock Competition';
-        document.getElementById('max-competitors').value = 4;
+        document.getElementById('max-competitors').value = 6;
         document.getElementById('do-judges').checked = true;
         document.getElementById('do-runners').checked = true;
         setupCompetition();
@@ -1319,10 +1367,18 @@ function addMockData() {
 }
 
 function handleAddingMockEvents() {
-    selectedEvents = ['333', '222', '444', '555'];
+    selectedEvents = ['222', '333', '444', '555', '666', '777'];
 
-    const eventIds = ['333', '222', '444', '555'];
-    eventIds.forEach((id) => {
+    const eventConfig = {
+        222: { sort: 'Round Robin', dynamic: true },
+        333: { sort: 'Linear', dynamic: true },
+        444: { sort: 'Random', dynamic: true },
+        555: { sort: 'Linear', dynamic: false, groups: 3 },
+        666: { sort: 'Round Robin', dynamic: false, groups: 4 },
+        777: { sort: 'Random', dynamic: false, groups: 5 },
+    };
+
+    selectedEvents.forEach((id) => {
         const checkbox = document.getElementById(id);
         checkbox.classList.add('checked');
         checkbox.classList.remove('unchecked');
@@ -1330,218 +1386,157 @@ function handleAddingMockEvents() {
 
         const dynamicGroupCheckbox = document.createElement('input');
         dynamicGroupCheckbox.type = 'checkbox';
-        dynamicGroupCheckbox.addEventListener('click', (e) => e.stopPropagation());
         dynamicGroupCheckbox.id = `dynamic-group-${id}`;
-        dynamicGroupCheckbox.name = 'dynamic-group';
-        dynamicGroupCheckbox.value = id;
-        dynamicGroupCheckbox.checked = true;
+        dynamicGroupCheckbox.checked = eventConfig[id].dynamic;
+        dynamicGroupCheckbox.addEventListener('click', (e) => e.stopPropagation());
 
         const dynamicGroupLabel = document.createElement('label');
-        dynamicGroupLabel.htmlFor = `dynamic-group-${id}`;
+        dynamicGroupLabel.htmlFor = dynamicGroupCheckbox.id;
         dynamicGroupLabel.textContent = 'Dynamic Groups';
 
         const groupInput = document.createElement('input');
         groupInput.type = 'number';
         groupInput.id = `group-input-${id}`;
-        groupInput.name = 'group-input';
-        groupInput.placeholder = 'Max Groups';
-        groupInput.style.display = 'none';
+        groupInput.placeholder = 'Number of Groups';
+        groupInput.style.display = eventConfig[id].dynamic ? 'none' : 'block';
+
+        if (!eventConfig[id].dynamic) {
+            groupInput.value = eventConfig[id].groups;
+        }
 
         dynamicGroupCheckbox.addEventListener('change', () => {
             groupInput.style.display = dynamicGroupCheckbox.checked ? 'none' : 'block';
         });
 
+        const competitorSortTypeSelect = document.createElement('select');
+        competitorSortTypeSelect.id = `competitor-sort-type-${id}`;
+
+        ['Round Robin', 'Linear', 'Random'].forEach((type) => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            competitorSortTypeSelect.appendChild(option);
+        });
+
+        competitorSortTypeSelect.value = eventConfig[id].sort;
+
+        const competitorSortTypeLabel = document.createElement('label');
+        competitorSortTypeLabel.textContent = 'Sort competitors by:';
+        competitorSortTypeLabel.appendChild(competitorSortTypeSelect);
+
         const wrapper = document.createElement('div');
         dynamicGroupLabel.appendChild(dynamicGroupCheckbox);
         wrapper.appendChild(dynamicGroupLabel);
         wrapper.appendChild(groupInput);
-
-        const competitorSortTypeSelect = document.createElement('select');
-        competitorSortTypeSelect.id = `competitor-sort-type-${id}`;
-        competitorSortTypeSelect.name = 'competitor-sort-type';
-        competitorSortTypeSelect.style.display = 'block';
-
-        const competitorSortTypeLabel = document.createElement('label');
-        competitorSortTypeLabel.htmlFor = `competitor-sort-type-${id}`;
-        competitorSortTypeLabel.textContent = 'Sort competitors by:';
-
-        const sortTypes = ['Round Robin', 'Linear', 'Random'];
-
-        sortTypes.forEach((sortType) => {
-            const option = document.createElement('option');
-            option.value = sortType;
-            option.textContent = sortType;
-            competitorSortTypeSelect.appendChild(option);
-        });
-
-        competitorSortTypeLabel.appendChild(competitorSortTypeSelect);
-
         wrapper.appendChild(competitorSortTypeLabel);
 
-        // Prevent the checkbox from closing if the input is clicked
         wrapper.addEventListener('click', (e) => e.stopPropagation());
-
         checkbox.appendChild(wrapper);
     });
-
-    // Set sort types and max groups for each event
-    document.getElementById('dynamic-group-333').checked = true;
-    document.getElementById('competitor-sort-type-333').value = 'Round Robin';
-
-    document.getElementById('dynamic-group-222').checked = true;
-    document.getElementById('competitor-sort-type-222').value = 'Linear';
-
-    document.getElementById('dynamic-group-444').checked = true;
-    document.getElementById('competitor-sort-type-444').value = 'Random';
-
-    document.getElementById('dynamic-group-555').checked = false;
-    document.getElementById('group-input-555').display = 'block';
-    document.getElementById('group-input-555').value = 2;
-    document.getElementById('competitor-sort-type-555').value = 'Round Robin';
 }
 
 function handleAddingMockCompetitors() {
+    const allEvents = ['222', '333', '444', '555', '666', '777'];
     const mockCompetitors = [];
+
     for (let i = 1; i <= 8; i++) {
         mockCompetitors.push({
             id: i,
             name: `Competitor ${i}`,
             wcaId: null,
-            events: ['333', '222', '444', '555'],
+            events: allEvents,
             groupAssignments: {},
         });
     }
+
     for (let i = 9; i <= 16; i++) {
         mockCompetitors.push({
             id: i,
             name: `WCA ID ${i}`,
             wcaId: '2023KLIN02',
-            events: ['333', '222', '444', '555'],
+            events: allEvents,
             groupAssignments: {},
         });
     }
-    competitors = mockCompetitors;
 
+    competitors = mockCompetitors;
     competitionData.competitors = competitors;
+    console.log('Mock competitors:', competitors);
     displayCompetitors(false);
 }
 
-/* Persist a compact snapshot of the current competition to the URL (param: cd).
-   Uses base64 of an encoded JSON to safely support unicode. */
 function storeCompetitionDataInURL() {
     try {
-        // Ensure competitionData exists
-        competitionData = competitionData || {};
+        const flags = (includeRunners ? 1 : 0) | (includeJudges ? 2 : 0);
 
-        const payload = {
-            r: !!competitionData.includeRunners || !!includeRunners,
-            j: !!competitionData.includeJudges || !!includeJudges,
-            c: (competitionData.competitors || competitors || []).map(
-                ({ id, name, wcaId, events }) => ({
-                    id,
-                    name,
-                    wcaId,
-                    events,
-                })
-            ),
-            g: Object.fromEntries(
-                Object.entries(competitionData.groups || {}).map(([eventId, groups]) => [
-                    eventId,
-                    (groups || []).map((grp) => ({
-                        c: (grp.competitors || []).map((p) => p.id),
-                        j: (grp.judges || []).map((p) => p.id),
-                        r: (grp.runners || []).map((p) => p.id),
-                        s: (grp.scramblers || []).map((p) => p.id),
-                    })),
-                ])
-            ),
-        };
+        const index = Object.fromEntries(competitors.map((c, i) => [c.id, i]));
 
-        const json = JSON.stringify(payload);
-        const compressed = btoa(unescape(encodeURIComponent(json)));
+        const comp = competitors.map((c) => [c.id, c.name, c.events || []]);
 
-        const url = new URL(window.location.href);
-        url.searchParams.set('cd', compressed);
-        if (window.history && window.history.replaceState) {
-            window.history.replaceState({}, '', url.toString());
-        } else {
-            window.location.hash = `cd=${compressed}`;
-        }
+        const groups = {};
+        Object.entries(competitionData.groups || {}).forEach(([eid, gs]) => {
+            groups[eid] = gs.map((g) => [
+                (g.competitors || []).map((p) => index[p.id]),
+                (g.judges || []).map((p) => index[p.id]),
+                (g.runners || []).map((p) => index[p.id]),
+                (g.scramblers || []).map((p) => index[p.id]),
+            ]);
+        });
+
+        const json = JSON.stringify([flags, comp, groups]);
+        const encoded = btoa(json).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+        const url = new URL(location.href);
+        url.searchParams.set('cd', encoded);
+        history.replaceState({}, '', url);
     } catch (err) {
         console.warn('storeCompetitionDataInURL failed:', err);
     }
 }
 
-/* Load competition data from URL param 'cd' (if present). Restore UI and render groups / competitors.
-   Call this on load (after events are fetched if you rely on event names). */
 function loadCompetitionDataFromURL() {
     try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const compressed =
-            urlParams.get('cd') ||
-            (window.location.hash && window.location.hash.replace(/^#/, '').replace(/^cd=/, ''));
-        if (!compressed) return false;
+        const cd =
+            new URLSearchParams(location.search).get('cd') || location.hash.replace(/^#cd=/, '');
+        if (!cd) return false;
 
-        // decode safely
-        const json = decodeURIComponent(escape(atob(compressed)));
-        const data = JSON.parse(json);
+        const json = atob(cd.replace(/-/g, '+').replace(/_/g, '/'));
+        const [flags, comp, groups] = JSON.parse(json);
 
-        // create arrays / objects if missing
-        competitionData = competitionData || {};
-        competitors = []; // we'll restore from payload
-        competitionData.groups = {};
+        includeRunners = !!(flags & 1);
+        includeJudges = !!(flags & 2);
 
-        includeRunners = !!data.r;
-        includeJudges = !!data.j;
-
-        // restore minimal competitor objects
-        const restored = (data.c || []).map(({ id, name, wcaId, events }) => ({
+        competitors = comp.map(([id, name, events]) => ({
             id,
             name,
-            wcaId,
             events: events || [],
             groupAssignments: {},
         }));
 
-        competitors = restored;
-        competitionData.competitors = restored;
+        competitionData = competitionData || {};
+        competitionData.competitors = competitors;
+        competitionData.groups = {};
 
-        // map groups back to competitor objects
-        if (data.g) {
-            Object.entries(data.g).forEach(([eventId, groups]) => {
-                competitionData.groups[eventId] = (groups || []).map((grp) => {
-                    return {
-                        competitors: (grp.c || [])
-                            .map((cid) => restored.find((c) => c.id === cid))
-                            .filter(Boolean),
-                        judges: (grp.j || [])
-                            .map((cid) => restored.find((c) => c.id === cid))
-                            .filter(Boolean),
-                        runners: (grp.r || [])
-                            .map((cid) => restored.find((c) => c.id === cid))
-                            .filter(Boolean),
-                        scramblers: (grp.s || [])
-                            .map((cid) => restored.find((c) => c.id === cid))
-                            .filter(Boolean),
-                    };
-                });
-            });
+        Object.entries(groups || {}).forEach(([eid, gs]) => {
+            competitionData.groups[eid] = gs.map(([c, j, r, s]) => ({
+                competitors: c.map((i) => competitors[i]).filter(Boolean),
+                judges: j.map((i) => competitors[i]).filter(Boolean),
+                runners: r.map((i) => competitors[i]).filter(Boolean),
+                scramblers: s.map((i) => competitors[i]).filter(Boolean),
+            }));
+        });
 
-            selectedEvents = Object.keys(competitionData.groups);
-        } else {
-            selectedEvents = [];
-        }
+        selectedEvents = Object.keys(competitionData.groups);
 
-        // Sync UI toggles
+        // Rendering
+
         const runnersEl = document.getElementById('do-runners');
         const judgesEl = document.getElementById('do-judges');
         if (runnersEl) runnersEl.checked = includeRunners;
         if (judgesEl) judgesEl.checked = includeJudges;
 
-        // Render: ensure event tiles exist before generateGroupHTML (create tiles if needed)
         const eventCheckboxes = document.getElementById('event-checkboxes');
-        if (eventCheckboxes && events && events.length) {
-            // make sure we have tiles for restored selectedEvents
+        if (eventCheckboxes && events?.length) {
             selectedEvents.forEach((eid) => {
                 if (!document.getElementById(eid)) {
                     const eventObj = events.find((e) => e.id === eid) || {
@@ -1551,21 +1546,22 @@ function loadCompetitionDataFromURL() {
                     };
                     handleAddingEventDivs(eventObj, eventCheckboxes);
                     const tile = document.getElementById(eid);
-                    if (tile) tile.classList.add('checked'), tile.classList.remove('unchecked');
+                    if (tile) {
+                        tile.classList.add('checked');
+                        tile.classList.remove('unchecked');
+                    }
                 }
             });
         }
 
-        // final rendering
-        displayCompetitors(false); // don't try to fetch names again here
+        displayCompetitors(true);
         generateGroupHTML();
 
-        // show results view if groups exist
         if (Object.keys(competitionData.groups || {}).length) {
-            document.getElementById('competition-setup')?.classList?.add('hidden');
-            document.getElementById('event-selection')?.classList?.add('hidden');
-            document.getElementById('competitor-setup')?.classList?.add('hidden');
-            document.getElementById('grouping-results')?.classList?.remove('hidden');
+            document.getElementById('competition-setup')?.classList.add('hidden');
+            document.getElementById('event-selection')?.classList.add('hidden');
+            document.getElementById('competitor-setup')?.classList.add('hidden');
+            document.getElementById('grouping-results')?.classList.remove('hidden');
         }
 
         return true;
