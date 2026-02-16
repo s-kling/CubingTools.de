@@ -86,7 +86,7 @@ for SERVER in "${SERVERS[@]}"; do
     fi
 done
 
-echo -e "${CYAN}Type 'q' to quit all servers or rs to restart all servers.${NC}"
+echo -e "${CYAN}Type 'q' to quit all servers.${NC}"
 while true; do
     read -r CMD
     if [[ "$CMD" == "q" ]]; then
