@@ -1,8 +1,10 @@
-let times = [];
-let averageTags = [];
-let eventType = document.getElementById('event-type').value;
-let userSolves = [];
-let userAverages = [];
+const state = {
+    times: [],
+    averageTags: [],
+    eventType: document.getElementById('event-type').value,
+    userSolves: [],
+    userAverages: [],
+};
 
 const meanEvents = ['666', '777', '444bf', '555bf', '333bf'];
 
@@ -16,57 +18,6 @@ document.getElementById('timeInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') addTime();
 });
 
-// === Handle event type change (combined logic) ===
-document.getElementById('event-type').addEventListener('change', async (e) => {
-    const newEvent = e.target.value;
-
-    // Warn if user has unsaved solves or averages in current event
-    if (times.length > 0 || userSolves.length > 0 || userAverages.length > 0) {
-        const confirmSwitch = confirm(
-            "⚠️ You're in the middle of a session. Switching events will:\n" +
-                '• Clear all current solves and averages.\n' +
-                '• Reset your WCA-based ranks.\n' +
-                '• Load stored averages for the new event.\n\n' +
-                'Do you want to continue?'
-        );
-        if (!confirmSwitch) {
-            e.target.value = eventType;
-            return;
-        }
-
-        // Clear current data before switching
-        times = [];
-        userSolves = [];
-        userAverages = [];
-        calculateStats();
-        displayCurrentTimes();
-    }
-
-    eventType = newEvent;
-
-    // Load event-specific averages and rebuild stats
-    loadAveragesFromCookies();
-    calculateStats();
-
-    // Fetch WCA data if WCA ID is present and valid
-    const wcaId = document.getElementById('wca').value.trim().toUpperCase();
-    if (wcaId && /\d{4}[a-zA-Z]{4}\d{2}/.test(wcaId)) {
-        await fetchUserData(wcaId);
-        calculateStats();
-    }
-
-    // Show/hide BPA/WPA for mean events
-    const bpaDiv = document.getElementById('bpa-div');
-    const wpaDiv = document.getElementById('wpa-div');
-    if (!meanEvents.includes(eventType)) {
-        bpaDiv.style.display = 'block';
-        wpaDiv.style.display = 'block';
-    } else {
-        bpaDiv.style.display = 'none';
-        wpaDiv.style.display = 'none';
-    }
-});
-
 // === Recalculate when target time changes ===
 document.getElementById('target').addEventListener('input', (e) => {
     calculateStats();
@@ -77,9 +28,7 @@ document.getElementById('target').addEventListener('input', (e) => {
 function formatInputField(input) {
     var currentValue = input.value;
 
-    if (input.value.includes('DNF')) {
-        input.value = '0.00';
-    } else if (/[a-zA-Z]/.test(currentValue)) {
+    if (/[a-zA-Z]/.test(currentValue)) {
         input.value = 'DNF';
         return;
     }
@@ -121,8 +70,8 @@ function addTime() {
 
     let penalty = null;
 
-    if (times.length >= 5) {
-        times = [];
+    if (state.times.length >= 5) {
+        state.times = [];
     }
 
     if (time == 'DNF') {
@@ -151,10 +100,16 @@ function addTime() {
     const event = document.getElementById('event-type').value;
 
     // Generate a custom ID to link each time to an average
-    const averageId = `${event}${averageTags.length > 0 ? averageTags.length : 1}`;
+    const averageId = `${event}${state.averageTags.length > 0 ? state.averageTags.length : 1}`;
 
-    times.push({ raw: time, penalty: penalty, value: time, event: event, averageId: averageId });
-    userSolves.push(time); // add to user solves for ranking
+    state.times.push({
+        raw: time,
+        penalty: penalty,
+        value: time,
+        event: event,
+        averageId: averageId,
+    });
+    state.userSolves.push(time); // add to user solves for ranking
     input.value = '';
 
     calculateStats();
@@ -163,27 +118,25 @@ function addTime() {
 
 // === Calculate stats for current session ===
 function calculateStats() {
-    const n = times.length;
+    const n = state.times.length;
 
     if (n === 0) return;
 
-    let html = '';
-    const mean = (times.reduce((a, b) => a + b.value, 0) / n).toFixed(2);
+    const mean = (state.times.reduce((a, b) => a + b.value, 0) / n).toFixed(2);
     let ao5 = null;
     let mo3 = null;
 
-    if (n >= 5 && !meanEvents.includes(eventType)) {
-        const last5 = times
+    if (n >= 5 && !meanEvents.includes(state.eventType)) {
+        const last5 = state.times
             .slice(-5)
             .map((t) => t.value)
             .sort((a, b) => a - b);
         const trimmed = last5.slice(1, 4);
         ao5 = (trimmed.reduce((a, b) => a + b, 0) / 3).toFixed(2);
-        html += `<div><strong>Average of 5:</strong> ${ao5}</div>`;
     }
 
-    if (n >= 3 && meanEvents.includes(eventType)) {
-        const last3 = times
+    if (n >= 3 && meanEvents.includes(state.eventType)) {
+        const last3 = state.times
             .slice(-3)
             .map((t) => t.value)
             .sort((a, b) => a - b);
@@ -191,7 +144,7 @@ function calculateStats() {
     }
 
     const target = parseFloat(document.getElementById('target').value) || Infinity;
-    let { bpa, wpa, tft } = calculateBpaWpaTft(times, target);
+    let { bpa, wpa, tft } = calculateBpaWpaTft(state.times, target);
 
     // First test if tft exists, set to -
     tft = tft ? tft : '-';
@@ -213,20 +166,36 @@ function calculateStats() {
     const event = document.getElementById('event-type').value;
 
     // When a mean of 3 or an average of 5 is completed, store it
-    if (mo3) {
-        const avgId = times[times.length - 1].averageId;
+    if (mo3 && n === 3) {
+        const avgId = state.times[state.times.length - 1].averageId;
 
-        averageTags.push({ average: mo3, times: times.slice(-3), event: event, averageId: avgId });
+        state.averageTags.push({
+            average: mo3,
+            times: state.times.slice(-3),
+            event: event,
+            averageId: avgId,
+        });
+        saveAveragesToCookies();
+        deleteCookie(`incomplete_${event}`);
+        state.times = [];
         mo3 = mo3 === 'DNF' ? 'DNF' : parseFloat(mo3);
-        userAverages.push(mo3); // add to user averages for ranking
+        state.userAverages.push(mo3); // add to user averages for ranking
         displayTags();
     }
-    if (ao5) {
-        const avgId = times[times.length - 1].averageId;
+    if (ao5 && n === 5) {
+        const avgId = state.times[state.times.length - 1].averageId;
 
-        averageTags.push({ average: ao5, times: times.slice(-5), event: event, averageId: avgId });
+        state.averageTags.push({
+            average: ao5,
+            times: state.times.slice(-5),
+            event: event,
+            averageId: avgId,
+        });
+        saveAveragesToCookies();
+        deleteCookie(`incomplete_${event}`);
+        state.times = [];
         ao5 = ao5 === 'DNF' ? 'DNF' : parseFloat(ao5);
-        userAverages.push(ao5); // add to user averages for ranking
+        state.userAverages.push(ao5); // add to user averages for ranking
         displayTags();
     }
 }
@@ -234,33 +203,30 @@ function calculateStats() {
 // === BPA / WPA / TFT calculation ===
 function calculateBpaWpaTft(times, target) {
     // For mean events (6x6, 7x7, BLD)
-    if (times.length === 2 && meanEvents.includes(eventType)) {
-        // Get last 2 times as numbers (handle DNF)
-        const times = times.map((t) => {
+    if (times.length === 2 && meanEvents.includes(state.eventType)) {
+        const mappedTimes = times.map((t) => {
             if (t.penalty === 'dnf' || t.value === Infinity) return 'DNF';
             return t.value;
         });
 
-        // Count DNFs
-        const dnfCount = times.filter((t) => t === 'DNF').length;
+        const dnfCount = mappedTimes.filter((t) => t === 'DNF').length;
 
         if (dnfCount > 0) {
             return { bpa: 'DNF', wpa: 'DNF', tft: 'Not Possible' };
         }
 
-        const sum = times.reduce((a, b) => a + b, 0);
-        const avg = sum / 2;
+        const sum = mappedTimes.reduce((a, b) => a + b, 0);
 
-        // time for target
         let tft = null;
         if (target !== Infinity) {
             const needed = target * 2 - sum;
             tft = needed;
         }
 
-        // Handle impossible/guaranteed target
         if (target <= 0 || dnfCount > 0) tft = 'Not Possible';
 
+        let bpa = '-';
+        let wpa = '-';
         return { bpa, wpa, tft };
     } else if (times.length === 4) {
         // Get last 4 times as numbers (handle DNF)
@@ -311,75 +277,12 @@ function calculateBpaWpaTft(times, target) {
     return { bpa: '-', wpa: '-', tft: '-' };
 }
 
-// === Sidebar averages display ===
-function displayTags() {
-    const container = document.getElementById('tagContainer');
-    container.innerHTML = '';
-
-    averageTags
-        .slice()
-        .reverse()
-        .forEach((tag) => {
-            const li = document.createElement('li');
-            tag.average = !isFinite(tag.average) ? 'DNF' : parseFloat(tag.average).toFixed(2);
-            li.textContent = `Avg: ${tag.average}`;
-
-            // Add ranking if WCA data available
-            const rank = getAverageRank(tag.average);
-            if (rank) {
-                const rankSpan = document.createElement('span');
-                rankSpan.textContent = ` PR${rank}`;
-                rankSpan.style.float = 'right';
-                li.appendChild(rankSpan);
-            }
-
-            const timesDiv = document.createElement('div');
-            timesDiv.classList.add('times');
-
-            const values = tag.times.map((t) => t.value);
-            const min = Math.min(...values);
-            const max = Math.max(...values);
-
-            let markedBest = false;
-            let markedWorst = false;
-
-            tag.times.forEach((t) => {
-                let span = document.createElement('span');
-                const val = t.value === Infinity ? 'DNF' : t.value;
-                span.textContent = val === 'DNF' ? 'DNF' : val.toFixed(2);
-
-                // Mark best/worst
-                if (val === min && !markedBest) {
-                    span.classList.add('best');
-                    span.textContent = `[${span.textContent}]`;
-                    markedBest = true;
-                } else if ((val === max || val === 'DNF') && !markedWorst) {
-                    span.classList.add('worst');
-                    span.textContent = `[${span.textContent}]`;
-                    markedWorst = true;
-                }
-
-                // Add rank
-                const solveRank = getSingleRank(val);
-                if (solveRank) {
-                    span.textContent += ` (#${solveRank})`;
-                }
-
-                timesDiv.appendChild(span);
-                timesDiv.appendChild(document.createTextNode(' '));
-            });
-
-            li.appendChild(timesDiv);
-            container.appendChild(li);
-        });
-}
-
 // === Display current times in right container ===
 function displayCurrentTimes() {
     const container = document.getElementById('currentTimes');
     container.innerHTML = '';
 
-    times.forEach((solve, i) => {
+    state.times.forEach((solve, i) => {
         const wrapper = document.createElement('div');
         wrapper.classList.add('solve');
 
@@ -442,7 +345,7 @@ function createButton({ text, color, onClick }) {
 
 // === Apply penalty to a solve ===
 function applyPenalty(index, type) {
-    const solve = times[index];
+    const solve = state.times[index];
 
     if (type === 'plus2') {
         solve.penalty = 'plus2';
@@ -455,9 +358,10 @@ function applyPenalty(index, type) {
     // Use average ID to remove the average from the list, then re-add it with the penalty applied
     const avgId = solve.averageId;
     // Remove from list
-    averageTags = averageTags.filter((tag) => tag.averageId !== avgId);
+    state.averageTags = state.averageTags.filter((tag) => tag.averageId !== avgId);
+    setCookie(`averages_${state.eventType}`, state.averageTags, 365);
     // Remove from averages
-    userAverages.shift();
+    state.userAverages.shift();
 
     calculateStats();
     displayCurrentTimes();
@@ -465,7 +369,7 @@ function applyPenalty(index, type) {
 
 // === Remove penalty from a solve ===
 function removePenalty(index) {
-    const solve = times[index];
+    const solve = state.times[index];
     if (!solve || !solve.penalty) return; // no penalty to remove
 
     solve.penalty = null;
@@ -474,9 +378,10 @@ function removePenalty(index) {
     // Use average ID to remove the average from the list, then re-add it with the penalty applied
     const avgId = solve.averageId;
     // Remove from list
-    averageTags = averageTags.filter((tag) => tag.averageId !== avgId);
+    state.averageTags = state.averageTags.filter((tag) => tag.averageId !== avgId);
+    setCookie(`averages_${state.eventType}`, state.averageTags, 365);
     // Remove from averages
-    userAverages.shift();
+    state.userAverages.shift();
 
     calculateStats();
     displayCurrentTimes();
@@ -512,20 +417,20 @@ document.getElementById('wca').addEventListener('input', async () => {
 // === Fetch solves & averages for ranking ===
 async function fetchUserData(wcaId) {
     try {
-        const solvesRes = await fetch(`/api/wca/${wcaId}/${eventType}?getsolves=true`);
-        const averagesRes = await fetch(`/api/wca/${wcaId}/${eventType}?getaverages=true`);
+        const solvesRes = await fetch(`/api/wca/${wcaId}/${state.eventType}?getsolves=true`);
+        const averagesRes = await fetch(`/api/wca/${wcaId}/${state.eventType}?getaverages=true`);
 
         if (solvesRes.ok) {
             const solvesData = await solvesRes.json();
-            userSolves = solvesData.allResults || [];
+            state.userSolves = solvesData.allResults || [];
         }
         if (averagesRes.ok) {
             const averagesData = await averagesRes.json();
-            userAverages = averagesData.allAverages || [];
+            state.userAverages = averagesData.allAverages || [];
         }
 
-        userSolves = userSolves.map((t) => (t <= 0 ? Infinity : t / 100));
-        userAverages = userAverages.map((t) => (t <= 0 ? Infinity : t / 100));
+        state.userSolves = state.userSolves.map((t) => (t <= 0 ? Infinity : t / 100));
+        state.userAverages = state.userAverages.map((t) => (t <= 0 ? Infinity : t / 100));
     } catch (err) {
         throw new Error('Error fetching user solves/averages:', err);
     }
@@ -533,25 +438,22 @@ async function fetchUserData(wcaId) {
 
 // === Rank helpers ===
 function getSingleRank(time) {
-    const sorted = [...userSolves, time].sort((a, b) => a - b);
-
+    const sorted = [...state.userSolves, time].sort((a, b) => a - b);
     return sorted.indexOf(time) + 1;
 }
 
 function getAverageRank(time) {
-    if (time === 'DNF') return userAverages.length;
+    if (time === 'DNF') return state.userAverages.length;
     time = parseFloat(time);
-
-    const sorted = [...userAverages, time].sort((a, b) => a - b);
-
+    const sorted = [...state.userAverages, time].sort((a, b) => a - b);
     return sorted.indexOf(time) + 1;
 }
 
 // === Handle PR target checkbox ===
 // Helper to get user's PR average (best non-DNF average)
 function getUserPRAverage() {
-    if (!userAverages.length) return null;
-    const validAverages = userAverages.filter((a) => a !== Infinity && isFinite(a));
+    if (!state.userAverages.length) return null;
+    const validAverages = state.userAverages.filter((a) => a !== Infinity && isFinite(a));
     if (!validAverages.length) return null;
     return Math.min(...validAverages).toFixed(2);
 }
@@ -565,10 +467,12 @@ usePrCheckbox.addEventListener('change', () => {
         if (pr) {
             targetInput.value = pr;
             targetInput.disabled = true;
+            calculateBpaWpaTft(state.times, parseFloat(pr));
         }
     } else {
         targetInput.disabled = false;
         targetInput.value = '';
+        calculateBpaWpaTft(state.times, Infinity);
     }
 });
 
@@ -576,7 +480,7 @@ usePrCheckbox.addEventListener('change', () => {
 function setCookie(name, value, days = 365) {
     const expires = new Date(Date.now() + days * 86400000).toUTCString();
     document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(
-        JSON.stringify(value)
+        JSON.stringify(value),
     )}; expires=${expires}; path=/`;
 }
 
@@ -585,15 +489,17 @@ function getCookie(name) {
     const cookie = cookies.find((row) => row.startsWith(encodeURIComponent(name) + '='));
     if (!cookie) return null;
     try {
-        return JSON.parse(decodeURIComponent(cookie.split('=')[1]));
-    } catch {
+        const value = decodeURIComponent(cookie.split('=')[1]);
+        return JSON.parse(value);
+    } catch (e) {
+        console.error(`Error parsing cookie ${name}:`, e);
         return null;
     }
 }
 
 function deleteCookie(name) {
     document.cookie = `${encodeURIComponent(
-        name
+        name,
     )}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
 }
 
@@ -602,14 +508,14 @@ function saveAveragesToCookies() {
     const grouped = {};
 
     // Group averages by event type
-    averageTags.forEach((avg) => {
+    state.averageTags.forEach((avg) => {
         if (!grouped[avg.event]) grouped[avg.event] = [];
         grouped[avg.event].push(avg);
     });
 
     // Save each event separately
     Object.keys(grouped).forEach((event) => {
-        setCookie(`averages_${event}`, grouped[event]);
+        setCookie(`averages_${event}`, grouped[event], 365);
     });
 }
 
@@ -617,38 +523,36 @@ function loadAveragesFromCookies() {
     const event = document.getElementById('event-type').value;
     const saved = getCookie(`averages_${event}`);
     if (saved && Array.isArray(saved)) {
-        averageTags = saved;
-        displayTags();
-
-        // Rebuild userSolves and userAverages from saved data
-        userSolves = [];
-        userAverages = [];
-        saved.forEach((avg) => {
+        // Ensure all loaded averages have the event property set
+        state.averageTags = saved.map((avg) => ({
+            ...avg,
+            event: avg.event || event,
+        }));
+        state.userSolves = [];
+        state.userAverages = [];
+        state.averageTags.forEach((avg) => {
             const values = avg.times.map((t) =>
-                t.value === Infinity || t.value <= 0 ? Infinity : t.value
+                t.value === Infinity || t.value <= 0 ? Infinity : t.value,
             );
-            userSolves.push(...values);
+            state.userSolves.push(...values);
             if (avg.average !== 'DNF' && isFinite(avg.average)) {
-                userAverages.push(parseFloat(avg.average));
+                state.userAverages.push(parseFloat(avg.average));
             }
         });
     } else {
-        // No stored averages for this event
-        averageTags = [];
-        userSolves = [];
-        userAverages = [];
-        displayTags();
+        state.averageTags = [];
+        state.userSolves = [];
+        state.userAverages = [];
     }
+    displayTags();
 }
 
-// === Modify displayTags() to only show averages for current event ===
-const originalDisplayTags = displayTags;
-displayTags = function () {
+function displayTags() {
     const container = document.getElementById('tagContainer');
     container.innerHTML = '';
 
     const currentEvent = document.getElementById('event-type').value;
-    const eventAverages = averageTags.filter((tag) => tag.event === currentEvent);
+    const eventAverages = state.averageTags.filter((tag) => tag.event === currentEvent);
 
     eventAverages
         .slice()
@@ -700,10 +604,7 @@ displayTags = function () {
             li.appendChild(timesDiv);
             container.appendChild(li);
         });
-
-    // Save to cookies after updating
-    saveAveragesToCookies();
-};
+}
 
 // === Confirm before switching event mid-solve ===
 const eventSelector = document.getElementById('event-type');
@@ -712,30 +613,32 @@ let lastEventType = eventSelector.value;
 eventSelector.addEventListener('change', async (e) => {
     const newEvent = e.target.value;
 
-    // Warn if user has unsaved solves or averages in current event
-    if (times.length > 0 || userSolves.length > 0 || userAverages.length > 0) {
-        const confirmSwitch = confirm(
-            "⚠️ You're in the middle of a session. Switching events will:\n" +
-                '• Clear all current solves and averages.\n' +
-                '• Reset your WCA-based ranks.\n' +
-                '• Load stored averages for the new event.\n\n' +
-                'Do you want to continue?'
-        );
-        if (!confirmSwitch) {
-            e.target.value = lastEventType;
-            return;
-        }
+    // Save incomplete solves for current event before switching
+    const minSolvesForEvent = meanEvents.includes(state.eventType) ? 3 : 5;
+    if (state.times.length > 0 && state.times.length < minSolvesForEvent) {
+        setCookie(`incomplete_${state.eventType}`, state.times);
+    } else if (state.times.length === 0) {
+        deleteCookie(`incomplete_${state.eventType}`);
+    }
 
-        // Clear current data before switching
-        times = [];
-        userSolves = [];
-        userAverages = [];
-        calculateStats();
+    // Load incomplete solves for the new event if they exist
+    const incompleteSolves = getCookie(`incomplete_${newEvent}`);
+    if (incompleteSolves && Array.isArray(incompleteSolves)) {
+        state.times = incompleteSolves;
+        displayCurrentTimes();
+    } else {
+        state.times = [];
         displayCurrentTimes();
     }
 
+    // Reset session-specific rankings
+    state.userSolves = [];
+    state.userAverages = [];
+    state.averageTags = [];
+    calculateStats();
+
     lastEventType = newEvent;
-    eventType = newEvent;
+    state.eventType = newEvent;
 
     // Load event-specific averages and rebuild stats
     loadAveragesFromCookies();
@@ -744,5 +647,7 @@ eventSelector.addEventListener('change', async (e) => {
 
 // === Auto-load averages on page load ===
 window.addEventListener('DOMContentLoaded', () => {
+    state.eventType = document.getElementById('event-type').value;
     loadAveragesFromCookies();
+    calculateStats();
 });

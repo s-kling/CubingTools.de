@@ -28,6 +28,12 @@ ul li::before {
     border-radius: 4px;
 }
 
+.controls input:disabled {
+    background: var(--input-disabled-bg);
+    color: var(--input-disabled-text);
+    cursor: not-allowed;
+}
+
 .controls > label {
     justify-content: center;
 }

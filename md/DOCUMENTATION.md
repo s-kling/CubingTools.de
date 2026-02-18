@@ -1,7 +1,7 @@
 # API Routes for cubingtools.de Backend
 
 This module defines the API routes for the `cubingtools.de` backend.  
-It includes endpoints for fetching **WCA data**, **CubingContests data**, and **metadata for HTML tools**.
+It includes endpoints for fetching **WCA data**, **tool metadata**, and **server status**.
 
 ## Dependencies
 
@@ -15,148 +15,93 @@ It includes endpoints for fetching **WCA data**, **CubingContests data**, and **
 
 ## API Endpoints
 
-### 1. `GET /api/wca/:wcaId/:event`
+### WCA API
 
-Fetches WCA data based on competitor ID and event.
+#### `GET /api/wca/:wcaId/:event`
+
+Fetches WCA competitor data for a specific event.
 
 - **URL Parameters**:
-  - `wcaId`: The WCA ID of the competitor (e.g., `2023ABCD01`)
-  - `event`: The event to fetch data for (e.g., `333`, `name`)
+  - `wcaId`: WCA ID of the competitor (e.g., `2023ABCD01`)
+  - `event`: Event ID (e.g., `333`) or `name` for competitor name
 - **Query Parameters**:
-  - `num`: Number of solves to return (default is 12)
+  - `num`: Number of solves to return (default: 12)
   - `getsolves`: If `true`, returns all solves
-  - `getaverages`: If `true`, returns all averages
-- **Response**:
-  - JSON object containing the requested data (e.g., name, solves, averages, or average solve time)
+  - `getaverages`: If `true`, returns all competition averages
+- **Response**: JSON object with average, personal records, or solves/averages based on query parameters
 
-### 2. `GET /api/version`
+### Version API
 
-Returns the version of the application.
+#### `GET /api/version`
 
-- **Response**:
-  - JSON object containing the version (e.g., `{ version: "1.0.0" }`)
+Returns the application version.
 
-### 3. `GET /api/cc/:eventId/:competitors`
+- **Response**: `{ version: "x.x.x" }`
 
-Fetches CubingContests data for specific competitors in an event.
+### Status API
 
-- **URL Parameters**:
-  - `eventId`: The ID of the event (e.g., `333`)
-  - `competitors`: Comma-separated list of competitor names or WCA IDs
-- **Response**:
-  - JSON array containing the world ranking and time for each competitor
+#### `POST /api/status`
 
-### 4. `GET /api/tools`
+Returns server status including uptime, memory usage, and log analytics.
 
-Returns a list of HTML files with metadata from the tools directory.
+- **Request Body**:
+  - `password`: SHA-256 hashed password for authentication
+- **Response**: JSON object with uptime, memory usage, log file size, and traffic statistics
 
-- **Response**:
-  - JSON array containing the filename, title, and description of each HTML file
+### Tools API
 
-### 5. `GET /`
+#### `GET /api/tools`
 
+Returns metadata for all available HTML tools.
+
+- **Response**: JSON array of tools with `filename`, `title`, and `description`
+
+### Page Routes
+
+#### `GET /`
 Serves the main page.
 
-- **Response**:
-  - HTML file for the main page
+#### `GET /status`
+Serves the status report page.
 
-### 6. `GET /status`
-
-Returns the status report of the server.
-
-- **Response**:
-  - JSON object containing the uptime, memory usage, and log file size
-
-### 7. `GET /privacy-policy`
-
+#### `GET /privacy-policy`
 Serves the privacy policy page.
 
-- **Response**:
-  - HTML file for the privacy policy page
-
-### 8. `GET /robots.txt`
-
-Serves the `robots.txt` file.
-
-- **Response**:
-  - `robots.txt` file
-
-### 9. `GET /404`
-
+#### `GET /404`
 Serves the 404 error page.
 
-- **Response**:
-  - HTML file for the 404 error page
+### Static Asset Routes
 
-### 10. `GET /apple-touch-icon.png`
+#### `GET /robots.txt`
+Serves the robots.txt file.
 
-Serves the `apple-touch-icon.png` file.
+#### `GET /sitemap.xml`
+Serves the sitemap.xml file.
 
-- **Response**:
-  - `apple-touch-icon.png` file
+#### `GET /apple-touch-icon.png`
+Serves the Apple touch icon.
 
-### 11. `GET /sitemap.xml`
+#### `GET /googlea20166777fc211f6.html`
+Serves Google verification file.
 
-Serves the `sitemap.xml` file.
+### Tool Routes
 
-- **Response**:
-  - `sitemap.xml` file
+#### `GET /tools/:toolName`
+Serves an HTML tool page.
 
-### 12. `GET /googlea20166777fc211f6.html`
+#### `GET /css/:cssName`
+Serves a tool's CSS file.
 
-Serves the `google.html` file for Google verification.
+#### `GET /js/:jsName`
+Serves a tool's JavaScript file.
 
-- **Response**:
-  - `google.html` file
+#### `GET /assets/:assetName`
+Serves a tool's asset file.
 
-### 13. `GET /tools/:toolName`
-
-Serves specific tool pages.
-
-- **URL Parameters**:
-  - `toolName`: The name of the tool
-- **Response**:
-  - HTML file for the specified tool
-
-### 14. `GET /css/:cssName`
-
-Serves specific tool CSS files.
-
-- **URL Parameters**:
-  - `cssName`: The name of the CSS file
-- **Response**:
-  - CSS file for the specified tool
-
-### 15. `GET /js/:jsName`
-
-Serves specific tool JavaScript files.
-
-- **URL Parameters**:
-  - `jsName`: The name of the JavaScript file
-- **Response**:
-  - JavaScript file for the specified tool
-
-### 16. `GET *`
-
-Catch-all route for non-existing paths.
-
-- **Response**:
-  - Redirects to the 404 error page with the directory as a query parameter
+#### `GET *`
+Catch-all route that redirects to 404 with the requested path as a query parameter.
 
 ---
 
-## Usage
+Ensure the `.env` file contains required environment variables like `STATUS_PAGE_PASSWORD`.
 
-- Import the router module and use it in an Express application.
-- Ensure the `.env` file is present in the appropriate directory with necessary environment variables.
-- Place HTML, CSS, and JavaScript files in the specified directories for serving.
-
-### Example
-
-```js
-const express = require('express');
-const apiRouter = require('./path/to/this/file');
-const app = express();
-
-app.use('/', apiRouter);
-app.listen(3000, () => console.log('Server running on port 3000'));
