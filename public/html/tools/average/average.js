@@ -531,9 +531,12 @@ function loadAveragesFromCookies() {
         state.userSolves = [];
         state.userAverages = [];
         state.averageTags.forEach((avg) => {
-            const values = avg.times.map((t) =>
-                t.value === Infinity || t.value <= 0 ? Infinity : t.value,
-            );
+            const values = avg.times.map((t) => {
+                const timeValue = t.value ?? t.raw;
+                return timeValue === -1 || timeValue === Infinity || timeValue <= 0
+                    ? Infinity
+                    : timeValue;
+            });
             state.userSolves.push(...values);
             if (avg.average !== 'DNF' && isFinite(avg.average)) {
                 state.userAverages.push(parseFloat(avg.average));
@@ -572,7 +575,10 @@ function displayTags() {
             const timesDiv = document.createElement('div');
             timesDiv.classList.add('times');
 
-            const values = tag.times.map((t) => t.value);
+            const values = tag.times.map((t) => {
+                const timeValue = t.value ?? t.raw;
+                return timeValue === -1 ? Infinity : timeValue;
+            });
             const min = Math.min(...values);
             const max = Math.max(...values);
 
@@ -581,8 +587,10 @@ function displayTags() {
 
             tag.times.forEach((t) => {
                 let span = document.createElement('span');
-                const val = t.value === Infinity ? 'DNF' : t.value;
-                span.textContent = val === 'DNF' ? 'DNF' : val.toFixed(2);
+                const timeValue = t.value ?? t.raw;
+                const val = timeValue === Infinity || timeValue === -1 ? 'DNF' : timeValue;
+                span.textContent =
+                    val === 'DNF' ? 'DNF' : typeof val === 'number' ? val.toFixed(2) : 'DNF';
 
                 if (val === min && !markedBest) {
                     span.classList.add('best');
@@ -594,7 +602,7 @@ function displayTags() {
                     markedWorst = true;
                 }
 
-                const solveRank = getSingleRank(val);
+                const solveRank = val === 'DNF' ? null : getSingleRank(timeValue);
                 if (solveRank) span.textContent += ` (#${solveRank})`;
 
                 timesDiv.appendChild(span);
