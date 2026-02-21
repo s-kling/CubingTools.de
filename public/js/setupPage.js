@@ -285,7 +285,7 @@ function setupFooter() {
 
     // Copyright
     const footerText = document.createElement('a');
-    footerText.innerHTML = '© 2025 CubingTools by Sebastian Kling';
+    footerText.innerHTML = `© ${new Date().getFullYear()} CubingTools by Sebastian Kling`;
     footerText.href = 'mailto:sebastian@cubingtools.de';
     footerText.className = 'small-screen';
 

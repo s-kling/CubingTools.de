@@ -39,6 +39,7 @@
   
     <!-- CSS Stylesheets -->
     <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/404.css">
 
     <!-- JS Files -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P" defer></script>
@@ -57,8 +58,20 @@
         <div id="version"></div>
 
         <main>
-            <section class="heading">
-                <div style="text-align: center;" id="message">The page you were trying to access doesn't exist</div>
+            <section class="heading error-shell">
+                <div class="error-card">
+                    <p class="error-kicker">Lost in inspection?</p>
+                    <h1 id="error-code" class="error-code" aria-label="Error 404">404</h1>
+
+                    <div id="message" class="error-message">
+                        <p id="message-text">The requested page doesn't exist.</p>
+                        <p>If you think this is a mistake, please refer to our <a href="mailto:info@cubingtools.de">email</a>.</p>
+                    </div>
+
+                    <div class="error-actions">
+                        <a href="/" class="home-button">Back Home</a>
+                    </div>
+                </div>
             </section>
         </main>
         <footer id="footer"></footer>

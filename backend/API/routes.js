@@ -1,7 +1,6 @@
 const express = require('express');
 const path = require('path');
 const router = express.Router();
-const fs = require('fs');
 const events = require('../events');
 
 router.use((req, res, next) => {
@@ -145,15 +144,9 @@ router.get('/assets/:assetName', (req, res) => {
 
 // Catch-all route for non-existing paths
 router.get('*', (req, res) => {
-    // Extract the directory from the requested path
-    const requestedPath = req.path;
-
-    // Find the directory from the requested path (first segment of the path after '/')
-    const pathSegments = requestedPath.split('/').filter(Boolean); // Filter out empty strings
-
-    // Redirect to the 404 page with the directory as a query parameter
-    res.redirect(`/404?dir=${pathSegments.join('/')}`);
+    // Serve the 404 page with the directory as a query parameter
     res.status(404);
+    res.sendFile(path.join(__dirname, '..', '../public/html', '404.html'), (err) => {});
 });
 
 module.exports = router;

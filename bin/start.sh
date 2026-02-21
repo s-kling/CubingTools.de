@@ -24,7 +24,7 @@ echo -e "${CYAN}Select an option:${NC}"
 echo "1) Production server (port $PROD_PORT)"
 echo "2) Beta server (port $BETA_PORT)"
 echo "3) Both servers"
-read -p "$(echo -e ${CYAN}Enter your choice [1/2/3]: ${NC})" CHOICE
+read -r -p "$(echo -e "${CYAN}Enter your choice [1/2/3]: ${NC}")" CHOICE
 
 SERVERS=()
 if [[ "$CHOICE" == "1" || "$CHOICE" == "3" ]]; then
@@ -39,7 +39,6 @@ if [[ ${#SERVERS[@]} -eq 0 ]]; then
     exit 1
 fi
 
-# Kill processes on necessary ports and setup log folder
 for SERVER in "${SERVERS[@]}"; do
     PORT="${SERVER%%:*}"
     if lsof -i:$PORT > /dev/null; then
