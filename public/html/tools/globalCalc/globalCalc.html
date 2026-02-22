@@ -121,15 +121,26 @@
                             <h3>Top 5 Most Frequent Times</h3>
                             <ul id="topTimesList"></ul>
                         </div>
+
+                        <div id="advancedStats" class="panel stat-panel">
+                            <h3>Performance Stats</h3>
+                            <ul id="advancedStatsList">
+                                <li>Average Deviation: <span id="averageDeviation">—</span></li>
+                                <li>Best Single: <span id="bestSingle">—</span></li>
+                                <li>Best Average: <span id="bestAverage">—</span></li>
+                                <li>Chance to beat Best Single: <span id="probBetterSingle">—</span></li>
+                                <li>Chance to beat Best Average: <span id="probBetterAverage">—</span></li>
+                            </ul>
+                        </div>
                     </div>
 
                     <div id="chartContainer" class="panel">
                         <h3>Solve Frequency Distribution</h3>
                         <div id="sliderContainer" style="display: none;">
                             <label for="elementSlider">Number of solves to consider:
-                                <span id="sliderValue">0</span>
+                                <span id="sliderValue">5</span>
                             </label>
-                            <input type="range" id="elementSlider" min="1" max="100" value="10" oninput="updateChart()">
+                            <input type="range" id="elementSlider" min="5" max="100" value="10" oninput="updateChart()">
                         </div>
                         <canvas id="frequencyChart"></canvas>
                     </div>
