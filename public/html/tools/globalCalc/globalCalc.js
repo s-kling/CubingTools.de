@@ -3,16 +3,42 @@ let originalArray = [];
 let frequencyMap = {};
 let sessions = {};
 let sessionNames = {};
+let currentDataSourceMode = 'cstimer';
+
+function setDataSourceMode(mode) {
+    currentDataSourceMode = mode === 'wca' ? 'wca' : 'cstimer';
+
+    const fileUpload = document.getElementById('fileUpload');
+    const wcaIdFetch = document.getElementById('wcaIdFetch');
+    const sourceCsTimer = document.getElementById('sourceCsTimer');
+    const sourceWca = document.getElementById('sourceWca');
+
+    if (!fileUpload || !wcaIdFetch || !sourceCsTimer || !sourceWca) {
+        return;
+    }
+
+    const showCsTimer = currentDataSourceMode === 'cstimer';
+    fileUpload.style.display = showCsTimer ? 'flex' : 'none';
+    wcaIdFetch.style.display = showCsTimer ? 'none' : 'flex';
+
+    sourceCsTimer.classList.toggle('active', showCsTimer);
+    sourceWca.classList.toggle('active', !showCsTimer);
+}
 
 function loadCSTimerFile(event) {
     const file = event.target.files[0];
+
+    if (!file) {
+        return;
+    }
+
     const reader = new FileReader();
 
     reader.onload = function (e) {
         try {
             const data = JSON.parse(e.target.result);
             sessions = data;
-            sessionNames = JSON.parse(data.properties.sessionData); // Extract session names
+            sessionNames = parseSessionNames(data?.properties?.sessionData);
             populateSessionDropdown();
         } catch (error) {
             alert('Invalid cstimer file format.');
@@ -22,12 +48,48 @@ function loadCSTimerFile(event) {
     reader.readAsText(file);
 }
 
+function parseSessionNames(sessionData) {
+    if (!sessionData) {
+        return {};
+    }
+
+    if (typeof sessionData === 'string') {
+        try {
+            return JSON.parse(sessionData);
+        } catch (error) {
+            return {};
+        }
+    }
+
+    if (typeof sessionData === 'object') {
+        return sessionData;
+    }
+
+    return {};
+}
+
+function extractSolveCentiseconds(solve) {
+    const baseTime = Number(solve?.[0]?.[0]);
+    const penaltyTime = Number(solve?.[0]?.[1] || 0);
+
+    if (!Number.isFinite(baseTime) || baseTime < 0) {
+        return null;
+    }
+
+    const totalMilliseconds = baseTime + Math.max(0, penaltyTime);
+    return Math.round(totalMilliseconds / 10);
+}
+
 function populateSessionDropdown() {
     const sessionDropdown = document.getElementById('sessionDropdown');
     sessionDropdown.innerHTML = ''; // Clear previous options
 
-    for (const sessionKey in sessions) {
-        if (sessions[sessionKey].length > 0 && sessionKey !== 'properties') {
+    const sessionKeys = Object.keys(sessions)
+        .filter((sessionKey) => sessionKey !== 'properties' && Array.isArray(sessions[sessionKey]))
+        .sort((a, b) => Number(a.replace('session', '')) - Number(b.replace('session', '')));
+
+    for (const sessionKey of sessionKeys) {
+        if (sessions[sessionKey].length > 0) {
             const option = document.createElement('option');
             option.value = sessionKey;
 
@@ -37,20 +99,29 @@ function populateSessionDropdown() {
         }
     }
 
+    if (sessionDropdown.options.length === 0) {
+        alert('No valid sessions found in this csTimer export.');
+        return;
+    }
+
     document.getElementById('sessionDropdownContainer').style.display = 'block';
     generateChartFromSession();
 }
 
 function generateChartFromSession() {
     const selectedSession = document.getElementById('sessionDropdown').value;
-    const sessionData = sessions[selectedSession];
+    const sessionData = sessions[selectedSession] || [];
 
-    // Process session data to handle penalties and DNFs
     originalArray = sessionData
-        .map((item) =>
-            Math.floor(item[0][0] < 0 ? Infinity : Math.floor(item[0][0] + item[0][1]) / 100)
-        )
+        .map((item) => extractSolveCentiseconds(item))
+        .filter((time) => Number.isFinite(time) && time > 0)
         .reverse(); // Convert milliseconds to centiseconds
+
+    if (originalArray.length === 0) {
+        setEmptyState('No valid solves found in this session.');
+        return;
+    }
+
     inputArray = [...originalArray];
 
     initializeSlider();
@@ -58,10 +129,12 @@ function generateChartFromSession() {
 }
 
 async function fetchWCAData() {
+    setDataSourceMode('wca');
+
     const wcaId = document.getElementById('wcaIdInput').value.toUpperCase().trim();
     const event = document.getElementById('event-type').value;
     if (!wcaId || !event) {
-        alert('Please a valid WCA ID.');
+        alert('Please enter a valid WCA ID and event.');
         return;
     }
 
@@ -73,7 +146,13 @@ async function fetchWCAData() {
         if (data.allResults && data.allResults.length > 0) {
             originalArray = data.allResults
                 .filter((time) => time > 0)
-                .map((time) => Math.floor(time / 10));
+                .map((time) => Math.floor(time));
+
+            if (originalArray.length === 0) {
+                setEmptyState('No valid solve data found for this WCA ID and event.');
+                return;
+            }
+
             inputArray = [...originalArray];
             initializeSlider();
             updateChart();
@@ -89,76 +168,132 @@ async function fetchWCAData() {
 
 function initializeSlider() {
     const slider = document.getElementById('elementSlider');
+
+    if (originalArray.length === 0) {
+        document.getElementById('sliderContainer').style.display = 'none';
+        return;
+    }
+
     const defaultSliderValue = Math.min(originalArray.length, 2000); // Default to 2000 or the total solves
     slider.max = originalArray.length;
+    slider.min = 1;
     slider.value = defaultSliderValue;
     document.getElementById('sliderValue').textContent = defaultSliderValue;
     document.getElementById('sliderContainer').style.display = 'block';
 }
 
-// Helper function to format times for chart labels (one decimal place)
-function formatTimeForChart(milliseconds) {
-    return (milliseconds / 1000).toFixed(1);
+function formatTimeForChart(seconds) {
+    return Number(seconds).toFixed(1);
 }
 
-// Helper function to format times for the top 5 list (minutes:seconds.milliseconds)
-function formatTimeForTop5(milliseconds) {
-    const minutes = Math.floor(milliseconds / 60000);
-    const seconds = ((milliseconds % 60000) / 1000).toFixed(1);
-    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+function formatSecondsToClock(seconds) {
+    if (!Number.isFinite(seconds)) {
+        return '—';
+    }
+
+    if (seconds < 60) {
+        return seconds.toFixed(2);
+    }
+
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = (seconds % 60).toFixed(2);
+    return `${minutes}:${remainingSeconds.padStart(5, '0')}`;
+}
+
+function setEmptyState(message) {
+    document.getElementById('predictedGlobal').textContent = '—';
+
+    const topTimesList = document.getElementById('topTimesList');
+    topTimesList.innerHTML = '';
+    const listItem = document.createElement('li');
+    listItem.textContent = message;
+    topTimesList.appendChild(listItem);
+
+    if (window.myChart) {
+        window.myChart.destroy();
+    }
+}
+
+function computePredictedGlobal(topTimes) {
+    const sortedTimes = topTimes.map(([time]) => Number(time)).sort((a, b) => a - b);
+
+    if (sortedTimes.length >= 5) {
+        const middleThree = sortedTimes.slice(1, 4);
+        return middleThree.reduce((sum, value) => sum + value, 0) / middleThree.length;
+    }
+
+    if (sortedTimes.length >= 3) {
+        return sortedTimes.reduce((sum, value) => sum + value, 0) / sortedTimes.length;
+    }
+
+    return null;
 }
 
 // Function to update the chart with the current input data
 function updateChart() {
-    const sliderValue = document.getElementById('elementSlider').value;
+    if (originalArray.length === 0) {
+        setEmptyState('Load data to see your solve distribution.');
+        return;
+    }
+
+    const sliderValue = Number(document.getElementById('elementSlider').value);
     document.getElementById('sliderValue').textContent = sliderValue;
 
-    // Slice the input array based on the slider value
     inputArray = originalArray.slice(0, sliderValue);
 
-    // Sort times as numbers and round them to 1 decimal place
-    inputArray.sort((a, b) => a - b); // Sort numerically (correct order)
-    inputArray = inputArray.map((num) => num / 10);
+    if (inputArray.length === 0) {
+        setEmptyState('No solves available for the selected range.');
+        return;
+    }
 
-    // Calculate frequency data with 1 decimal accuracy (numeric values)
+    inputArray.sort((a, b) => a - b);
+    const timeInSeconds = inputArray.map((centiseconds) => centiseconds / 100);
+
     frequencyMap = {};
-    inputArray.forEach((num) => {
-        frequencyMap[num.toFixed(1)] = (frequencyMap[num.toFixed(1)] || 0) + 1; // Map time to frequency
+    timeInSeconds.forEach((time) => {
+        const bucket = time.toFixed(1);
+        frequencyMap[bucket] = (frequencyMap[bucket] || 0) + 1;
     });
 
-    const labels = Object.keys(frequencyMap).map((time) => formatTimeForChart(time * 1000)); // Convert back to ms
-    const data = Object.values(frequencyMap);
+    const sortedBuckets = Object.keys(frequencyMap)
+        .map(Number)
+        .sort((a, b) => a - b);
+    const labels = sortedBuckets.map((time) => formatTimeForChart(time));
+    const data = sortedBuckets.map((time) => frequencyMap[time.toFixed(1)]);
 
-    // Calculate top 5 Times based on frequency
     const topTimes = Object.entries(frequencyMap)
-        .sort((a, b) => b[1] - a[1])
+        .sort((a, b) => b[1] - a[1] || Number(a[0]) - Number(b[0]))
         .slice(0, 5);
 
     const topTimesList = document.getElementById('topTimesList');
     topTimesList.innerHTML = '';
-    topTimes.forEach(([num, freq]) => {
+    topTimes.forEach(([time, freq]) => {
         const listItem = document.createElement('li');
-        listItem.textContent = `Time ${formatTimeForTop5(num * 1000)}: ${freq} times`;
+        listItem.textContent = `Time ${formatSecondsToClock(Number(time))}: ${freq} solves`;
         topTimesList.appendChild(listItem);
     });
 
-    const globalTime = document.getElementById('predictedGlobal');
-    globalTime.innerHTML = '';
-    let times = [];
-    for (let i = 0; i < topTimes.length; i++) {
-        times.push(parseFloat(topTimes[i][0]));
+    if (topTimes.length === 0) {
+        const listItem = document.createElement('li');
+        listItem.textContent = 'No frequency data available.';
+        topTimesList.appendChild(listItem);
     }
-    times.sort((a, b) => a - b);
-    let middleTimes = times.slice(1, -1); // Remove fastest and slowest
-    let average = middleTimes.reduce((a, b) => a + b, 0) / 3;
-    globalTime.innerText = Math.round(average * 100) / 100;
 
-    // Destroy the old chart if it exists
+    const globalTime = document.getElementById('predictedGlobal');
+    const predictedGlobal = computePredictedGlobal(topTimes);
+    globalTime.textContent =
+        predictedGlobal === null
+            ? 'Need at least 3 frequency buckets'
+            : formatSecondsToClock(predictedGlobal);
+
     if (window.myChart) {
         window.myChart.destroy();
     }
 
-    // Create the new chart
+    const rootStyles = getComputedStyle(document.documentElement);
+    const barColor = rootStyles.getPropertyValue('--button-background').trim();
+    const textColor = rootStyles.getPropertyValue('--main-text').trim();
+
     const ctx = document.getElementById('frequencyChart').getContext('2d');
     window.myChart = new Chart(ctx, {
         type: 'bar',
@@ -168,28 +303,53 @@ function updateChart() {
                 {
                     label: 'Frequency',
                     data: data,
-                    backgroundColor: 'rgba(80, 120, 162, 1)',
-                    borderColor: 'rgba(80, 120, 162, 1)',
+                    backgroundColor: barColor,
+                    borderColor: barColor,
                     borderWidth: 1,
                 },
             ],
         },
         options: {
+            responsive: true,
+            maintainAspectRatio: false,
             scales: {
                 x: {
                     title: {
                         display: true,
                         text: 'Solve Times (seconds)',
+                        color: textColor,
+                    },
+                    ticks: {
+                        color: textColor,
+                        maxRotation: 0,
+                        autoSkip: true,
+                        maxTicksLimit: 12,
                     },
                 },
                 y: {
                     title: {
                         display: true,
                         text: 'Frequency',
+                        color: textColor,
+                    },
+                    ticks: {
+                        color: textColor,
+                        precision: 0,
                     },
                     beginAtZero: true,
+                },
+            },
+            plugins: {
+                legend: {
+                    labels: {
+                        color: textColor,
+                    },
                 },
             },
         },
     });
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    setDataSourceMode('cstimer');
+});

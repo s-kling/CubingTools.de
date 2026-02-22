@@ -46,7 +46,7 @@
     <link rel="stylesheet" href="/css/globalCalc">
 
     <!-- JS Files -->
-    <script nonce=async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P" defer></script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     <script src="../../js/setupPage.js" defer></script>
     <script src="/js/globalCalc" defer></script>
@@ -68,54 +68,65 @@
                 <p>
                     Analyze your cube solve times. Upload a csTimer file or fetch data from the WCA API.
                 </p>
-                <div id="mainGrid">
-                    <div id="fileUpload">
-                        <label>Upload a cstimer file:
-                            <input type="file" id="fileInput" accept=".txt" onchange="loadCSTimerFile(event)">
-                        </label>
-                        <div id="sessionDropdownContainer" style="display: none;">
-                            <label for="sessionDropdown">Select Session:</label>
-                            <select id="sessionDropdown" onchange="generateChartFromSession()"></select>
+                <div id="mainGrid" class="global-grid">
+                    <div id="dataSources" class="panel">
+                        <h2>Data Source</h2>
+                        <div id="sourceToggle" class="source-toggle" role="tablist" aria-label="Choose data source">
+                            <button id="sourceCsTimer" class="source-toggle-btn active" type="button" onclick="setDataSourceMode('cstimer')">csTimer File</button>
+                            <button id="sourceWca" class="source-toggle-btn" type="button" onclick="setDataSourceMode('wca')">WCA Data</button>
+                        </div>
+
+                        <div id="fileUpload" class="input-group">
+                            <label for="fileInput">Upload a csTimer export</label>
+                            <input type="file" id="fileInput" accept=".txt,.json" onchange="loadCSTimerFile(event)">
+                            <div id="sessionDropdownContainer" style="display: none;">
+                                <label for="sessionDropdown">Select Session</label>
+                                <select id="sessionDropdown" onchange="generateChartFromSession()"></select>
+                            </div>
+                        </div>
+
+                        <div id="wcaIdFetch" class="input-group" style="display: none;">
+                            <label for="wcaIdInput">Fetch from WCA profile</label>
+                            <div class="control-row">
+                                <input type="text" id="wcaIdInput" placeholder="e.g., 2023KLIN02">
+                                <select name="event" id="event-type">
+                                    <option value="333">3x3x3</option>
+                                    <option value="222">2x2x2</option>
+                                    <option value="444">4x4x4</option>
+                                    <option value="555">5x5x5</option>
+                                    <option value="666">6x6x6</option>
+                                    <option value="777">7x7x7</option>
+                                    <option value="333bf">3x3x3 Blindfolded</option>
+                                    <option value="333oh">3x3x3 One-Handed</option>
+                                    <option value="clock">Clock</option>
+                                    <option value="minx">Megaminx</option>
+                                    <option value="pyram">Pyraminx</option>
+                                    <option value="skewb">Skewb</option>
+                                    <option value="sq1">Square-1</option>
+                                    <option value="444bf">4x4x4 Blindfolded</option>
+                                    <option value="555bf">5x5x5 Blindfolded</option>
+                                </select>
+                                <button type="button" onclick="fetchWCAData()">Fetch WCA Data</button>
+                            </div>
                         </div>
                     </div>
 
-                    <div id="wcaIdFetch">
-                        <label>Enter your WCA ID:
-                            <input type="text" id="wcaIdInput" placeholder="e.g., 2023KLIN02">
-                        </label>
-                        <select name="event" id="event-type">
-                            <option value="333">3x3x3</option>
-                            <option value="222">2x2x2</option>
-                            <option value="444">4x4x4</option>
-                            <option value="555">5x5x5</option>
-                            <option value="666">6x6x6</option>
-                            <option value="777">7x7x7</option>
-                            <option value="333bf">3x3x3 Blindfolded</option>
-                            <option value="333oh">3x3x3 One-Handed</option>
-                            <option value="clock">Clock</option>
-                            <option value="minx">Megaminx</option>
-                            <option value="pyram">Pyraminx</option>
-                            <option value="skewb">Skewb</option>
-                            <option value="sq1">Square-1</option>
-                            <option value="444bf">4x4x4 Blindfolded</option>
-                            <option value="555bf">5x5x5 Blindfolded</option>
-                        </select>
-                        <button onclick="fetchWCAData()">Fetch WCA Data</button>
+                    <div id="statsGrid" class="stats-grid">
+                        <div id="globalTime" class="panel stat-panel">
+                            <h3>Predicted Global</h3>
+                            <span id="predictedGlobal">—</span>
+                        </div>
+
+                        <div id="topTimes" class="panel stat-panel">
+                            <h3>Top 5 Most Frequent Times</h3>
+                            <ul id="topTimesList"></ul>
+                        </div>
                     </div>
 
-                    <div id="topTimes">
-                        <h3>Top 5 Most Frequent Times</h3>
-                        <ul id="topTimesList"></ul>
-                    </div>
-
-                    <div id="globalTime">
-                        <h3>Predicted Global</h3>
-                        <span id="predictedGlobal"></span>
-                    </div>
-
-                    <div id="chartContainer">
+                    <div id="chartContainer" class="panel">
+                        <h3>Solve Frequency Distribution</h3>
                         <div id="sliderContainer" style="display: none;">
-                            <label for="elementSlider">Number of elements to consider:
+                            <label for="elementSlider">Number of solves to consider:
                                 <span id="sliderValue">0</span>
                             </label>
                             <input type="range" id="elementSlider" min="1" max="100" value="10" oninput="updateChart()">

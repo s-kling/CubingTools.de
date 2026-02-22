@@ -1,23 +1,89 @@
-/* Additional Styles for Global Calculator Page */
+main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
 
-/* File Upload and WCA ID Fetch Section */
-#fileUpload,
-#wcaIdFetch {
-    background-color: var(--main-lighter);
+.heading {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.heading h1,
+.heading p {
+    margin: 0;
+}
+
+.global-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+}
+
+.panel {
+    background: var(--main-lighter);
+    border: 1px solid var(--input-border);
     border-radius: var(--main-radius);
     padding: var(--space-md);
-    margin-bottom: var(--space-md);
 }
 
-#fileUpload label,
-#wcaIdFetch label {
+.panel h2,
+.panel h3 {
+    margin-top: 0;
+    margin-bottom: var(--space-sm);
+}
+
+#dataSources {
+    display: grid;
+    gap: var(--space-md);
+}
+
+.source-toggle {
+    display: inline-flex;
+    gap: var(--space-xs);
+    background: var(--input-background);
+    border: 1px solid var(--input-border);
+    border-radius: var(--main-radius);
+    padding: 4px;
+    width: fit-content;
+}
+
+.source-toggle-btn {
+    min-height: 34px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--secondary-text);
+    padding: 0 var(--space-sm);
     font-size: var(--font-size-base);
-    color: var(--main-text);
-    margin-bottom: var(--space-xs);
 }
 
-#fileUpload input[type="file"],
-#wcaIdFetch input[type="text"],
+.source-toggle-btn:hover {
+    background: var(--hover-background);
+    color: var(--hover-text);
+}
+
+.source-toggle-btn.active {
+    background: var(--button-background);
+    color: var(--main-text);
+    border-color: var(--button-background);
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.control-row {
+    display: flex;
+    gap: var(--space-xs);
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+input[type="file"],
+input[type="text"],
 select {
     padding: var(--space-xs);
     border-radius: var(--main-radius);
@@ -26,37 +92,46 @@ select {
     color: var(--main-text);
 }
 
-button {
-    margin-left: 10px;
+input[type="text"],
+select {
+    min-height: 36px;
 }
 
-/* Session Dropdown */
+button {
+    min-height: 36px;
+    border-radius: var(--main-radius);
+    border: 1px solid var(--button-background);
+    background: var(--button-background);
+    color: var(--button-text);
+    padding: var(--space-xs) var(--space-sm);
+    cursor: pointer;
+}
+
+button:hover {
+    background: var(--button-hover);
+}
+
 #sessionDropdownContainer {
-    margin-top: var(--space-md);
+    margin-top: var(--space-xs);
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    gap: var(--space-xs);
 }
 
-#sessionDropdown {
-    margin-top: var(--space-xs);
-    padding: var(--space-xs);
-    border-radius: var(--main-radius);
-    border: 1px solid var(--input-border);
-    background-color: var(--input-background);
-    color: var(--main-text);
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-md);
 }
 
-/* Predicted Global Section */
+.stat-panel {
+    min-height: 140px;
+}
+
 #globalTime {
-    margin: var(--space-md) 0;
-    text-align: center;
-}
-
-#globalTime h3 {
-    font-size: var(--font-size-lg);
-    color: var(--main-text);
-    margin-bottom: var(--space-sm);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 #predictedGlobal {
@@ -65,45 +140,25 @@ button {
     color: var(--button-background);
 }
 
-/* Top 5 Most Frequent Times */
-#topTimes {
-    margin: var(--space-md) 0;
-}
-
 #topTimes ul {
     list-style: none;
     padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
 }
 
-#topTimes li {
-    margin: var(--space-xs) 0;
-    font-size: var(--font-size-base);
-    color: var(--main-text);
-}
-
-/* Chart Section */
 #chartContainer {
-    margin-top: var(--space-md);
-    padding: var(--space-sm);
-    border-radius: var(--main-radius);
-    background-color: var(--main-lighter);
-}
-
-#frequencyChart {
-    max-width: 100%;
-    height: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
 }
 
 #sliderContainer {
-    margin-top: var(--space-md);
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-}
-
-#sliderContainer label {
-    margin-bottom: var(--space-xs);
-    color: var(--main-text);
+    gap: var(--space-xs);
 }
 
 #elementSlider {
@@ -123,28 +178,46 @@ button {
     width: var(--space-md);
     height: var(--space-md);
     border-radius: 50%;
+    border: 1px solid var(--input-border);
     background: var(--main-text);
     cursor: pointer;
 }
 
-/* Responsive Design Enhancements */
+#elementSlider::-moz-range-thumb {
+    width: var(--space-md);
+    height: var(--space-md);
+    border-radius: 50%;
+    border: 1px solid var(--input-border);
+    background: var(--main-text);
+    cursor: pointer;
+}
+
+#frequencyChart {
+    width: 100%;
+    height: clamp(260px, 42vh, 380px) !important;
+    min-height: 0;
+    max-height: 380px;
+}
+
+@media only screen and (max-width: 900px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .control-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
 @media only screen and (max-width: 650px) {
     main .heading {
         margin: 0;
-        padding: var(--space-md);
-    }
-
-    #fileUpload,
-    #wcaIdFetch,
-    #globalTime,
-    #topTimes,
-    #chartContainer {
         padding: var(--space-sm);
     }
 
-    #globalTime h3,
-    #topTimes h3 {
-        font-size: var(--font-size-base);
+    .panel {
+        padding: var(--space-sm);
     }
 
     #predictedGlobal {
@@ -152,6 +225,7 @@ button {
     }
 
     #frequencyChart {
-        height: 300px;
+        height: clamp(220px, 34vh, 300px) !important;
+        max-height: 300px;
     }
 }
