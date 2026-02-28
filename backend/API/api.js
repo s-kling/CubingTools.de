@@ -102,6 +102,11 @@ class StatusApi {
         this.password = process.env.STATUS_PAGE_PASSWORD || '';
     }
 
+    isBetaRequest(req) {
+        const host = req?.get?.('host') || '';
+        return host.includes(':8001') || host.includes('beta.cubingtools.de');
+    }
+
     handleRequest(req, res) {
         const { password } = req.body || {};
         const hashedPassword = sha256Hash(password) || '';
@@ -113,7 +118,7 @@ class StatusApi {
         const uptime = process.uptime();
         const memoryUsage = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
 
-        const logFileSize = this.getLogFileSize();
+        const logFileSize = this.getLogFileSize(req);
         const logStats = this.analyzeLogs(req);
 
         return res.json({
@@ -125,8 +130,7 @@ class StatusApi {
     }
 
     analyzeLogs(req) {
-        const betaTest =
-            req.get('host').includes(':8001') || req.get('host').includes('beta.cubingtools.de');
+        const betaTest = this.isBetaRequest(req);
 
         const logPath = path.join(__dirname, '../log', betaTest ? 'beta.log' : 'server.log');
 
@@ -215,16 +219,13 @@ class StatusApi {
         return stats;
     }
 
-    getLogFileSize() {
+    getLogFileSize(req) {
         try {
-            const logPath = path.join(
-                __dirname,
-                '../../log',
-                this.betaTest ? 'beta.log' : 'server.log',
-            );
-            const stats = fs.statSync(logPath);
+            const betaTest = this.isBetaRequest(req);
+            const logPath = path.join(__dirname, '..', 'log', betaTest ? 'beta.log' : 'server.log');
+            const logFileSize = fs.existsSync(logPath) ? fs.statSync(logPath).size : 0;
             // Return size in kilo Bytes with 2 decimal places
-            return (stats.size / 1024).toFixed(2);
+            return (logFileSize / 1024).toFixed(2);
         } catch {
             return '0.00';
         }

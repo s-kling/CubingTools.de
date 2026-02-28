@@ -67,6 +67,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-xs);
+    overflow-y: scroll;
 }
 
 .control-row {
@@ -215,7 +216,6 @@ button:hover {
     }
 
     .control-row {
-        flex-direction: column;
         align-items: stretch;
     }
 }
