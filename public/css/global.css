@@ -328,12 +328,12 @@ body:has(#cookie-consent-banner) > *:not(#cookie-consent-banner) {
 .container {
     display: grid;
     height: 100svh;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: 0.3fr 1fr;
     grid-template-rows: 0.4fr 3fr 0.4fr;
     grid-template-areas:
-        "nav nav nav nav"
-        "sidebar main main main"
-        "version footer footer footer";
+        "nav nav"
+        "sidebar main"
+        "version footer";
     grid-gap: var(--main-margin);
 }
 
@@ -404,7 +404,7 @@ nav a.logo {
     color: var(--main-text);
     font-size: var(--font-size-xl);
     margin: 0 20%;
-    font-weight: bold;
+    font-weight: 600;
     margin-right: auto;
     cursor: pointer;
 }
@@ -706,7 +706,7 @@ footer {
     justify-content: center;
     margin: 0;
     color: var(--secondary-text);
-    background-color: #f8f9fa;
+    background-color: var(--secondary-background);
     font-size: clamp(5px, 10px, 15px);
     line-height: 1.4;
     overflow-y: hidden;

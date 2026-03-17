@@ -97,13 +97,13 @@ button {
     border-radius: var(--main-radius);
     border: 1px solid var(--button-background);
     background: var(--button-background);
-    color: var(--button-text);
+    color: var(--main-text);
     padding: var(--space-xs) var(--space-sm);
     cursor: pointer;
 }
 
 button:hover {
-    background: var(--button-hover);
+    background: var(--hover-background);
 }
 
 #sessionDropdownContainer {

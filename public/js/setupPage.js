@@ -193,8 +193,12 @@ function setupNavbar() {
     logo.className = 'logo';
 
     const logoImage = document.createElement('img');
-    logoImage.src = '/assets/logo_long.png';
-    logoImage.alt = 'CubingTools Logo';
+    if (window.location.port == 8001 || window.location.hostname === 'beta.cubingtools.de') {
+        logoImage.src = '/assets/beta_logo_long.png';
+    } else {
+        logoImage.src = '/assets/logo_long.png';
+    }
+    logoImage.alt = 'CubingTools.de';
     logoImage.className = 'logo-image';
     logoImage.style.maxHeight = '50px'; // Limit the size to match the text logo
 
