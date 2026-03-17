@@ -18,7 +18,7 @@ function extractMetadata(filePath) {
 
 // API endpoint to get the list of HTML files with metadata
 router.get('/api/tools', (req, res) => {
-    const toolsDir = path.join(__dirname, '../../public/html/tools');
+    const toolsDir = path.join(__dirname, '../../public/tools');
 
     fs.readdir(toolsDir, (err, folders) => {
         if (err) {

@@ -66,7 +66,7 @@ router.get('/googlea20166777fc211f6.html', (req, res) => {
 // Serve specific tool pages
 router.get('/tools/:toolName', (req, res) => {
     const toolName = req.params.toolName;
-    const filePath = path.join(__dirname, `../../public/html/tools`, toolName, `${toolName}.html`);
+    const filePath = path.join(__dirname, `../../public/tools`, toolName, `${toolName}.html`);
 
     res.sendFile(filePath, (err) => {
         if (err) {
@@ -86,7 +86,7 @@ router.get('/tools/:toolName', (req, res) => {
 // Serve specific tool CSS files
 router.get('/css/:cssName', (req, res) => {
     const cssName = req.params.cssName;
-    const cssFile = path.join(__dirname, `../../public/html/tools`, cssName, `${cssName}.css`);
+    const cssFile = path.join(__dirname, `../../public/tools`, cssName, `${cssName}.css`);
 
     res.sendFile(cssFile, (err) => {
         if (err) {
@@ -105,7 +105,7 @@ router.get('/css/:cssName', (req, res) => {
 
 router.get('/js/:jsName', (req, res) => {
     const jsName = req.params.jsName;
-    const jsFile = path.join(__dirname, `../../public/html/tools`, jsName, `${jsName}.js`);
+    const jsFile = path.join(__dirname, `../../public/tools`, jsName, `${jsName}.js`);
 
     res.sendFile(jsFile, (err) => {
         if (err) {
@@ -125,7 +125,7 @@ router.get('/js/:jsName', (req, res) => {
 
 router.get('/assets/:assetName', (req, res) => {
     const assetName = req.params.assetName;
-    const assetFile = path.join(__dirname, `../../public/html/tools`, assetName, `${assetName}`);
+    const assetFile = path.join(__dirname, `../../public/tools`, assetName, `${assetName}`);
 
     res.sendFile(assetFile, (err) => {
         if (err) {
