@@ -307,25 +307,39 @@ function displayCurrentTimes() {
 
         const okayBtn = createButton({
             text: '✓',
-            color: 'lime',
+            type: 'confirm',
             onClick: () => removePenalty(i),
         });
 
         const plus2Btn = createButton({
             text: '+',
-            color: 'orange',
+            type: 'plus2',
             onClick: () => applyPenalty(i, 'plus2'),
         });
 
         const dnfBtn = createButton({
             text: 'x',
-            color: 'red',
+            type: 'dnf',
             onClick: () => applyPenalty(i, 'dnf'),
+        });
+
+        const editBtn = createButton({
+            text: '✎',
+            type: 'edit',
+            onClick: () => editTime(i),
+        });
+
+        const deleteBtn = createButton({
+            text: '⊗',
+            type: 'delete',
+            onClick: () => deleteTime(i),
         });
 
         btns.appendChild(okayBtn);
         btns.appendChild(plus2Btn);
         btns.appendChild(dnfBtn);
+        btns.appendChild(editBtn);
+        btns.appendChild(deleteBtn);
         wrapper.appendChild(btns);
 
         container.appendChild(wrapper);
@@ -333,12 +347,14 @@ function displayCurrentTimes() {
 }
 
 // === Create a button helper ===
-function createButton({ text, color, onClick }) {
+function createButton({ text, color, type = 'confirm', onClick }) {
     const btn = document.createElement('button');
     btn.textContent = text;
-    btn.classList.add('penalty-btn');
-    btn.style.borderColor = color;
-    btn.style.color = color;
+    btn.classList.add('penalty-btn', type);
+    if (color) {
+        btn.style.borderColor = color;
+        btn.style.color = color;
+    }
     btn.onclick = onClick;
     return btn;
 }
@@ -382,6 +398,89 @@ function removePenalty(index) {
     setCookie(`averages_${state.eventType}`, state.averageTags, 365);
     // Remove from averages
     state.userAverages.shift();
+
+    calculateStats();
+    displayCurrentTimes();
+}
+
+// === Edit a time ===
+function editTime(index) {
+    const solve = state.times[index];
+    if (!solve) return;
+
+    // Get the raw time value for display
+    let currentValue = solve.raw;
+    if (solve.raw === -1) {
+        currentValue = 'DNF';
+    } else if (currentValue >= 60) {
+        const minutes = Math.floor(currentValue / 60);
+        const seconds = (currentValue % 60).toFixed(2);
+        currentValue = `${minutes}:${seconds.padStart(5, '0')}`;
+    } else {
+        currentValue = currentValue.toFixed(2);
+    }
+
+    const newValue = prompt(`Edit time (current: ${currentValue}):`, currentValue);
+    if (newValue === null) return; // User cancelled
+
+    let time = newValue;
+    let penalty = null;
+
+    if (time.toUpperCase() === 'DNF') {
+        time = -1;
+        penalty = 'dnf';
+    } else if (time.includes(':')) {
+        const parts = time.split(':');
+        if (parts.length !== 2) {
+            alert('Invalid time format');
+            return;
+        }
+        const minutes = parseInt(parts[0], 10);
+        const seconds = parseFloat(parts[1]);
+        if (isNaN(minutes) || isNaN(seconds)) {
+            alert('Invalid time format');
+            return;
+        }
+        time = minutes * 60 + seconds;
+    } else {
+        time = parseFloat(time);
+        if (isNaN(time)) {
+            alert('Invalid time format');
+            return;
+        }
+    }
+
+    solve.raw = time;
+    solve.value = time;
+    solve.penalty = penalty;
+
+    // Remove the average that this time belongs to, since the value changed
+    const avgId = solve.averageId;
+    state.averageTags = state.averageTags.filter((tag) => tag.averageId !== avgId);
+    setCookie(`averages_${state.eventType}`, state.averageTags, 365);
+    // Remove from averages
+    state.userAverages = state.userAverages.filter((avg) => avg !== solve.value);
+
+    calculateStats();
+    displayCurrentTimes();
+}
+
+// === Delete a time ===
+function deleteTime(index) {
+    if (!confirm('Delete this time?')) return;
+
+    const solve = state.times[index];
+    if (!solve) return;
+
+    // Remove the average that this time belongs to, since the set is incomplete now
+    const avgId = solve.averageId;
+    state.averageTags = state.averageTags.filter((tag) => tag.averageId !== avgId);
+    setCookie(`averages_${state.eventType}`, state.averageTags, 365);
+    // Remove from averages
+    state.userAverages = state.userAverages.filter((avg) => avg !== solve.value);
+
+    // Remove the time from the current session
+    state.times.splice(index, 1);
 
     calculateStats();
     displayCurrentTimes();

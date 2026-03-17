@@ -35,7 +35,16 @@ ul li::before {
 }
 
 .controls > label {
-    justify-content: center;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.controls > label input[type="checkbox"] {
+    margin: 0;
+    flex-shrink: 0;
 }
 
 .layout {
@@ -188,25 +197,83 @@ ul li::before {
     display: flex;
     align-items: center;
     justify-content: center;
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    padding: 0;
     background: var(--main-background);
-    border: 3px solid;
-    border-radius: 50%;
+    border: 2px solid;
+    border-radius: 9999px;
     aspect-ratio: 1 / 1;
-    width: 34px;
-    height: 34px;
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    min-height: 38px;
+    line-height: 1;
     font-family: var(--font-main);
     font-size: var(--font-size-lg);
     font-weight: bold;
-    color: var(--main-text);
     cursor: pointer;
-    transition: transform 0.2s ease, background 0.3s ease, color 0.3s ease;
+    transition: all 0.2s ease;
 }
 
 .penalty-btn:hover {
-    background: var(--hover-background);
-    color: var(--hover-text);
-    transform: scale(1.15);
-    box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.penalty-btn:active {
+    transform: scale(0.95);
+}
+
+/* Button colors by type */
+.penalty-btn.confirm {
+    border-color: #2ecc71;
+    color: #2ecc71;
+}
+
+.penalty-btn.confirm:hover {
+    background: #2ecc71;
+    color: var(--main-background);
+}
+
+.penalty-btn.plus2 {
+    border-color: #f39c12;
+    color: #f39c12;
+}
+
+.penalty-btn.plus2:hover {
+    background: #f39c12;
+    color: var(--main-background);
+}
+
+.penalty-btn.dnf {
+    border-color: #e74c3c;
+    color: #e74c3c;
+}
+
+.penalty-btn.dnf:hover {
+    background: #e74c3c;
+    color: var(--main-background);
+}
+
+.penalty-btn.edit {
+    border-color: #3498db;
+    color: #3498db;
+}
+
+.penalty-btn.edit:hover {
+    background: #3498db;
+    color: var(--main-background);
+}
+
+.penalty-btn.delete {
+    border-color: #95a5a6;
+    color: #95a5a6;
+}
+
+.penalty-btn.delete:hover {
+    background: #95a5a6;
+    color: var(--main-background);
 }
 
 /* Disabled state */
@@ -285,8 +352,12 @@ ul li::before {
     }
 
     .penalty-btn {
-        width: 30px;
-        height: 30px;
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        min-height: 32px;
+        border-width: 2px;
+        font-size: var(--font-size-lg);
     }
 }
 
@@ -350,10 +421,12 @@ ul li::before {
     }
 
     .penalty-btn {
-        width: 26px;
-        height: 26px;
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        min-height: 28px;
         border-width: 2px;
-        font-size: 0.9rem;
+        font-size: 0.95rem;
     }
 
     .penalty-btn:hover {
@@ -379,9 +452,11 @@ ul li::before {
     }
 
     .penalty-btn {
-        width: 24px;
-        height: 24px;
+        width: 26px;
+        height: 26px;
+        min-width: 26px;
+        min-height: 26px;
         border-width: 2px;
-        font-size: 0.85rem;
+        font-size: 0.9rem;
     }
 }

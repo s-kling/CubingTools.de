@@ -186,7 +186,7 @@ function renderTopWcaIds(title, obj, limit = null) {
     return `
         <h4>${title}</h4>
         <ul>
-            ${entries.map(([key, value]) => `<li>${value} (${((value / entries.reduce((sum, [_, val]) => sum + val, 0)) * 100).toFixed(2)}%) — ${key}</li>`).join('')}
+            ${entries.map(([key, value]) => `<li>${value} (${((value / entries.reduce((sum, [_, val]) => sum + val, 0)) * 100).toFixed(2)}%) — <a href="https://www.worldcubeassociation.org/persons/${key}">${key}</a></li>`).join('')}
         </ul>
     `;
 }
