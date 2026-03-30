@@ -1,25 +1,137 @@
 const express = require('express');
 const axios = require('axios');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const path = require('path');
 const packageJson = require('../../package.json');
 const crypto = require('crypto');
 const fs = require('fs');
 
+const { RecaptchaEnterpriseServiceClient } = require('@google-cloud/recaptcha-enterprise');
+
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
+
+function createRateLimiter(windowMs, max, message, options = {}) {
+    return rateLimit({
+        windowMs,
+        max,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { error: message },
+        ...options,
+    });
+}
+
+const contactLimiter = createRateLimiter(
+    10 * 60 * 1000,
+    8,
+    'Too many contact requests, please try again later.',
+);
+
+const adminLoginLimiter = createRateLimiter(
+    15 * 60 * 1000,
+    10,
+    'Too many login attempts, please try again later.',
+    { skipSuccessfulRequests: true },
+);
+
+const adminVerifyLimiter = createRateLimiter(
+    15 * 60 * 1000,
+    120,
+    'Too many verification requests, please try again later.',
+);
+
+const adminStatusLimiter = createRateLimiter(
+    15 * 60 * 1000,
+    60,
+    'Too many status requests, please try again later.',
+);
+
+const adminTodosReadLimiter = createRateLimiter(
+    15 * 60 * 1000,
+    60,
+    'Too many TODO read requests, please try again later.',
+);
+
+const adminTodosWriteLimiter = createRateLimiter(
+    15 * 60 * 1000,
+    20,
+    'Too many TODO update requests, please try again later.',
+);
+
+const wcaLimiter = createRateLimiter(
+    15 * 60 * 1000,
+    180,
+    'Too many WCA API requests, please try again later.',
+);
 
 class WcaApi {
     constructor() {
         this.baseUrl =
             'https://raw.githubusercontent.com/robiningelbrecht/wca-rest-api/master/api/persons';
+        this.cacheTtlMs = 5 * 60 * 1000;
+        this.responseCache = new Map();
+    }
+
+    normalizeWcaId(wcaId) {
+        return String(wcaId || '')
+            .trim()
+            .toUpperCase();
+    }
+
+    pruneExpiredCache() {
+        const now = Date.now();
+
+        for (const [cacheKey, entry] of this.responseCache.entries()) {
+            if (!entry.promise && entry.expiresAt <= now) {
+                this.responseCache.delete(cacheKey);
+            }
+        }
     }
 
     async fetchCompetitorData(wcaId) {
+        const cacheKey = this.normalizeWcaId(wcaId);
+        const now = Date.now();
+
+        this.pruneExpiredCache();
+
+        const cachedEntry = this.responseCache.get(cacheKey);
+        if (cachedEntry) {
+            if (cachedEntry.promise) {
+                return cachedEntry.promise;
+            }
+
+            if (cachedEntry.expiresAt > now) {
+                return cachedEntry.data;
+            }
+
+            this.responseCache.delete(cacheKey);
+        }
+
+        const requestPromise = axios
+            .get(`${this.baseUrl}/${cacheKey}.json`)
+            .then((response) => {
+                this.responseCache.set(cacheKey, {
+                    data: response.data,
+                    expiresAt: Date.now() + this.cacheTtlMs,
+                });
+                return response.data;
+            })
+            .catch((error) => {
+                this.responseCache.delete(cacheKey);
+                throw new Error(`Failed to fetch data for ${cacheKey}: ${error.message}`);
+            });
+
+        this.responseCache.set(cacheKey, {
+            data: null,
+            expiresAt: 0,
+            promise: requestPromise,
+        });
+
         try {
-            const response = await axios.get(`${this.baseUrl}/${wcaId}.json`);
-            return response.data;
+            return await requestPromise;
         } catch (error) {
-            throw new Error(`Failed to fetch data for ${wcaId}: ${error.message}`);
+            throw error;
         }
     }
 
@@ -108,13 +220,6 @@ class StatusApi {
     }
 
     handleRequest(req, res) {
-        const { password } = req.body || {};
-        const hashedPassword = sha256Hash(password) || '';
-
-        if (hashedPassword !== this.password) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
         const uptime = process.uptime();
         const memoryUsage = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
 
@@ -236,14 +341,232 @@ function sha256Hash(input) {
     return crypto.createHash('sha256').update(input).digest('hex');
 }
 
+class AdminSessionApi {
+    constructor() {
+        this.password = process.env.STATUS_PAGE_PASSWORD || '';
+        this.sessions = new Map();
+        this.SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
+    }
+
+    _cleanExpired() {
+        const now = Date.now();
+        for (const [token, expiry] of this.sessions) {
+            if (now > expiry) this.sessions.delete(token);
+        }
+    }
+
+    createSession() {
+        this._cleanExpired();
+        const token = crypto.randomBytes(32).toString('hex');
+        this.sessions.set(token, Date.now() + this.SESSION_TTL_MS);
+        return token;
+    }
+
+    verifyToken(token) {
+        if (!token || typeof token !== 'string') return false;
+        const expiry = this.sessions.get(token);
+        if (!expiry) return false;
+        if (Date.now() > expiry) {
+            this.sessions.delete(token);
+            return false;
+        }
+        return true;
+    }
+
+    extractToken(req) {
+        const auth = req.headers['authorization'] || '';
+        if (auth.startsWith('Bearer ')) return auth.slice(7).trim();
+        return null;
+    }
+
+    handleLogin(req, res) {
+        const { password } = req.body || {};
+        if (!password || typeof password !== 'string') {
+            return res.status(400).json({ error: 'Password required' });
+        }
+
+        const hashedInput = sha256Hash(password);
+        let isValid = false;
+        try {
+            const a = Buffer.from(hashedInput, 'hex');
+            const b = Buffer.from(this.password, 'hex');
+            if (a.length === b.length && a.length > 0) {
+                isValid = crypto.timingSafeEqual(a, b);
+            }
+        } catch {
+            isValid = false;
+        }
+
+        if (!isValid) return res.status(401).json({ error: 'Unauthorized' });
+
+        const token = this.createSession();
+        return res.json({ token });
+    }
+
+    handleVerify(req, res) {
+        const token = this.extractToken(req);
+        if (!this.verifyToken(token)) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        return res.json({ valid: true });
+    }
+
+    requireAuth(req, res, next) {
+        const token = this.extractToken(req);
+        if (!this.verifyToken(token)) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        next();
+    }
+}
+
+// class ContactApi {
+//     constructor() {
+//         this.password = process.env.CONTACT_API_PASSWORD || '';
+//     }
+
+//     handleRequest(req, res) {
+//         const { name, email, message, 'g-recaptcha-response': recaptchaToken } = req.body || {};
+
+//         if (!name || !email || !message || !recaptchaToken) {
+//             return res.status(400).json({ success: false, error: 'Missing required fields' });
+//         }
+
+//         // Verify reCAPTCHA token
+//         this.createAssessment({ token: recaptchaToken })
+//             .then((score) => {
+//                 if (score && parseFloat(score) >= 0.5) {
+//                     // Here you would typically send the message via email or store it in a database
+//                     console.log('New contact message:', { name, email, message });
+//                     return res.json({ success: true });
+//                 } else {
+//                     return res
+//                         .status(400)
+//                         .json({ success: false, error: 'reCAPTCHA verification failed' });
+//                 }
+//             })
+//             .catch((error) => {
+//                 console.error('Error verifying reCAPTCHA:', error);
+//                 return res.status(500).json({ success: false, error: 'Internal server error' });
+//             });
+//     }
+
+//     async createAssessment({
+//         // TODO: Replace the token and reCAPTCHA action variables before running the sample.
+//         projectID = 'cubingtools-capt-1734716026920',
+//         recaptchaKey = '6LeFG5EsAAAAADPRHMlWmGradnyV3LSWufMYnsq5',
+//         token = 'action-token',
+//         recaptchaAction = 'action-name',
+//     }) {
+//         // Create the reCAPTCHA client.
+//         // TODO: Cache the client generation code (recommended) or call client.close() before exiting the method.
+//         const client = new RecaptchaEnterpriseServiceClient();
+//         const projectPath = client.projectPath(projectID);
+
+//         // Build the assessment request.
+//         const request = {
+//             assessment: {
+//                 event: {
+//                     token: token,
+//                     siteKey: recaptchaKey,
+//                 },
+//             },
+//             parent: projectPath,
+//         };
+
+//         const [response] = await client.createAssessment(request);
+
+//         // Check if the token is valid.
+//         if (!response.tokenProperties.valid) {
+//             console.log(
+//                 `The CreateAssessment call failed because the token was: ${response.tokenProperties.invalidReason}`,
+//             );
+//             return null;
+//         }
+
+//         // Check if the expected action was executed.
+//         // The `action` property is set by user client in the grecaptcha.enterprise.execute() method.
+//         if (response.tokenProperties.action === recaptchaAction) {
+//             // Get the risk score and the reason(s).
+//             // For more information on interpreting the assessment, see:
+//             // https://cloud.google.com/recaptcha/docs/interpret-assessment
+//             console.log(`The reCAPTCHA score is: ${response.riskAnalysis.score}`);
+//             response.riskAnalysis.reasons.forEach((reason) => {
+//                 console.log(reason);
+//             });
+
+//             return response.riskAnalysis.score;
+//         } else {
+//             console.log(
+//                 'The action attribute in your reCAPTCHA tag does not match the action you are expecting to score',
+//             );
+//             return null;
+//         }
+//     }
+// }
+
 const wcaApi = new WcaApi();
 const statusApi = new StatusApi();
+// const contactApi = new ContactApi();
+const adminSessionApi = new AdminSessionApi();
 
-// Status API endpoint
-router.post('/api/status', (req, res) => statusApi.handleRequest(req, res));
+// // Contact API endpoint
+// router.post('/api/contact', contactLimiter, (req, res) => contactApi.handleRequest(req, res));
+
+// Admin session endpoints
+router.post('/api/admin/login', adminLoginLimiter, (req, res) =>
+    adminSessionApi.handleLogin(req, res),
+);
+router.get('/api/admin/verify', adminVerifyLimiter, (req, res) =>
+    adminSessionApi.handleVerify(req, res),
+);
+
+// Status API endpoint — requires valid session token
+router.post(
+    '/api/admin/status',
+    adminStatusLimiter,
+    (req, res, next) => adminSessionApi.requireAuth(req, res, next),
+    (req, res) => statusApi.handleRequest(req, res),
+);
+
+// Admin todos endpoint — serves TODO.md content
+router.get(
+    '/api/admin/todos',
+    adminTodosReadLimiter,
+    (req, res, next) => adminSessionApi.requireAuth(req, res, next),
+    (req, res) => {
+        const todoPath = path.join(__dirname, '../../md/TODO.md');
+        if (!fs.existsSync(todoPath)) {
+            return res.status(404).json({ error: 'TODO file not found' });
+        }
+        const content = fs.readFileSync(todoPath, 'utf8');
+        return res.json({ content });
+    },
+);
+
+// Admin todos update endpoint — writes TODO.md content
+router.post(
+    '/api/admin/todos',
+    adminTodosWriteLimiter,
+    (req, res, next) => adminSessionApi.requireAuth(req, res, next),
+    (req, res) => {
+        const { content } = req.body || {};
+        if (typeof content !== 'string') {
+            return res.status(400).json({ error: 'Invalid todo content' });
+        }
+
+        const todoPath = path.join(__dirname, '../../md/TODO.md');
+        try {
+            fs.writeFileSync(todoPath, content, 'utf8');
+            return res.json({ success: true });
+        } catch {
+            return res.status(500).json({ error: 'Failed to update TODO file' });
+        }
+    },
+);
 
 // Wire class into router
-router.get('/api/wca/:wcaId/:event', (req, res) => wcaApi.handleRequest(req, res));
+router.get('/api/wca/:wcaId/:event', wcaLimiter, (req, res) => wcaApi.handleRequest(req, res));
 
 router.get('/api/version', (req, res) => {
     res.json({ version: packageJson.version });

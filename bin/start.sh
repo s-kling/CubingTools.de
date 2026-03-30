@@ -90,7 +90,12 @@ while true; do
     read -r CMD
     if [[ "$CMD" == "q" ]]; then
         echo -e "${YELLOW}Quitting...${NC}"
-        killall node
+        for SERVER in "${SERVERS[@]}"; do
+            PORT="${SERVER%%:*}"
+            lsof -ti:$PORT | xargs kill -9 2>/dev/null
+        done
+        echo -e "${GREEN}All servers have been terminated.${NC}"
+        
         break
     fi
 done

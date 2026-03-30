@@ -1,40 +1,59 @@
-const passwordInput = document.getElementById('admin-password');
-const statusReport = document.getElementById('status-report');
-const statusError = document.getElementById('status-error');
+const SESSION_KEY = 'admin-token';
 
-passwordInput.addEventListener('keydown', async (event) => {
-    if (event.key !== 'Enter') return;
-
-    statusError.style.display = 'none';
-    statusReport.style.display = 'none';
-    statusReport.innerHTML = '';
-
-    const password = passwordInput.value.trim();
-    if (!password) return;
+document.addEventListener('DOMContentLoaded', async () => {
+    const token = sessionStorage.getItem(SESSION_KEY);
+    if (!token) {
+        redirectToLogin();
+        return;
+    }
 
     try {
-        const response = await fetch('/api/status', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password }),
+        const verify = await fetch('/api/admin/verify', {
+            headers: { Authorization: `Bearer ${token}` },
         });
-
-        if (!response.ok) {
-            throw new Error('Invalid password');
+        if (!verify.ok) {
+            redirectToLogin();
+            return;
         }
-
-        const data = await response.json();
-        renderStatus(data);
-
-        passwordInput.value = '';
-        statusReport.style.display = 'block';
-    } catch (err) {
-        statusError.textContent = 'Unauthorized or server error';
-        statusError.style.display = 'block';
+        await loadStatus(token);
+    } catch {
+        redirectToLogin();
     }
 });
 
+function redirectToLogin() {
+    window.location.href = '/admin';
+}
+
+async function loadStatus(token) {
+    const loadingEl = document.getElementById('status-loading');
+    const statusReport = document.getElementById('status-report');
+
+    try {
+        const response = await fetch('/api/admin/status', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({}),
+        });
+
+        if (!response.ok) throw new Error('Failed');
+
+        const data = await response.json();
+        loadingEl.style.display = 'none';
+        statusReport.style.display = 'block';
+        renderStatus(data);
+    } catch {
+        loadingEl.textContent = 'Failed to load status data.';
+    }
+}
+
 function renderStatus(data) {
+    const statusReport = document.getElementById('status-report');
+    if (!statusReport) return;
+
     const logs = data.logs || {};
 
     const uptime = parseFloat(data.uptime) || 0;

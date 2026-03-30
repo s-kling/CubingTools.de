@@ -1,0 +1,193 @@
+#todo-content {
+    display: grid;
+    gap: var(--space-md);
+    margin-top: var(--space-md);
+}
+
+.todo-status {
+    min-height: 28px;
+    margin-top: var(--space-xs);
+    padding: var(--space-xxs) var(--space-sm);
+    border: 1px solid transparent;
+    border-radius: var(--main-radius);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--secondary-text);
+    font-size: 0.95em;
+}
+
+.todo-status.is-saving {
+    color: #f9c74f;
+    border-color: rgba(249, 199, 79, 0.4);
+}
+
+.todo-status.is-success {
+    color: #8bd450;
+    border-color: rgba(139, 212, 80, 0.35);
+}
+
+.todo-status.is-error {
+    color: #f07167;
+    border-color: rgba(240, 113, 103, 0.35);
+}
+
+.todo-section {
+    background: linear-gradient(180deg, rgba(42, 42, 49, 0.95) 0%, rgba(25, 25, 35, 0.95) 100%);
+    border: 1px solid var(--input-border);
+    border-radius: calc(var(--main-radius) + 4px);
+    padding: var(--space-md);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.25);
+    margin: var(--space-xs);
+}
+
+.todo-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+}
+
+.todo-section-header h2 {
+    margin: 0;
+    font-size: var(--font-size-lg);
+    letter-spacing: 0.01em;
+}
+
+.todo-add-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    padding: 0;
+    border: 1px solid var(--input-border);
+    background: linear-gradient(180deg, var(--button-background) 0%, #3f38c7 100%);
+    color: var(--main-text);
+    font-weight: 600;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--main-radius);
+    cursor: pointer;
+    transition: transform 0.18s ease, filter 0.18s ease, box-shadow 0.18s ease;
+}
+
+.todo-add-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.05);
+    box-shadow: 0 6px 16px rgba(79, 70, 229, 0.32);
+}
+
+.todo-add-btn:active {
+    transform: translateY(0);
+}
+
+.todo-add-btn:focus-visible {
+    outline: 2px solid var(--link-color);
+    outline-offset: 2px;
+}
+
+.todo-list {
+    list-style: none;
+    margin: 0;
+    padding: 0 var(--space-sm);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--main-radius);
+    background: rgba(0, 0, 0, 0.18);
+}
+
+.todo-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    transition: background-color 0.15s ease;
+}
+
+.todo-item:last-child {
+    border-bottom: none;
+}
+
+.todo-item:hover {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+.todo-item::before {
+    content: none;
+}
+
+.todo-item input[type='checkbox'] {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    background: var(--input-background);
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.todo-item input[type='checkbox']:checked {
+    border-color: transparent;
+    background-color: var(--button-background);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' d='M5 13l4 4L19 7'/%3E%3C/svg%3E");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 13px 13px;
+}
+
+.todo-item input[type='checkbox']:focus-visible {
+    outline: 2px solid var(--link-color);
+    outline-offset: 2px;
+}
+
+.todo-item-label {
+    line-height: 1.4;
+    color: var(--main-text);
+    word-break: break-word;
+}
+
+.todo-item.todo-done .todo-item-label {
+    color: var(--secondary-text);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+}
+
+.todo-item.todo-done {
+    opacity: 0.68;
+}
+
+.todo-section-empty {
+    margin: 0;
+    padding: var(--space-sm);
+    border: 1px dashed var(--input-border);
+    border-radius: var(--main-radius);
+    background: rgba(0, 0, 0, 0.14);
+    color: var(--secondary-text);
+    font-style: italic;
+}
+
+@media (max-width: 900px) {
+    .todo-section {
+        padding: var(--space-sm);
+    }
+}
+
+@media (max-width: 700px) {
+    #todo-content {
+        gap: var(--space-sm);
+    }
+
+    .todo-section-header h2 {
+        font-size: var(--font-size-base);
+    }
+
+    .todo-section {
+        padding: var(--space-sm);
+    }
+
+    .todo-list {
+        padding: 0 var(--space-xs);
+    }
+}

@@ -1,12 +1,12 @@
 let currentPrivacyPolicyVersion = '2026-02-14';
 
 document.addEventListener('DOMContentLoaded', () => {
-    // HERO
-    const hasSeenHero = localStorage.getItem('hero_seen');
+    // // HERO
+    // const hasSeenHero = localStorage.getItem('hero_seen');
 
-    if (!hasSeenHero) {
-        showHero();
-    }
+    // if (!hasSeenHero) {
+    //     showHero();
+    // }
 
     // COOKIE CONSENT
     const cookiesAccepted = localStorage.getItem('cookies_accepted');
@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         gtag('js', new Date());
         gtag('config', 'G-7FDCB5928P');
-    } else if (cookiesAccepted === null || cookiesAccepted !== currentPrivacyPolicyVersion) {
+    } else if (cookiesAccepted !== currentPrivacyPolicyVersion && cookiesAccepted !== 'false') {
         addCookieConsentBanner();
     }
 
@@ -28,59 +28,59 @@ document.addEventListener('DOMContentLoaded', () => {
     setupFooter();
 });
 
-function showHero() {
-    const hero = document.createElement('section');
-    hero.className = 'hero';
-    hero.innerHTML = `
-        <h1>CubingTools is back.</h1>
-        <p>New and Improved 🚀</p>
-        <div class="info-section">
-            <div class="info-card" id="why-gone">
-                <h2>Why we were gone</h2>
-                <p>We took time to completely restructure the codebase, making it faster, more efficient, and easier to understand.</p>
-            </div>
-            <div class="info-card" id="what-changed">
-                <h2>What has changed</h2>
-                <p>Click here to check out the new features, fixes, and improvements on our GitHub release page.</p>
-            </div>
-            <div class="info-card" id="follow-bluesky">
-                <h2>Follow us on BlueSky</h2>
-                <p>Stay connected with CubingTools on BlueSky for news, updates, and sneak peeks into upcoming features.</p>
-            </div>
-        </div>
-        `;
-    document.body.prepend(hero);
+// function showHero() {
+//     const hero = document.createElement('section');
+//     hero.className = 'hero';
+//     hero.innerHTML = `
+//         <h1>CubingTools is back.</h1>
+//         <p>New and Improved 🚀</p>
+//         <div class="info-section">
+//             <div class="info-card" id="why-gone">
+//                 <h2>Why we were gone</h2>
+//                 <p>We took time to completely restructure the codebase, making it faster, more efficient, and easier to understand.</p>
+//             </div>
+//             <div class="info-card" id="what-changed">
+//                 <h2>What has changed</h2>
+//                 <p>Click here to check out the new features, fixes, and improvements on our GitHub release page.</p>
+//             </div>
+//             <div class="info-card" id="follow-bluesky">
+//                 <h2>Follow us on BlueSky</h2>
+//                 <p>Stay connected with CubingTools on BlueSky for news, updates, and sneak peeks into upcoming features.</p>
+//             </div>
+//         </div>
+//         `;
+//     document.body.prepend(hero);
 
-    // Disable scroll until hero is dismissed
-    document.body.style.overflow = 'hidden';
+//     // Disable scroll until hero is dismissed
+//     document.body.style.overflow = 'hidden';
 
-    const dismissHero = () => {
-        hero.style.transition = 'opacity 0.8s ease, transform 0.8s ease';
-        hero.style.opacity = '0';
-        hero.style.transform = 'translateY(-40px)';
+//     const dismissHero = () => {
+//         hero.style.transition = 'opacity 0.8s ease, transform 0.8s ease';
+//         hero.style.opacity = '0';
+//         hero.style.transform = 'translateY(-40px)';
 
-        setTimeout(() => {
-            hero.remove();
-            document.body.style.overflowY = 'auto';
-            localStorage.setItem('hero_seen', 'true'); // store flag
-        }, 800);
+//         setTimeout(() => {
+//             hero.remove();
+//             document.body.style.overflowY = 'auto';
+//             localStorage.setItem('hero_seen', 'true'); // store flag
+//         }, 800);
 
-        document.removeEventListener('keydown', dismissHero);
-        document.removeEventListener('click', dismissHero);
-    };
+//         document.removeEventListener('keydown', dismissHero);
+//         document.removeEventListener('click', dismissHero);
+//     };
 
-    document.addEventListener('keydown', dismissHero);
-    document.addEventListener('click', dismissHero);
+//     document.addEventListener('keydown', dismissHero);
+//     document.addEventListener('click', dismissHero);
 
-    // Card actions
-    document.getElementById('what-changed').addEventListener('click', () => {
-        window.open('https://github.com/s-kling/CubingTools.de/releases/tag/Release', '_blank');
-    });
+//     // Card actions
+//     document.getElementById('what-changed').addEventListener('click', () => {
+//         window.open('https://github.com/s-kling/CubingTools.de/releases/tag/Release', '_blank');
+//     });
 
-    document.getElementById('follow-bluesky').addEventListener('click', () => {
-        window.open('https://bsky.app/profile/cubingtools.de', '_blank');
-    });
-}
+//     document.getElementById('follow-bluesky').addEventListener('click', () => {
+//         window.open('https://bsky.app/profile/cubingtools.de', '_blank');
+//     });
+// }
 
 function addCookieConsentBanner() {
     const banner = document.createElement('div');
@@ -224,7 +224,7 @@ function setupNavbar() {
     homeLink.innerHTML = '<a href="/">Home</a>';
 
     const contactLink = document.createElement('li');
-    contactLink.innerHTML = '<a href="mailto:info@cubingtools.de">Contact</a>';
+    contactLink.innerHTML = '<a href="/contact">Contact</a>';
 
     const changeRelease = document.createElement('li');
     changeRelease.style.cursor = 'pointer';

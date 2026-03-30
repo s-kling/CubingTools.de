@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Basic Metadata -->
+    <title>CT.de • Admin Console</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="CubingTools.de Admin Console - Manage server status, users, and system analytics.">
+    <meta name="keywords" content="WCA, cubing, admin, console, dashboard, server management">
+  
+    <!-- Other Fancy Things -->
+    <link rel="icon" href="../../assets/favicon.ico" type="image/x-icon">
+    <link rel="apple-touch-icon" href="../../assets/logo_no_text.png">
+
+    <!-- CSS Stylesheets -->
+    <link rel="stylesheet" href="../../css/global.css">
+
+    <!-- JS Files -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P" defer></script>
+    <script src="../../js/setupPage.js" defer></script>
+    <script src="../../js/admin/admin.js" defer></script>
+</head>
+
+<body>
+    <div class="container">
+        <nav id="navbar"></nav>
+
+        <div id="sidebar">
+            <h2>Tools</h2>
+        </div>
+
+        <div id="version"></div>
+
+        <main>
+            <section class="heading">
+                <h1>Admin Console</h1>
+                <p>
+                    Access server status, developer tools, and system analytics.
+                </p>
+
+                <div id="admin-auth">
+                    <label>
+                        Enter Admin Password:
+                        <input type="password" id="admin-password" placeholder="Password" />
+                    </label>
+                    <p id="admin-error" style="color: red; display: none;"></p>
+                </div>
+
+                <div id="dashboard" style="display: none;"></div>
+            </section>
+        </main>
+        <footer id="footer"></footer>
+    </div>
+</body>
+
+</html>

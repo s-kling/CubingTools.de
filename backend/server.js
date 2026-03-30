@@ -7,6 +7,8 @@ const sanitizeHtml = require('sanitize-html');
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
 
 const app = express();
+// Respect one reverse-proxy hop so req.ip is accurate for rate limiting.
+app.set('trust proxy', 1);
 const prodPort = config.prod_port;
 let betaPort = config.beta_port;
 let betaTest = process.argv.includes('--beta');
@@ -93,14 +95,11 @@ function logRequest(req, res, startTime) {
         const method = colorize('cyan', req.method.padEnd(6));
         const status = colorize(statusColor, String(res.statusCode));
         const duration = colorize('yellow', formatDuration(durationMs));
-        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown-ip';
-        const ua = req.headers['user-agent'] || 'unknown-agent';
         const responseSize = res.getHeader('content-length') || '-';
 
         console.log(
-            `${method} ${req.originalUrl} ${status} ${duration} ${colorize('dim', `ip=${ip} bytes=${responseSize}`)}`,
+            `${method} ${req.originalUrl} ${status} ${duration} ${colorize('dim', `bytes=${responseSize}`)}`,
         );
-        console.log(`${colorize('dim', `      ua=${ua}`)}`);
     }
 }
 
@@ -149,6 +148,7 @@ app.use((req, res, next) => {
 
 app.use(require('./API/tools'));
 app.use(require('./API/api'));
+app.use(require('./API/admin-routes'));
 app.use(require('./API/routes'));
 
 /* =========================
@@ -168,7 +168,7 @@ server.listen(port, () => {
 });
 
 process.on('SIGINT', () => {
-    console.log('Received SIGINT. Shutting down gracefully...');
+    console.log('\nReceived SIGINT. Shutting down gracefully...');
     debugLog('closing HTTP server and log stream');
     server.close(() => {
         logStream.end();

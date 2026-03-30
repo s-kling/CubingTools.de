@@ -18,11 +18,6 @@ router.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '..', '../public/html', 'index.html'));
 });
 
-// Serve the status report
-router.get('/status', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', '../public/html', 'status.html'));
-});
-
 // Serve the events
 router.get('/events', (req, res) => {
     res.json({ events: events });
@@ -32,6 +27,10 @@ router.get('/events', (req, res) => {
 router.get('/privacy-policy', (req, res) => {
     res.sendFile(path.join(__dirname, '..', '../public/html', 'privacy.html'));
 });
+
+// router.get('/contact', (req, res) => {
+//     res.sendFile(path.join(__dirname, '..', '../public/html', 'contact.html'));
+// });
 
 // Serve the robots txt
 router.get('/robots.txt', (req, res) => {
