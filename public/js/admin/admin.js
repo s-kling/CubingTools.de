@@ -42,6 +42,10 @@ function showDashboard() {
                 <h3>Server Status</h3>
                 <p>Uptime, memory usage, and log statistics.</p>
             </a>
+            <a href="/admin/messages" class="admin-card">
+                <h3>Messages</h3>
+                <p>View and manage user messages.</p>
+            </a>
             <a href="/admin/dev-todo" class="admin-card">
                 <h3>Developer Todo</h3>
                 <p>Track development tasks and project progress.</p>

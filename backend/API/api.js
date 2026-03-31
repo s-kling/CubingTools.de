@@ -60,6 +60,24 @@ const adminTodosWriteLimiter = createRateLimiter(
     'Too many TODO update requests, please try again later.',
 );
 
+const adminMessagesReadLimiter = createRateLimiter(
+    15 * 60 * 1000,
+    120,
+    'Too many messages requests, please try again later.',
+);
+
+const adminMessagesWriteLimiter = createRateLimiter(
+    15 * 60 * 1000,
+    40,
+    'Too many message updates, please try again later.',
+);
+
+const adminMessagesBanLimiter = createRateLimiter(
+    15 * 60 * 1000,
+    40,
+    'Too many ban requests, please try again later.',
+);
+
 const wcaLimiter = createRateLimiter(
     15 * 60 * 1000,
     180,
@@ -419,6 +437,52 @@ class AdminSessionApi {
         }
         next();
     }
+
+    getAdminMessages(req, res) {
+        const messages = contactApi.getMessages();
+        const bans = contactApi.getBans();
+        return res.json({ messages, bans });
+    }
+
+    deleteAdminMessage(req, res) {
+        const id = String(req?.params?.id || '').trim();
+        if (!id) {
+            return res.status(400).json({ error: 'Message id required' });
+        }
+
+        const removed = contactApi.removeMessage(id);
+        if (!removed) {
+            return res.status(404).json({ error: 'Message not found' });
+        }
+
+        return res.json({ success: true });
+    }
+
+    getAdminBans(req, res) {
+        return res.json({ bans: contactApi.getBans() });
+    }
+
+    addAdminBan(req, res) {
+        const { type, value, reason } = req.body || {};
+        const added = contactApi.addBan({ type, value, reason });
+
+        if (!added) {
+            return res.status(400).json({ error: 'Invalid ban payload' });
+        }
+
+        return res.json({ success: true, bans: contactApi.getBans() });
+    }
+
+    removeAdminBan(req, res) {
+        const { type, value } = req.body || {};
+        const removed = contactApi.removeBan({ type, value });
+
+        if (!removed) {
+            return res.status(404).json({ error: 'Ban entry not found' });
+        }
+
+        return res.json({ success: true, bans: contactApi.getBans() });
+    }
 }
 
 class ContactApi {
@@ -427,6 +491,122 @@ class ContactApi {
         this.projectID = process.env.RECAPTCHA_PROJECT_ID || '';
         this.recaptchaKey = process.env.RECAPTCHA_SITE_KEY || '';
         this.recaptchaAction = process.env.RECAPTCHA_ACTION || '';
+        this.mailsPath = path.join(__dirname, 'mail', 'mails.json');
+        this.bansPath = path.join(__dirname, 'mail', 'bans.json');
+        this.unconfirmedTtlMs = 60 * 60 * 1000;
+    }
+
+    normalizeEmail(email) {
+        return String(email || '')
+            .trim()
+            .toLowerCase();
+    }
+
+    normalizeBanValue(type, value) {
+        if (type === 'email') {
+            return this.normalizeEmail(value);
+        }
+
+        if (type === 'ip') {
+            return String(value || '')
+                .trim()
+                .toLowerCase();
+        }
+
+        return '';
+    }
+
+    readBansFile() {
+        const empty = { emails: [], ips: [] };
+
+        if (!fs.existsSync(this.bansPath)) {
+            return empty;
+        }
+
+        try {
+            const parsed = JSON.parse(fs.readFileSync(this.bansPath, 'utf8'));
+
+            if (!parsed || typeof parsed !== 'object') {
+                return empty;
+            }
+
+            return {
+                emails: Array.isArray(parsed.emails) ? parsed.emails : [],
+                ips: Array.isArray(parsed.ips) ? parsed.ips : [],
+            };
+        } catch {
+            return empty;
+        }
+    }
+
+    writeBansFile(bans) {
+        fs.writeFileSync(this.bansPath, JSON.stringify(bans, null, 2), 'utf8');
+    }
+
+    getBans() {
+        return this.readBansFile();
+    }
+
+    isBanned({ email, secIp }) {
+        const bans = this.readBansFile();
+        const normalizedEmail = this.normalizeEmail(email);
+        const normalizedIp = this.normalizeBanValue('ip', secIp);
+
+        const emailHit = bans.emails.some((entry) => entry?.value === normalizedEmail);
+        const ipHit = bans.ips.some((entry) => entry?.value === normalizedIp);
+
+        return emailHit || ipHit;
+    }
+
+    addBan({ type, value, reason }) {
+        const normalizedType = String(type || '')
+            .trim()
+            .toLowerCase();
+        const normalizedValue = this.normalizeBanValue(normalizedType, value);
+
+        if (!normalizedValue || !['email', 'ip'].includes(normalizedType)) {
+            return false;
+        }
+
+        const key = normalizedType === 'email' ? 'emails' : 'ips';
+        const bans = this.readBansFile();
+
+        const exists = bans[key].some((entry) => entry?.value === normalizedValue);
+        if (exists) {
+            return true;
+        }
+
+        bans[key].push({
+            value: normalizedValue,
+            reason: String(reason || '').trim(),
+            createdAt: new Date().toISOString(),
+        });
+
+        this.writeBansFile(bans);
+        return true;
+    }
+
+    removeBan({ type, value }) {
+        const normalizedType = String(type || '')
+            .trim()
+            .toLowerCase();
+        const normalizedValue = this.normalizeBanValue(normalizedType, value);
+
+        if (!normalizedValue || !['email', 'ip'].includes(normalizedType)) {
+            return false;
+        }
+
+        const key = normalizedType === 'email' ? 'emails' : 'ips';
+        const bans = this.readBansFile();
+        const index = bans[key].findIndex((entry) => entry?.value === normalizedValue);
+
+        if (index === -1) {
+            return false;
+        }
+
+        bans[key].splice(index, 1);
+        this.writeBansFile(bans);
+        return true;
     }
 
     handleRequest(req, res) {
@@ -444,9 +624,9 @@ class ContactApi {
         if (id) {
             const valid = this.validateConfirmationLink(id);
             if (valid) {
-                return res.redirect(302, '/contact/confirmed');
+                return res.redirect(302, '/contact?status=confirmed');
             } else {
-                return res.redirect(302, '/contact/invalid');
+                return res.redirect(302, '/contact?status=invalid');
             }
         }
 
@@ -454,6 +634,11 @@ class ContactApi {
 
         if (!name || !email || !message || !token) {
             return res.status(400).json({ success: false, error: 'Missing required fields' });
+        }
+
+        const sec_ip = sha256Hash(req.ip || 'unknown');
+        if (this.isBanned({ email, secIp: sec_ip })) {
+            return res.status(403).json({ success: false, error: 'Sender is banned' });
         }
 
         // Verify reCAPTCHA token
@@ -469,12 +654,15 @@ class ContactApi {
 
                 if (score && parseFloat(score) >= 0.5) {
                     // Here you would typically send the message via email or store it in a database
+                    const requestHost = req?.get?.('host') || '';
                     this.sendConfirmationEmail({
+                        sec_ip,
                         name,
                         email,
                         tool,
                         message,
                         recaptcha_score: score,
+                        requestHost,
                     }).catch((error) => {
                         console.error('Failed to send confirmation email:', error);
                     });
@@ -572,31 +760,74 @@ class ContactApi {
     }
 
     // Saves messages to /mail/mails.json until they are confirmed by the sender
-    saveMessage({ id, name, email, tool, message, recaptcha_score }) {
-        const mailsPath = path.join(__dirname, 'mail', 'mails.json');
-        let mails = [];
-        if (fs.existsSync(mailsPath)) {
-            try {
-                mails = JSON.parse(fs.readFileSync(mailsPath, 'utf8'));
-            } catch {
-                mails = [];
-            }
-        }
+    saveMessage({ id, sec_ip, name, email, tool, message, recaptcha_score }) {
+        let mails = this.readMailsFile();
+        const pruneResult = this.pruneExpiredUnconfirmedMails(mails);
+        mails = pruneResult.mails;
 
         mails.push({
             id: id,
+            secured_ip: sec_ip,
             name,
             email,
             tool,
             message,
             timestamp: new Date().toISOString(),
             recaptcha_score: recaptcha_score,
+            confirmed: false,
         });
 
-        fs.writeFileSync(mailsPath, JSON.stringify(mails, null, 2), 'utf8');
+        fs.writeFileSync(this.mailsPath, JSON.stringify(mails, null, 2), 'utf8');
     }
 
-    async sendConfirmationEmail({ name, email, tool, message, recaptcha_score }) {
+    readMailsFile() {
+        if (!fs.existsSync(this.mailsPath)) {
+            return [];
+        }
+
+        try {
+            const parsed = JSON.parse(fs.readFileSync(this.mailsPath, 'utf8'));
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    }
+
+    pruneExpiredUnconfirmedMails(mails) {
+        const cutoff = Date.now() - this.unconfirmedTtlMs;
+        let changed = false;
+
+        const filtered = mails.filter((mail) => {
+            if (mail?.confirmed) {
+                return true;
+            }
+
+            const timestampMs = Date.parse(mail?.timestamp || '');
+            if (Number.isNaN(timestampMs)) {
+                return true;
+            }
+
+            const isExpired = timestampMs < cutoff;
+            if (isExpired) {
+                changed = true;
+                return false;
+            }
+
+            return true;
+        });
+
+        return { mails: filtered, changed };
+    }
+
+    async sendConfirmationEmail({
+        sec_ip,
+        name,
+        email,
+        tool,
+        message,
+        recaptcha_score,
+        requestHost,
+    }) {
         const escapeHtml = (str) =>
             String(str)
                 .replace(/&/g, '&amp;')
@@ -606,7 +837,16 @@ class ContactApi {
                 .replace(/'/g, '&#39;');
 
         const id = crypto.randomBytes(16).toString('hex');
-        this.saveMessage({ id, name, email, tool, message, recaptcha_score });
+        this.saveMessage({
+            id,
+            sec_ip,
+            name,
+            email,
+            tool,
+            message,
+            recaptcha_score,
+            confirmed: false,
+        });
 
         const safeName = escapeHtml(name);
         const safeTool = escapeHtml(tool);
@@ -623,7 +863,7 @@ class ContactApi {
         });
 
         try {
-            let hostname = req?.get?.('host') || '';
+            let hostname = String(requestHost || '');
             hostname =
                 hostname.includes(':8001') || hostname.includes('beta.cubingtools.de')
                     ? 'beta.cubingtools.de'
@@ -686,7 +926,8 @@ class ContactApi {
                 .replace(/\$\{recaptchaScore\}/g, safeRecaptchaScore);
 
             const info = await transporter.sendMail({
-                from: `${mail.name}, <${mail.email}>`,
+                from: `CubingTools.de <${process.env.EMAIL_USER}>`,
+                replyTo: `${mail.name} <${mail.email}>`,
                 to: `Sebastian <${process.env.EMAIL_RECEIVER}>`,
                 subject: 'New contact message from CubingTools.de',
                 html: htmlContent,
@@ -697,31 +938,86 @@ class ContactApi {
     }
 
     validateConfirmationLink(id) {
-        const mailsPath = path.join(__dirname, 'mail', 'mails.json');
-        if (!fs.existsSync(mailsPath)) {
+        if (!fs.existsSync(this.mailsPath)) {
             return false;
         }
 
-        let mails = [];
-        try {
-            mails = JSON.parse(fs.readFileSync(mailsPath, 'utf8'));
-        } catch {
+        let mails = this.readMailsFile();
+        if (!mails.length) {
             return false;
         }
+
+        const pruneResult = this.pruneExpiredUnconfirmedMails(mails);
+        mails = pruneResult.mails;
 
         const mailIndex = mails.findIndex((mail) => mail.id === id);
         if (mailIndex === -1) {
+            if (pruneResult.changed) {
+                fs.writeFileSync(this.mailsPath, JSON.stringify(mails, null, 2), 'utf8');
+            }
             return false;
         }
 
         const mail = mails[mailIndex];
-        // Remove the mail from the pending list
-        mails.splice(mailIndex, 1);
-        fs.writeFileSync(mailsPath, JSON.stringify(mails, null, 2), 'utf8');
+        if (mail.confirmed) {
+            return false;
+        }
+
+        mail.confirmed = true;
+        mails[mailIndex] = mail;
+        fs.writeFileSync(this.mailsPath, JSON.stringify(mails, null, 2), 'utf8');
 
         this.sendMail(mail);
 
         return true;
+    }
+
+    removeMessage(id) {
+        if (!fs.existsSync(this.mailsPath)) {
+            return false;
+        }
+
+        let mails = this.readMailsFile();
+        if (!mails.length) {
+            return false;
+        }
+
+        const pruneResult = this.pruneExpiredUnconfirmedMails(mails);
+        mails = pruneResult.mails;
+
+        const mailIndex = mails.findIndex((mail) => mail.id === id);
+        if (mailIndex === -1) {
+            if (pruneResult.changed) {
+                fs.writeFileSync(this.mailsPath, JSON.stringify(mails, null, 2), 'utf8');
+            }
+            return false;
+        }
+
+        // Remove the mail from the pending list
+        mails.splice(mailIndex, 1);
+        fs.writeFileSync(this.mailsPath, JSON.stringify(mails, null, 2), 'utf8');
+
+        return true;
+    }
+
+    getMessages() {
+        if (!fs.existsSync(this.mailsPath)) {
+            return [];
+        }
+
+        let mails = this.readMailsFile();
+        if (!mails.length) {
+            return [];
+        }
+
+        const pruneResult = this.pruneExpiredUnconfirmedMails(mails);
+        mails = pruneResult.mails;
+
+        if (pruneResult.changed) {
+            fs.writeFileSync(this.mailsPath, JSON.stringify(mails, null, 2), 'utf8');
+        }
+
+        return mails;
     }
 }
 
@@ -785,6 +1081,41 @@ router.post(
             return res.status(500).json({ error: 'Failed to update TODO file' });
         }
     },
+);
+
+router.get(
+    '/api/admin/messages',
+    adminMessagesReadLimiter,
+    adminSessionApi.requireAuth.bind(adminSessionApi),
+    (req, res) => adminSessionApi.getAdminMessages(req, res),
+);
+
+router.delete(
+    '/api/admin/messages/:id',
+    adminMessagesWriteLimiter,
+    adminSessionApi.requireAuth.bind(adminSessionApi),
+    (req, res) => adminSessionApi.deleteAdminMessage(req, res),
+);
+
+router.get(
+    '/api/admin/messages/bans',
+    adminMessagesReadLimiter,
+    adminSessionApi.requireAuth.bind(adminSessionApi),
+    (req, res) => adminSessionApi.getAdminBans(req, res),
+);
+
+router.post(
+    '/api/admin/messages/ban',
+    adminMessagesBanLimiter,
+    adminSessionApi.requireAuth.bind(adminSessionApi),
+    (req, res) => adminSessionApi.addAdminBan(req, res),
+);
+
+router.post(
+    '/api/admin/messages/unban',
+    adminMessagesBanLimiter,
+    adminSessionApi.requireAuth.bind(adminSessionApi),
+    (req, res) => adminSessionApi.removeAdminBan(req, res),
 );
 
 // Wire class into router

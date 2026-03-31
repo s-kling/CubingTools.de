@@ -1,0 +1,297 @@
+.messages-dashboard {
+    display: grid;
+    gap: var(--space-md);
+    margin-top: var(--space-md);
+}
+
+.card {
+    background: var(--secondary-background);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.23);
+    padding: var(--space-md);
+    border-radius: var(--main-radius);
+}
+
+.messages-controls .control-grid {
+    display: grid;
+    gap: var(--space-sm);
+    grid-template-columns: repeat(3, minmax(180px, 1fr));
+    overflow-y: scroll;
+}
+
+.messages-controls label,
+.ban-form label {
+    display: grid;
+    gap: 6px;
+    font-size: 0.95em;
+    color: var(--secondary-text);
+}
+
+.messages-controls input,
+.messages-controls select,
+.ban-form input,
+.ban-form select {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: var(--main-radius);
+    border: 1px solid var(--input-border);
+    background: var(--input-background);
+    color: var(--main-text);
+}
+
+.actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    margin-top: var(--space-sm);
+}
+
+.actions-row button,
+.row-actions button,
+.ban-form button,
+.ban-list button {
+    background: white;
+    color: black;
+    border-radius: var(--main-radius);
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: filter 0.16s ease, transform 0.16s ease;
+}
+
+.actions-row button:hover,
+.row-actions button:hover,
+.ban-form button:hover,
+.ban-list button:hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+}
+
+.messages-stats {
+    display: grid;
+    gap: var(--space-sm);
+    grid-template-columns: repeat(9, minmax(120px, 1fr));
+    padding-bottom: 5px;
+    overflow-y: scroll;
+}
+
+.messages-stats .stat {
+    padding: var(--space-sm);
+}
+
+.messages-stats h3 {
+    margin: 0;
+    font-size: 0.85em;
+    color: var(--secondary-text);
+    font-weight: 500;
+}
+
+.messages-stats p {
+    margin: 6px 0 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+}
+
+.messages-table-wrap {
+    overflow: auto;
+}
+
+.messages-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 1150px;
+}
+
+.messages-table th,
+.messages-table td {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    padding: 10px 8px;
+    vertical-align: top;
+    text-align: left;
+}
+
+.messages-table th {
+    color: var(--secondary-text);
+    font-weight: 600;
+    font-size: 0.92em;
+}
+
+.messages-table tr.is-banned {
+    background: rgba(255, 98, 98, 0.1);
+}
+
+.messages-table tr.is-confirmed {
+    background: rgba(137, 211, 77, 0.05);
+}
+
+.messages-table tr.is-unconfirmed {
+    background: rgba(249, 199, 79, 0.05);
+}
+
+.confirmed-badge,
+.unconfirmed-badge {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.confirmed-badge {
+    background: rgba(137, 211, 77, 0.18);
+    color: #89d34d;
+    border: 1px solid rgba(137, 211, 77, 0.35);
+}
+
+.unconfirmed-badge {
+    background: rgba(249, 199, 79, 0.15);
+    color: #f9c74f;
+    border: 1px solid rgba(249, 199, 79, 0.35);
+}
+
+.messages-table details summary {
+    width: 250px;
+    cursor: pointer;
+    color: var(--main-text);
+}
+
+.messages-table pre {
+    white-space: pre-wrap;
+    margin: 8px 0 0;
+    font-family: inherit;
+    color: var(--secondary-text);
+}
+
+.row-actions {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.row-actions button {
+    white-space: nowrap;
+}
+
+.messages-table td.ip-cell {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    white-space: nowrap;
+}
+
+.messages-empty {
+    color: var(--secondary-text);
+    font-style: italic;
+}
+
+.messages-ban-manager {
+    overflow-y: scroll;
+}
+
+.messages-ban-manager h3 {
+    margin-top: 0;
+}
+
+.ban-form {
+    display: grid;
+    gap: var(--space-sm);
+    grid-template-columns: minmax(130px, 160px) minmax(220px, 1fr) minmax(220px, 1fr) auto;
+    align-items: end;
+}
+
+.ban-lists {
+    display: grid;
+    gap: var(--space-md);
+    grid-template-columns: repeat(2, minmax(240px, 1fr));
+    margin-top: var(--space-md);
+}
+
+.ban-lists h4 {
+    margin: 0 0 var(--space-xs);
+}
+
+.ban-list {
+    list-style: none;
+    margin: 0;
+    padding: var(--space-xs);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--main-radius);
+    background: rgba(0, 0, 0, 0.16);
+    display: grid;
+    gap: 8px;
+}
+
+.ban-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-xs);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 6px;
+    text-overflow: ellipsis;
+}
+
+.ban-list li:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.ban-empty {
+    color: var(--secondary-text);
+    font-style: italic;
+}
+
+.messages-status {
+    min-height: 26px;
+    margin: 0;
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--main-radius);
+    border: 1px solid transparent;
+    color: var(--secondary-text);
+}
+
+.messages-status.is-saving {
+    color: #f9c74f;
+    border-color: rgba(249, 199, 79, 0.35);
+}
+
+.messages-status.is-success {
+    color: #89d34d;
+    border-color: rgba(137, 211, 77, 0.35);
+}
+
+.messages-status.is-error {
+    color: #f07167;
+    border-color: rgba(240, 113, 103, 0.35);
+}
+
+@media (max-width: 1120px) {
+    .messages-controls .control-grid {
+        grid-template-columns: repeat(2, minmax(180px, 1fr));
+    }
+
+    .messages-stats {
+        grid-template-columns: repeat(4, minmax(120px, 1fr));
+    }
+
+    .ban-form {
+        grid-template-columns: 1fr;
+    }
+
+    .ban-lists {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 700px) {
+    .messages-controls .control-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .messages-stats {
+        grid-template-columns: repeat(2, minmax(120px, 1fr));
+    }
+
+    .card {
+        padding: var(--space-sm);
+    }
+}

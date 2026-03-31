@@ -13,3 +13,4 @@ node_modules/
 package-lock.json
 
 /md/TODO.md
+backend/API/mail/mails.json

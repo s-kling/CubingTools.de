@@ -4,6 +4,46 @@ const RECAPTCHA_ACTION = 'contact_submit';
 document.addEventListener('DOMContentLoaded', () => {
     const contactForm = document.getElementById('contact-form');
     const submitButton = contactForm?.querySelector('button[type="submit"]');
+    const messageField = document.getElementById('message');
+    const messageCounter = document.getElementById('message-counter');
+
+    const { status } = new URLSearchParams(window.location.search);
+    if (status === 'confirmed') {
+        window.showUserErrorPopup({
+            title: 'Message confirmed',
+            message:
+                'Thank you for confirming your message. We will get back to you as soon as possible.',
+        });
+    } else if (status === 'invalid') {
+        window.showUserErrorPopup({
+            title: 'Invalid confirmation link',
+            message:
+                'The confirmation link is invalid or has already been used. If you believe this is a mistake, please contact us directly at <a href="mailto:info@cubingtools.de">info@cubingtools.de</a>.',
+        });
+    }
+
+    const updateMessageCounter = () => {
+        if (!messageField || !messageCounter) {
+            return;
+        }
+
+        const maxLength = Number.parseInt(messageField.getAttribute('maxlength') || '0', 10);
+
+        if (!maxLength) {
+            messageCounter.textContent = '';
+            return;
+        }
+
+        const remainingCharacters = Math.max(0, maxLength - messageField.value.length);
+        messageCounter.textContent = remainingCharacters;
+        // Change color from green to red as the user types more characters
+        const percentageUsed = (maxLength - remainingCharacters) / maxLength;
+        const hue = 120 * (1 - percentageUsed);
+        messageCounter.style.color = `hsl(${hue}, 80%, 50%)`;
+    };
+
+    updateMessageCounter();
+    messageField?.addEventListener('input', updateMessageCounter);
 
     window
         .fetchJsonOrThrow('/api/tools', {
@@ -67,6 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             contactForm.reset();
+            updateMessageCounter();
         } catch (error) {
             console.error('Error submitting contact form:', error);
             window.showUserErrorPopup({

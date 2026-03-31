@@ -1,117 +1,205 @@
+main {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-lg);
+}
+
 .heading {
     display: flex;
     flex-direction: column;
     gap: var(--space-lg);
     padding: var(--space-md);
-    background: linear-gradient(160deg, rgba(25, 25, 35, 0.92), rgba(42, 42, 49, 0.78));
-    border: 1px solid var(--input-border);
+    width: 100%;
+    max-width: 720px;
+
+    background:
+        linear-gradient(160deg, rgba(25, 25, 35, 0.92), rgba(42, 42, 49, 0.78)),
+        radial-gradient(120% 120% at 0% 0%, rgba(79, 70, 229, 0.08), transparent);
+
+    border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: var(--main-radius);
+
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(6px);
 }
 
+/* Title refinement */
 .heading h1 {
     font-size: var(--font-size-xl);
     color: var(--main-text);
     margin: 0;
-    letter-spacing: 0.01em;
+    letter-spacing: 0.015em;
+    line-height: 1.2;
 }
 
 form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-sm);
-    max-width: 680px;
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: var(--space-md) var(--space-lg);
+    align-items: center;
 }
 
+/* Label refinement */
 form label {
-    font-size: var(--font-size-base);
-    color: var(--main-text);
-    font-weight: 500;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
+    grid-column: 1;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: var(--space-sm);
 }
 
 form input,
 form textarea,
 form select {
-    background-color: var(--input-background);
+    background:
+        linear-gradient(180deg, rgba(50, 50, 62, 0.95), rgba(50, 50, 62, 0.85));
+
     border: 1px solid var(--input-border);
     border-radius: var(--main-radius);
+
     color: var(--main-text);
     padding: var(--space-sm) var(--space-md);
+
     font-family: var(--font-main);
     font-size: var(--font-size-base);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.08s ease;
+
+    grid-column: 2;
+    width: 100%;
 }
 
+/* hover = subtle affordance */
+form input:hover,
+form textarea:hover,
+form select:hover {
+    border-color: var(--secondary-text);
+}
+
+/* focus = strong but clean */
 form input:focus,
 form textarea:focus,
 form select:focus {
     outline: none;
     border-color: var(--link-color);
-    box-shadow: 0 0 0 2px rgba(63, 167, 214, 0.2);
+
+    box-shadow:
+        0 0 0 2px rgba(63, 167, 214, 0.18),
+        0 2px 8px rgba(0, 0, 0, 0.25);
+
+    transform: translateY(-1px);
 }
 
 form select {
     appearance: none;
-    background-image: linear-gradient(45deg, transparent 50%, var(--secondary-text) 50%),
+
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--secondary-text) 50%),
         linear-gradient(135deg, var(--secondary-text) 50%, transparent 50%);
-    background-position: calc(100% - 18px) calc(50% - 2px), calc(100% - 12px) calc(50% - 2px);
-    background-size: 6px 6px, 6px 6px;
+
+    background-position:
+        calc(100% - 18px) calc(50% - 2px),
+        calc(100% - 12px) calc(50% - 2px);
+
+    background-size: 6px 6px;
     background-repeat: no-repeat;
+
     padding-right: 40px;
 }
 
 form textarea {
-    resize: vertical;
-    min-height: 136px;
-    line-height: 1.45;
+    resize: none;
+    min-height: 200px;
+    line-height: 1.5;
+}
+
+.message-counter {
+    margin: 0;
+    grid-column: 2;
+    color: var(--secondary-text);
+    font-size: 13px;
+    justify-self: end;
+
+    transition: color 0.2s ease;
 }
 
 form button {
-    background-color: var(--button-background);
+    background:
+        linear-gradient(180deg, var(--button-background), #4338ca);
+
     color: var(--main-text);
     border: none;
     border-radius: var(--main-radius);
+
     padding: var(--space-sm) var(--space-md);
+
     font-size: var(--font-size-base);
     font-weight: 600;
+
     cursor: pointer;
-    transition: background-color 0.2s ease, transform 0.12s ease;
-    align-self: flex-start;
-    min-width: 132px;
+
+    transition:
+        background 0.2s ease,
+        transform 0.12s ease,
+        box-shadow 0.2s ease;
+
+    grid-column: 2;
+    justify-content: start;
+    min-width: 140px;
+
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.25);
 }
 
+/* hover = lift */
 form button:hover {
-    background-color: var(--hover-background);
+    background: var(--hover-background);
+    transform: translateY(-1px);
 }
 
+/* focus-visible = accessibility */
 form button:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px rgba(63, 167, 214, 0.28);
+    box-shadow:
+        0 0 0 2px rgba(63, 167, 214, 0.28),
+        0 4px 14px rgba(79, 70, 229, 0.3);
 }
 
+/* active = press */
 form button:active {
-    opacity: 0.9;
     transform: translateY(1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 }
 
+/* disabled */
 form button:disabled {
-    opacity: 0.7;
+    opacity: 0.6;
     cursor: not-allowed;
+    box-shadow: none;
 }
 
 @media (max-width: 768px) {
-    .heading {
-        padding: var(--space-sm);
+    form {
+        grid-template-columns: 1fr;
     }
 
-    form {
-        max-width: 100%;
+    form label,
+    form input,
+    form select,
+    form textarea,
+    .message-counter,
+    form button {
+        grid-column: 1;
+    }
+
+    form label {
+        flex-direction: column;
+        align-items: flex-start;
     }
 
     form button {
         width: 100%;
-        align-self: stretch;
     }
 }

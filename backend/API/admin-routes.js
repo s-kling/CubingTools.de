@@ -12,6 +12,11 @@ router.get('/admin/status', (req, res) => {
     res.sendFile(path.join(__dirname, '..', '../public/html/admin', 'status.html'));
 });
 
+// Serve the messages report
+router.get('/admin/messages', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', '../public/html/admin', 'messages.html'));
+});
+
 // Serve the dev todo page
 router.get('/admin/dev-todo', (req, res) => {
     res.sendFile(path.join(__dirname, '..', '../public/html/admin', 'dev-todo.html'));
