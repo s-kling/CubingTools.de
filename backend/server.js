@@ -14,6 +14,22 @@ let betaPort = config.beta_port;
 let betaTest = process.argv.includes('--beta');
 const debug = process.argv.includes('--debug');
 
+const defaultCorsWhitelist = [
+    'https://cubingtools.de',
+    'https://www.cubingtools.de',
+    'https://beta.cubingtools.de',
+    'http://localhost:8000',
+    'http://localhost:8001',
+    'http://localhost:8002',
+];
+
+const corsWhitelist = new Set(
+    (process.env.CORS_WHITELIST || defaultCorsWhitelist.join(','))
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+);
+
 const ansi = {
     reset: '\x1b[0m',
     dim: '\x1b[2m',
@@ -130,6 +146,35 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, '../public')));
 app.use(express.json({ limit: config.body_parser_limit }));
 app.use(express.urlencoded({ extended: true, limit: config.body_parser_limit }));
+
+app.use((req, res, next) => {
+    const origin = req.headers.origin;
+
+    // Requests without Origin header (same-origin/server-to-server) are allowed.
+    if (!origin) {
+        return next();
+    }
+
+    if (corsWhitelist.has(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Vary', 'Origin');
+        res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+        if (req.method === 'OPTIONS') {
+            return res.sendStatus(204);
+        }
+
+        return next();
+    }
+
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(403);
+    }
+
+    return res.status(403).json({ error: 'Origin not allowed by CORS policy' });
+});
 
 /* =========================
    Routes
