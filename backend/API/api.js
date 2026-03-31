@@ -439,6 +439,17 @@ class ContactApi {
             recaptchaToken,
         } = req.body || {};
 
+        const { id } = req.query;
+
+        if (id) {
+            const valid = this.validateConfirmationLink(id);
+            if (valid) {
+                return res.redirect(302, '/contact/confirmed');
+            } else {
+                return res.redirect(302, '/contact/invalid');
+            }
+        }
+
         const token = recaptchaResponse || recaptchaToken;
 
         if (!name || !email || !message || !token) {
@@ -453,19 +464,20 @@ class ContactApi {
                     console.warn(
                         'reCAPTCHA verification skipped (credentials not available). Message allowed through.',
                     );
-                    // Still log the message
-                    console.log('New contact message (unverified):', {
-                        name,
-                        email,
-                        tool,
-                        message,
-                    });
                     return res.json({ success: true });
                 }
 
                 if (score && parseFloat(score) >= 0.5) {
                     // Here you would typically send the message via email or store it in a database
-                    console.log('New contact message:', { name, email, tool, message });
+                    this.sendConfirmationEmail({
+                        name,
+                        email,
+                        tool,
+                        message,
+                        recaptcha_score: score,
+                    }).catch((error) => {
+                        console.error('Failed to send confirmation email:', error);
+                    });
                     return res.json({ success: true });
                 } else {
                     return res
@@ -477,12 +489,6 @@ class ContactApi {
                 console.error('Error verifying reCAPTCHA:', error);
                 // Graceful degradation: allow submission if verification fails
                 console.warn('Allowing submission due to reCAPTCHA verification error');
-                console.log('New contact message (unverified due to error):', {
-                    name,
-                    email,
-                    tool,
-                    message,
-                });
                 return res.json({ success: true });
             });
     }
@@ -564,6 +570,159 @@ class ContactApi {
             throw error;
         }
     }
+
+    // Saves messages to /mail/mails.json until they are confirmed by the sender
+    saveMessage({ id, name, email, tool, message, recaptcha_score }) {
+        const mailsPath = path.join(__dirname, 'mail', 'mails.json');
+        let mails = [];
+        if (fs.existsSync(mailsPath)) {
+            try {
+                mails = JSON.parse(fs.readFileSync(mailsPath, 'utf8'));
+            } catch {
+                mails = [];
+            }
+        }
+
+        mails.push({
+            id: id,
+            name,
+            email,
+            tool,
+            message,
+            timestamp: new Date().toISOString(),
+            recaptcha_score: recaptcha_score,
+        });
+
+        fs.writeFileSync(mailsPath, JSON.stringify(mails, null, 2), 'utf8');
+    }
+
+    async sendConfirmationEmail({ name, email, tool, message, recaptcha_score }) {
+        const escapeHtml = (str) =>
+            String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+
+        const id = crypto.randomBytes(16).toString('hex');
+        this.saveMessage({ id, name, email, tool, message, recaptcha_score });
+
+        const safeName = escapeHtml(name);
+        const safeTool = escapeHtml(tool);
+        const safeMessage = escapeHtml(message);
+
+        const transporter = nodemailer.createTransport({
+            host: process.env.EMAIL_HOST,
+            port: 587,
+            secure: false,
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASSWORD,
+            },
+        });
+
+        try {
+            let hostname = req?.get?.('host') || '';
+            hostname =
+                hostname.includes(':8001') || hostname.includes('beta.cubingtools.de')
+                    ? 'beta.cubingtools.de'
+                    : 'cubingtools.de';
+            const confirmationLink = `https://${hostname}/contact/confirm?id=${id}`;
+
+            const templatePath = path.join(__dirname, 'mail', 'confirm.html');
+            const htmlContent = fs
+                .readFileSync(templatePath, 'utf8')
+                .replace(/\$\{safeName\}/g, safeName)
+                .replace(/\$\{confirmationLink\}/g, confirmationLink)
+                .replace(/\$\{safeTool\}/g, safeTool || 'Other')
+                .replace(/\$\{safeMessage\}/g, safeMessage);
+
+            const info = await transporter.sendMail({
+                from: `CubingTools.de <${process.env.EMAIL_USER}>`,
+                to: `${name}, <${email}>`,
+                subject: 'Confirmation of your message to CubingTools',
+                html: htmlContent,
+            });
+        } catch (error) {
+            console.error('Failed to send confirmation email:', error);
+        }
+    }
+
+    async sendMail(mail) {
+        const escapeHtml = (str) =>
+            String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+
+        const safeName = escapeHtml(mail.name);
+        const safeEmail = escapeHtml(mail.email);
+        const safeTool = escapeHtml(mail.tool);
+        const safeMessage = escapeHtml(mail.message);
+        const safeRecaptchaScore =
+            mail.recaptcha_score != null ? escapeHtml(mail.recaptcha_score.toString()) : 'N/A';
+
+        const transporter = nodemailer.createTransport({
+            host: process.env.EMAIL_HOST,
+            port: 587,
+            secure: false,
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASSWORD,
+            },
+        });
+
+        try {
+            const templatePath = path.join(__dirname, 'mail', 'mail.html');
+            const htmlContent = fs
+                .readFileSync(templatePath, 'utf8')
+                .replace(/\$\{safeAuthor\}/g, safeName)
+                .replace(/\$\{safeEmail\}/g, safeEmail)
+                .replace(/\$\{safeTool\}/g, safeTool || 'Other')
+                .replace(/\$\{safeMessage\}/g, safeMessage)
+                .replace(/\$\{recaptchaScore\}/g, safeRecaptchaScore);
+
+            const info = await transporter.sendMail({
+                from: `${mail.name}, <${mail.email}>`,
+                to: `Sebastian <${process.env.EMAIL_RECEIVER}>`,
+                subject: 'New contact message from CubingTools.de',
+                html: htmlContent,
+            });
+        } catch (error) {
+            console.error('Failed to send message email:', error);
+        }
+    }
+
+    validateConfirmationLink(id) {
+        const mailsPath = path.join(__dirname, 'mail', 'mails.json');
+        if (!fs.existsSync(mailsPath)) {
+            return false;
+        }
+
+        let mails = [];
+        try {
+            mails = JSON.parse(fs.readFileSync(mailsPath, 'utf8'));
+        } catch {
+            return false;
+        }
+
+        const mailIndex = mails.findIndex((mail) => mail.id === id);
+        if (mailIndex === -1) {
+            return false;
+        }
+
+        const mail = mails[mailIndex];
+        // Remove the mail from the pending list
+        mails.splice(mailIndex, 1);
+        fs.writeFileSync(mailsPath, JSON.stringify(mails, null, 2), 'utf8');
+
+        this.sendMail(mail);
+
+        return true;
+    }
 }
 
 const wcaApi = new WcaApi();
@@ -573,6 +732,8 @@ const adminSessionApi = new AdminSessionApi();
 
 // Contact API endpoint
 router.post('/api/contact', contactLimiter, (req, res) => contactApi.handleRequest(req, res));
+
+router.get('/contact/confirm', (req, res) => contactApi.handleRequest(req, res));
 
 // Admin session endpoints
 router.post('/api/admin/login', adminLoginLimiter, (req, res) =>

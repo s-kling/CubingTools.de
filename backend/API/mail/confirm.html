@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Message Confirmation – CubingTools.de</title>
+</head>
+
+<body style="margin:0;padding:0;background-color:#000000;font-family:'Poppins',Arial,sans-serif;color:#F4F4F5;overflow: scroll;height: 100vh;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#000000;background-image:radial-gradient(circle at 92% 6%, rgba(79,70,229,0.22) 0%, transparent 38%), radial-gradient(circle at 6% 94%, rgba(63,167,214,0.22) 0%, transparent 38%);padding:52px 20px;height: 100vh;">
+        <tr>
+            <td align="center">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;border-radius:15px;overflow:hidden;box-shadow:0 24px 48px rgba(0,0,0,0.45);">
+
+                    <!-- Header -->
+                    <tr>
+                        <td style="background:linear-gradient(120deg,#4F46E5,#3FA7D6);padding:24px 32px;">
+                            <img src="https://cubingtools.de/assets/logo_long.png" alt="CubingTools.de" style="height:52px;vertical-align:middle;">
+                        </td>
+                    </tr>
+
+                    <!-- Body -->
+                    <tr>
+                        <td style="background:linear-gradient(170deg,rgba(255,255,255,0.05),rgba(255,255,255,0.01));background-color:#191923;border-left:1px solid rgba(255,255,255,0.1);border-right:1px solid rgba(255,255,255,0.1);padding:36px 32px;">
+
+                            <p style="margin:0 0 8px;font-size:11px;font-weight:600;color:#A1A1AA;text-transform:uppercase;letter-spacing:0.08em;">
+                                Message Confirmation
+                            </p>
+
+                            <p style="margin:0 0 24px;font-size:20px;font-weight:600;color:#F4F4F5;line-height:1.4;">
+                                Dear ${safeName},
+                            </p>
+
+                            <p style="margin:0 0 28px;font-size:16px;color:#A1A1AA;line-height:1.7;">
+                                We received the following message submitted through the CubingTools.de contact form. If this was you, please confirm your email by clicking the following link: ${confirmationLink}.
+                            </p>
+
+                            <!-- Details card -->
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                                   style="background:linear-gradient(170deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01));background-color:#2A2A31;border:1px solid rgba(255,255,255,0.1);border-radius:10px;margin-bottom:28px;box-shadow:0 8px 24px rgba(0,0,0,0.3);">
+                                <tr>
+                                    <td style="padding:16px 24px;border-bottom:1px solid rgba(255,255,255,0.07);">
+                                        <span style="font-size:11px;font-weight:600;color:#A1A1AA;text-transform:uppercase;letter-spacing:0.08em;">Tool</span><br>
+                                        <span style="font-size:16px;color:#F4F4F5;margin-top:6px;display:inline-block;">${safeTool}</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:16px 24px;">
+                                        <span style="font-size:11px;font-weight:600;color:#A1A1AA;text-transform:uppercase;letter-spacing:0.08em;">Message</span><br>
+                                        <span style="font-size:16px;color:#F4F4F5;line-height:1.7;white-space:pre-wrap;margin-top:6px;display:inline-block;">${safeMessage}</span>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="margin:0;font-size:16px;color:#A1A1AA;line-height:1.7;">
+                                If you did not send this message, please ignore this email. No account or data has been affected.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color:#191923;border:1px solid rgba(255,255,255,0.1);border-top:none;border-radius:0 0 15px 15px;padding:20px 32px;">
+                            <p style="margin:0;font-size:12px;color:#A1A1AA;line-height:1.6;">
+                                This is an automated message from CubingTools.de. Please do not reply to this email.<br>
+                                <a href="https://cubingtools.de" style="color:#3FA7D6;text-decoration:none;">Visit our website</a> • <a href="https://cubingtools.de/contact" style="color:#3FA7D6;text-decoration:none;">Contact us</a>
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
