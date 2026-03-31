@@ -29,13 +29,21 @@ function createEl(tag, attrs = {}, ...children) {
 document.addEventListener('DOMContentLoaded', async () => {
     // 1) fetch events once
     try {
-        const response = await fetch('/events');
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const payload = await response.json();
+        const payload = await window.fetchJsonOrThrow('/events', {
+            errorContext: 'Could not load events',
+        });
         events = payload.events || payload; // allow multiple shapes
     } catch (err) {
         console.error('Error fetching events:', err);
         events = events || []; // fallback
+        window.showUserErrorPopup({
+            title: 'Could not load event definitions',
+            message: 'The grouping tool could not load its event list.',
+            error: err,
+            reportTitle: 'Grouping tool failed to load events',
+            reportContext: 'The grouping tool could not fetch /events during initialization.',
+            dedupeKey: 'grouping-events',
+        });
     }
 
     // 2) load data from URL if present
@@ -591,17 +599,22 @@ async function getCompetitorName(wcaId) {
     const apiUrl = `/api/wca/${wcaId}/name`;
 
     try {
-        // Fetch the name from the backend
-        const response = await fetch(apiUrl);
-        if (!response.ok) {
-            throw new Error(`Error fetching data: ${response.statusText}`);
-        }
-        const data = await response.json();
+        const data = await window.fetchJsonOrThrow(apiUrl, {
+            errorContext: 'Could not load competitor name',
+        });
 
-        // Return the name
         return data.name;
     } catch (error) {
         console.error(`Error fetching name for event ${wcaId}: ${error.message}`);
+        window.showUserErrorPopup({
+            title: 'Could not load competitor details',
+            message:
+                "The grouping tool could not fetch this competitor's WCA name, so the entered ID will be used instead.",
+            error,
+            reportTitle: 'Grouping tool failed to load competitor name',
+            reportContext: `Fetching the competitor name failed for WCA ID ${wcaId}.`,
+            dedupeKey: `grouping-name:${wcaId}`,
+        });
         return wcaId;
     }
 }
@@ -648,12 +661,22 @@ async function sortArray(array, eventId) {
         }
 
         try {
-            const response = await fetch(`/api/wca/${competitor.wcaId}/${eventId}`);
-            const data = await response.json();
+            const data = await window.fetchJsonOrThrow(`/api/wca/${competitor.wcaId}/${eventId}`, {
+                errorContext: 'Could not load competitor average',
+            });
             item.average = data?.average ?? null;
         } catch (error) {
             console.error(`Failed to fetch data for ${competitor.wcaId}:`, error);
             item.average = null;
+            window.showUserErrorPopup({
+                title: 'Some competitor averages could not be loaded',
+                message:
+                    'Grouping continued with fallback ordering because some WCA averages were unavailable.',
+                error,
+                reportTitle: 'Grouping tool failed to load competitor averages',
+                reportContext: `Fetching the average failed for WCA ID ${competitor.wcaId} in event ${eventId}.`,
+                dedupeKey: `grouping-average:${eventId}`,
+            });
         }
     }
 

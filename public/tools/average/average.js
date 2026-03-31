@@ -509,30 +509,33 @@ document.getElementById('wca').addEventListener('input', async () => {
         }
     } catch (err) {
         console.error(err);
-        alert('Could not fetch WCA data. Check the ID.');
+        window.showUserErrorPopup({
+            title: 'Could not load WCA data',
+            message: 'WCA results could not be loaded for the average calculator.',
+            error: err,
+            reportTitle: 'Average calculator failed to load WCA data',
+            reportContext: `Loading WCA data failed for ${wcaId} in event ${state.eventType}.`,
+            dedupeKey: `average-wca:${wcaId}:${state.eventType}`,
+        });
     }
 });
 
 // === Fetch solves & averages for ranking ===
 async function fetchUserData(wcaId) {
-    try {
-        const solvesRes = await fetch(`/api/wca/${wcaId}/${state.eventType}?getsolves=true`);
-        const averagesRes = await fetch(`/api/wca/${wcaId}/${state.eventType}?getaverages=true`);
+    const [solvesData, averagesData] = await Promise.all([
+        window.fetchJsonOrThrow(`/api/wca/${wcaId}/${state.eventType}?getsolves=true`, {
+            errorContext: 'Could not load WCA solves',
+        }),
+        window.fetchJsonOrThrow(`/api/wca/${wcaId}/${state.eventType}?getaverages=true`, {
+            errorContext: 'Could not load WCA averages',
+        }),
+    ]);
 
-        if (solvesRes.ok) {
-            const solvesData = await solvesRes.json();
-            state.userSolves = solvesData.allResults || [];
-        }
-        if (averagesRes.ok) {
-            const averagesData = await averagesRes.json();
-            state.userAverages = averagesData.allAverages || [];
-        }
+    state.userSolves = Array.isArray(solvesData?.allResults) ? solvesData.allResults : [];
+    state.userAverages = Array.isArray(averagesData?.allAverages) ? averagesData.allAverages : [];
 
-        state.userSolves = state.userSolves.map((t) => (t <= 0 ? Infinity : t / 100));
-        state.userAverages = state.userAverages.map((t) => (t <= 0 ? Infinity : t / 100));
-    } catch (err) {
-        throw new Error('Error fetching user solves/averages:', err);
-    }
+    state.userSolves = state.userSolves.map((t) => (t <= 0 ? Infinity : t / 100));
+    state.userAverages = state.userAverages.map((t) => (t <= 0 ? Infinity : t / 100));
 }
 
 // === Rank helpers ===

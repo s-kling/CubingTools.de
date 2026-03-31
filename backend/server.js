@@ -9,7 +9,7 @@ const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), '
 const app = express();
 // Respect one reverse-proxy hop so req.ip is accurate for rate limiting.
 app.set('trust proxy', 1);
-const prodPort = config.prod_port;
+let prodPort = config.prod_port;
 let betaPort = config.beta_port;
 let betaTest = process.argv.includes('--beta');
 const debug = process.argv.includes('--debug');
@@ -58,8 +58,8 @@ function debugLog(message) {
 
 if (debug) {
     console.log(colorize('magenta', '[debug] Debug mode enabled'));
-    betaTest = true;
-    betaPort = config.dev_port;
+    // betaTest = true;
+    prodPort = config.dev_port;
 }
 
 /* =========================

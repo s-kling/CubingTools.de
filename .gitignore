@@ -6,6 +6,7 @@ node_modules/
 
 # Ignore environment variable files
 .env
+/backend/service-account.json
 .vscode
 .DS_Store
 

@@ -124,38 +124,49 @@ function handleAddingEvents() {
             customRelay.push(event);
         }
 
-        eventTag.addEventListener('click', () => {
-            if (!eventTag.classList.contains('selected')) {
-                eventTag.classList.add('selected');
-                customRelay.push(event);
-            } else {
-                eventTag.classList.remove('selected');
-                let index = customRelay.indexOf(event);
-                customRelay.splice(index, 1);
+        // When clicking too quickly the input might be removed before all future handling can be done
+        let isProcessing = false;
+        eventTag.addEventListener('click', async () => {
+            if (isProcessing) return;
+            isProcessing = true;
+
+            try {
+                if (!eventTag.classList.contains('selected')) {
+                    eventTag.classList.add('selected');
+                    customRelay.push(event);
+                } else {
+                    eventTag.classList.remove('selected');
+                    let index = customRelay.indexOf(event);
+                    customRelay.splice(index, 1);
+                }
+
+                // Make sure customRelay is the order of eventOptions.customEventOptions
+                customRelay = eventOptions.customEventOptions.filter((event) =>
+                    customRelay.includes(event),
+                );
+
+                // Check if customRelay matches any preset and update relaySelect if it does
+                const presetKey = Object.keys(eventOptions).find(
+                    (key) =>
+                        key !== 'customEventOptions' &&
+                        JSON.stringify(eventOptions[key]) === JSON.stringify(customRelay),
+                );
+                if (presetKey) {
+                    relaySelect.value = presetKey;
+                } else {
+                    relaySelect.value = 'custom';
+                }
+
+                events = customRelay;
+                addEventInputs();
+
+                document.getElementById(`c1-${event}`).value =
+                    competitor1AllEventTimes[event] || '';
+                document.getElementById(`c2-${event}`).value =
+                    competitor2AllEventTimes[event] || '';
+            } finally {
+                isProcessing = false;
             }
-
-            // Make sure customRelay is the order of eventOptions.customEventOptions
-            customRelay = eventOptions.customEventOptions.filter((event) =>
-                customRelay.includes(event),
-            );
-
-            // Check if customRelay matches any preset and update relaySelect if it does
-            const presetKey = Object.keys(eventOptions).find(
-                (key) =>
-                    key !== 'customEventOptions' &&
-                    JSON.stringify(eventOptions[key]) === JSON.stringify(customRelay),
-            );
-            if (presetKey) {
-                relaySelect.value = presetKey;
-            } else {
-                relaySelect.value = 'custom';
-            }
-
-            events = customRelay;
-            addEventInputs();
-
-            document.getElementById(`c1-${event}`).value = competitor1AllEventTimes[event] || '';
-            document.getElementById(`c2-${event}`).value = competitor2AllEventTimes[event] || '';
         });
 
         eventSpan.appendChild(eventTag);
@@ -505,32 +516,14 @@ async function getCurrentAverage(wcaId, event, competitorId) {
     )}?getsolves=true`;
 
     try {
-        // Fetch average and all solves in parallel
-        const [avgResponse, allSolvesResponse] = await Promise.all([
-            fetch(avgUrl),
-            fetch(allSolvesUrl),
+        const [avgData, allSolvesData] = await Promise.all([
+            window.fetchJsonOrThrow(avgUrl, {
+                errorContext: 'Could not load competitor average',
+            }),
+            window.fetchJsonOrThrow(allSolvesUrl, {
+                errorContext: 'Could not load competitor solves',
+            }),
         ]);
-
-        // Check for errors
-        if (!avgResponse.ok) {
-            if (avgResponse.status === 404) {
-                console.warn(
-                    `API returned 404 for WCA ID: ${sanitizedWcaId}, Event: ${sanitizedEvent}`,
-                );
-            }
-            throw new Error(`Error fetching average: ${avgResponse.statusText}`);
-        }
-        if (!allSolvesResponse.ok) {
-            if (allSolvesResponse.status === 404) {
-                console.warn(
-                    `API returned 404 for all solves for WCA ID: ${sanitizedWcaId}, Event: ${sanitizedEvent}`,
-                );
-            }
-            throw new Error(`Error fetching all solves: ${allSolvesResponse.statusText}`);
-        }
-
-        const avgData = await avgResponse.json();
-        const allSolvesData = await allSolvesResponse.json();
 
         // Use only the first N solves from allResults (convert -1 and <0 to NaN, remove <0 before trimming)
         let allResults = Array.isArray(allSolvesData.allResults)
@@ -557,6 +550,15 @@ async function getCurrentAverage(wcaId, event, competitorId) {
         console.error(
             `Error fetching average or all solves for event ${sanitizedEvent}: ${error.message}`,
         );
+        window.showUserErrorPopup({
+            title: 'Could not load Guildford WCA data',
+            message:
+                'Some Guildford event data could not be loaded, so missing results will stay empty.',
+            error,
+            reportTitle: 'Guildford tool failed to load WCA data',
+            reportContext: `Fetching Guildford data failed for ${sanitizedWcaId} in event ${sanitizedEvent}.`,
+            dedupeKey: `guildford-average:${sanitizedWcaId}:${sanitizedEvent}`,
+        });
         return null;
     }
 }
@@ -566,14 +568,20 @@ async function getCompetitorName(wcaId) {
     const apiUrl = `/api/wca/${wcaId}/name`;
 
     try {
-        const response = await fetch(apiUrl);
-        if (!response.ok) {
-            throw new Error(`Error fetching data: ${response.statusText}`);
-        }
-        const data = await response.json();
+        const data = await window.fetchJsonOrThrow(apiUrl, {
+            errorContext: 'Could not load competitor name',
+        });
         return data.name;
     } catch (error) {
         console.error(`Error fetching competitor name: ${error.message}`);
+        window.showUserErrorPopup({
+            title: 'Could not load competitor name',
+            message: 'The Guildford tool could not fetch the competitor name from WCA right now.',
+            error,
+            reportTitle: 'Guildford tool failed to load competitor name',
+            reportContext: `Fetching the competitor name failed for WCA ID ${wcaId}.`,
+            dedupeKey: `guildford-name:${wcaId}`,
+        });
         return 'Competitor Name';
     }
 }

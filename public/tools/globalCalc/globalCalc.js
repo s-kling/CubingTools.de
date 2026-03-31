@@ -141,8 +141,9 @@ async function fetchWCAData() {
 
     const apiUrl = `/api/wca/${wcaId}/${event}?getsolves=true`;
     try {
-        const response = await fetch(apiUrl);
-        const data = await response.json();
+        const data = await window.fetchJsonOrThrow(apiUrl, {
+            errorContext: 'Could not load WCA solve data',
+        });
 
         if (data.allResults && data.allResults.length > 0) {
             originalArray = data.allResults
@@ -162,8 +163,14 @@ async function fetchWCAData() {
         }
     } catch (error) {
         console.error(error);
-
-        alert('Error fetching WCA data. Please check your input and try again.');
+        window.showUserErrorPopup({
+            title: 'Could not load WCA solve data',
+            message: 'The GlobalCalc tool could not fetch WCA results right now.',
+            error,
+            reportTitle: 'GlobalCalc failed to load WCA data',
+            reportContext: `Fetching solve data failed for ${wcaId} in event ${event}.`,
+            dedupeKey: `global-calc-wca:${wcaId}:${event}`,
+        });
     }
 }
 

@@ -1,4 +1,246 @@
 let currentPrivacyPolicyVersion = '2026-02-14';
+const GITHUB_BUG_REPORT_URL = 'https://github.com/s-kling/cubingtools.de/issues/new';
+const USER_ERROR_POPUP_COOLDOWN_MS = 20000;
+const recentUserErrorPopups = new Map();
+
+// Format error messages
+function getErrorMessage(error) {
+    if (!error) {
+        return 'Unknown error';
+    }
+
+    if (typeof error === 'string') {
+        return error;
+    }
+
+    if (typeof error.message === 'string' && error.message.trim()) {
+        return error.message.trim();
+    }
+
+    return 'Unknown error';
+}
+
+// Dedupe user error popups to avoid spamming users with multiple popups for the same error in a short time frame
+function shouldSuppressUserErrorPopup(dedupeKey) {
+    if (!dedupeKey) {
+        return false;
+    }
+
+    const now = Date.now();
+
+    for (const [key, timestamp] of recentUserErrorPopups.entries()) {
+        if (now - timestamp > USER_ERROR_POPUP_COOLDOWN_MS) {
+            recentUserErrorPopups.delete(key);
+        }
+    }
+
+    const previousTimestamp = recentUserErrorPopups.get(dedupeKey);
+    recentUserErrorPopups.set(dedupeKey, now);
+
+    return (
+        typeof previousTimestamp === 'number' &&
+        now - previousTimestamp < USER_ERROR_POPUP_COOLDOWN_MS
+    );
+}
+
+// Build a GitHub issue URL with pre-filled title and body based on the error details
+function buildBugReportUrl({ title, message, error, reportTitle, reportContext = '' }) {
+    const bugTitle = reportTitle || `Bug: ${title}`;
+    const errorMessage = getErrorMessage(error);
+    const errorStack = typeof error?.stack === 'string' ? error.stack : 'Unavailable';
+    const errorUrl = typeof error?.url === 'string' ? error.url : 'Unavailable';
+    const body = [
+        '## Summary',
+        message,
+        '',
+        '## Context',
+        reportContext || 'Describe what you were doing when this happened.',
+        '',
+        '## Technical details',
+        `- Page: ${window.location.href}`,
+        `- Request URL: ${errorUrl}`,
+        `- Error: ${errorMessage}`,
+        `- User agent: ${navigator.userAgent}`,
+        '',
+        '## Stack trace',
+        '```',
+        errorStack,
+        '```',
+    ].join('\n');
+
+    const url = new URL(GITHUB_BUG_REPORT_URL);
+    url.searchParams.set('labels', 'bug');
+    url.searchParams.set('title', bugTitle);
+    url.searchParams.set('body', body);
+    return url.toString();
+}
+
+// Close the popup
+function closeUserErrorPopup() {
+    const popup = document.getElementById('user-error-popup');
+
+    if (popup) {
+        popup.remove();
+    }
+}
+
+function ensureUserErrorPopup() {
+    let popup = document.getElementById('user-error-popup');
+
+    if (popup) {
+        return popup;
+    }
+
+    popup = document.createElement('div');
+    popup.id = 'user-error-popup';
+    popup.className = 'user-error-popup';
+    popup.innerHTML = `
+        <div class="user-error-popup__backdrop" data-close-popup="true"></div>
+        <div class="user-error-popup__dialog" role="dialog" aria-modal="true" aria-labelledby="user-error-popup-title">
+            <button type="button" class="user-error-popup__close" aria-label="Close error dialog">&times;</button>
+            <p class="user-error-popup__eyebrow">Problem detected</p>
+            <h2 id="user-error-popup-title"></h2>
+            <p class="user-error-popup__message"></p>
+            <p class="user-error-popup__hint">
+                If this looks like a bug on our side, please open a GitHub report so it can be reproduced and fixed.
+            </p>
+            <div class="user-error-popup__actions">
+                <a class="user-error-popup__report" style="width=100%" target="_blank" rel="noopener noreferrer">Open bug report</a>
+                <button type="button" class="user-error-popup__dismiss">Dismiss</button>
+            </div>
+        </div>
+    `;
+
+    popup.addEventListener('click', (event) => {
+        if (
+            event.target?.dataset?.closePopup === 'true' ||
+            event.target.classList.contains('user-error-popup__close') ||
+            event.target.classList.contains('user-error-popup__dismiss')
+        ) {
+            closeUserErrorPopup();
+        }
+    });
+
+    return popup;
+}
+
+function showUserErrorPopup({
+    title = 'Something went wrong',
+    message = 'An unexpected error occurred.',
+    error = null,
+    reportTitle,
+    reportContext = '',
+    dedupeKey,
+}) {
+    if (shouldSuppressUserErrorPopup(dedupeKey)) {
+        return;
+    }
+
+    if (!document.body) {
+        alert(`${title}\n\n${message}`);
+        return;
+    }
+
+    const popup = ensureUserErrorPopup();
+    popup.querySelector('#user-error-popup-title').textContent = title;
+    popup.querySelector('.user-error-popup__message').textContent = message;
+    popup.querySelector('.user-error-popup__report').href = buildBugReportUrl({
+        title,
+        message,
+        error,
+        reportTitle,
+        reportContext,
+    });
+
+    if (!document.body.contains(popup)) {
+        document.body.appendChild(popup);
+    }
+
+    popup.querySelector('.user-error-popup__report').focus();
+}
+
+function shouldIgnoreGlobalError(error) {
+    const message = getErrorMessage(error);
+
+    return (
+        !message ||
+        message === 'Script error.' ||
+        message.includes('AbortError') ||
+        message.includes('ResizeObserver loop')
+    );
+}
+
+window.closeUserErrorPopup = closeUserErrorPopup;
+window.showUserErrorPopup = showUserErrorPopup;
+window.fetchJsonOrThrow = async function (url, options = {}) {
+    const { errorContext = 'Request failed', ...fetchOptions } = options;
+    const response = await fetch(url, fetchOptions);
+    const responseText = await response.text();
+
+    let payload = null;
+    if (responseText) {
+        try {
+            payload = JSON.parse(responseText);
+        } catch {
+            payload = responseText;
+        }
+    }
+
+    if (!response.ok) {
+        const payloadMessage =
+            payload && typeof payload === 'object'
+                ? payload.error || payload.message
+                : responseText;
+        const error = new Error(payloadMessage || `${errorContext} (${response.status})`);
+        error.status = response.status;
+        error.url = response.url;
+        error.payload = payload;
+        throw error;
+    }
+
+    return payload;
+};
+
+window.addEventListener('error', (event) => {
+    const error = event.error || new Error(event.message || 'Unexpected runtime error');
+
+    if (shouldIgnoreGlobalError(error)) {
+        return;
+    }
+
+    showUserErrorPopup({
+        title: 'Unexpected page error',
+        message: 'This page hit an unexpected error and may not behave correctly.',
+        error,
+        reportTitle: 'Unexpected browser error',
+        reportContext: 'The browser raised a runtime error while using the site.',
+        dedupeKey: `global-error:${getErrorMessage(error)}`,
+    });
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+    const error =
+        event.reason instanceof Error ? event.reason : new Error(getErrorMessage(event.reason));
+
+    if (shouldIgnoreGlobalError(error)) {
+        return;
+    }
+
+    showUserErrorPopup({
+        title: 'Unexpected request error',
+        message: 'A request failed unexpectedly and the page may be out of sync.',
+        error,
+        reportTitle: 'Unhandled browser promise rejection',
+        reportContext: 'The browser reported an unhandled rejected promise while using the site.',
+        dedupeKey: `unhandled-rejection:${getErrorMessage(error)}`,
+    });
+});
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+        closeUserErrorPopup();
+    }
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     // // HERO
@@ -7,6 +249,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // if (!hasSeenHero) {
     //     showHero();
     // }
+
+    const sessionId = sessionStorage.getItem('session_id');
+    if (!sessionId) {
+        sessionStorage.setItem('session_id', Date.now().toString());
+        const visits = localStorage.getItem('visits')
+            ? parseInt(localStorage.getItem('visits'))
+            : 0;
+        localStorage.setItem('visits', visits + 1);
+    }
 
     // COOKIE CONSENT
     const cookiesAccepted = localStorage.getItem('cookies_accepted');
@@ -121,8 +372,9 @@ async function loadTools() {
     toolsContainer.innerHTML = '';
 
     try {
-        const response = await fetch('/api/tools');
-        const tools = await response.json();
+        const tools = await window.fetchJsonOrThrow('/api/tools', {
+            errorContext: 'Could not load tools',
+        });
 
         if (Array.isArray(tools)) {
             const featuredTools = tools.filter((tool) => tool.filename.includes('guildford'));
@@ -156,10 +408,20 @@ async function loadTools() {
                 toolsContainer.appendChild(toolElement);
             });
         } else {
-            console.error('Expected an array but received:', tools);
+            throw new Error('Unexpected tool list response.');
         }
     } catch (error) {
         console.error('Error loading tools:', error);
+        toolsContainer.innerHTML = '<h3>Tools unavailable</h3>';
+        window.showUserErrorPopup({
+            title: 'Could not load the tool list',
+            message: 'The sidebar tools could not be loaded right now.',
+            error,
+            reportTitle: 'Tool list failed to load',
+            reportContext:
+                'The shared sidebar tool list request failed while rendering the page shell.',
+            dedupeKey: 'setup-tools',
+        });
     }
 }
 

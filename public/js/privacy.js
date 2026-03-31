@@ -25,6 +25,14 @@ function loadPolicy(version) {
         })
         .catch((error) => {
             content.innerHTML = `<p>Error loading policy: ${error.message}</p>`;
+            window.showUserErrorPopup({
+                title: 'Could not load the privacy policy',
+                message: 'The selected privacy policy version could not be loaded.',
+                error,
+                reportTitle: 'Privacy policy page failed to load a policy file',
+                reportContext: `Loading the privacy policy markdown failed for version ${version}.`,
+                dedupeKey: `privacy-policy:${version}`,
+            });
         });
 }
 

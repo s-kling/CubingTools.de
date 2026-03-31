@@ -28,9 +28,9 @@ router.get('/privacy-policy', (req, res) => {
     res.sendFile(path.join(__dirname, '..', '../public/html', 'privacy.html'));
 });
 
-// router.get('/contact', (req, res) => {
-//     res.sendFile(path.join(__dirname, '..', '../public/html', 'contact.html'));
-// });
+router.get('/contact', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', '../public/html', 'contact.html'));
+});
 
 // Serve the robots txt
 router.get('/robots.txt', (req, res) => {

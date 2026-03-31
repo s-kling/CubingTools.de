@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <!-- Basic Metadata -->
+    <title>Contact - CubingTools.de</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Get in touch with CubingTools.de. Contact us for support, feedback, or inquiries about our cubing tools and services.">
+    <meta name="keywords" content="contact, support, help, CubingTools.de, cubing, speedcubing">
+    
+    <!-- Other Fancy Things -->
+    <link rel="icon" href="../../assets/favicon.ico" type="image/x-icon">
+    <link rel="apple-touch-icon" href="../../assets/logo_no_text.png">
+
+    <!-- Open Graph Metadata (Facebook, LinkedIn, WhatsApp, Discord, etc.) -->
+    <meta property="og:title" content="Contact - CubingTools.de" />
+    <meta property="og:description" content="Get in touch with CubingTools.de. Contact us for support, feedback, or inquiries about our cubing tools and services." />
+    <meta property="og:image" content="../../assets/logo_with_text.png" />
+    <meta property="og:image:alt" content="CubingTools.de Logo" />
+    <meta property="og:url" content="https://cubingtools.de/contact" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter Card Metadata -->
+    <!-- We boycott Twitter/X -->
+    
+    <!-- Fallback Metadata -->
+    <meta name="robots" content="index, follow">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  
+    <!-- CSS Stylesheets -->
+    <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/contact.css">
+
+    <!-- JS Files -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P" defer></script>
+    <script src="https://www.google.com/recaptcha/enterprise.js?render=6LcbEp8sAAAAAKlVITh_cHrU2TXrtshRLqQG03oC"></script>
+    <script src="../js/setupPage.js" defer></script>
+    <script src="../js/contact.js" defer></script>
+</head>
+
+<body>
+    <div class="container">
+        <nav id="navbar"></nav>
+
+        <div id="sidebar">
+            <h2>Tools</h2>
+        </div>
+
+        <div id="version"></div>
+
+        <main>
+            <section class="heading">
+                <h1 id="title">Get in touch with our team</h1>
+
+                <form id="contact-form">
+                    <label>Name: <input type="text" id="name" name="name" required></label>
+
+                    <label>Email: <input type="email" id="email" name="email" required></label>
+
+                    <label>Tool: <select name="tool" id="tool"><option value="other">Other</option></select></label>
+
+                    <label for="message">Message:</label>
+                    <textarea id="message" name="message" rows="5" required></textarea>
+
+                    <button type="submit">Submit</button>
+                </form>
+            </section>
+        </main>
+        <footer id="footer"></footer>
+    </div>
+</body>
+
+</html>

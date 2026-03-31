@@ -6,6 +6,7 @@ const path = require('path');
 const packageJson = require('../../package.json');
 const crypto = require('crypto');
 const fs = require('fs');
+const nodemailer = require('nodemailer');
 
 const { RecaptchaEnterpriseServiceClient } = require('@google-cloud/recaptcha-enterprise');
 
@@ -420,98 +421,158 @@ class AdminSessionApi {
     }
 }
 
-// class ContactApi {
-//     constructor() {
-//         this.password = process.env.CONTACT_API_PASSWORD || '';
-//     }
+class ContactApi {
+    constructor() {
+        this.password = process.env.CONTACT_API_PASSWORD || '';
+        this.projectID = process.env.RECAPTCHA_PROJECT_ID || '';
+        this.recaptchaKey = process.env.RECAPTCHA_SITE_KEY || '';
+        this.recaptchaAction = process.env.RECAPTCHA_ACTION || '';
+    }
 
-//     handleRequest(req, res) {
-//         const { name, email, message, 'g-recaptcha-response': recaptchaToken } = req.body || {};
+    handleRequest(req, res) {
+        const {
+            name,
+            email,
+            tool,
+            message,
+            'g-recaptcha-response': recaptchaResponse,
+            recaptchaToken,
+        } = req.body || {};
 
-//         if (!name || !email || !message || !recaptchaToken) {
-//             return res.status(400).json({ success: false, error: 'Missing required fields' });
-//         }
+        const token = recaptchaResponse || recaptchaToken;
 
-//         // Verify reCAPTCHA token
-//         this.createAssessment({ token: recaptchaToken })
-//             .then((score) => {
-//                 if (score && parseFloat(score) >= 0.5) {
-//                     // Here you would typically send the message via email or store it in a database
-//                     console.log('New contact message:', { name, email, message });
-//                     return res.json({ success: true });
-//                 } else {
-//                     return res
-//                         .status(400)
-//                         .json({ success: false, error: 'reCAPTCHA verification failed' });
-//                 }
-//             })
-//             .catch((error) => {
-//                 console.error('Error verifying reCAPTCHA:', error);
-//                 return res.status(500).json({ success: false, error: 'Internal server error' });
-//             });
-//     }
+        if (!name || !email || !message || !token) {
+            return res.status(400).json({ success: false, error: 'Missing required fields' });
+        }
 
-//     async createAssessment({
-//         // TODO: Replace the token and reCAPTCHA action variables before running the sample.
-//         projectID = 'cubingtools-capt-1734716026920',
-//         recaptchaKey = '6LeFG5EsAAAAADPRHMlWmGradnyV3LSWufMYnsq5',
-//         token = 'action-token',
-//         recaptchaAction = 'action-name',
-//     }) {
-//         // Create the reCAPTCHA client.
-//         // TODO: Cache the client generation code (recommended) or call client.close() before exiting the method.
-//         const client = new RecaptchaEnterpriseServiceClient();
-//         const projectPath = client.projectPath(projectID);
+        // Verify reCAPTCHA token
+        this.createAssessment({ token })
+            .then((score) => {
+                // If score is null (due to missing credentials), allow through with warning
+                if (score === null) {
+                    console.warn(
+                        'reCAPTCHA verification skipped (credentials not available). Message allowed through.',
+                    );
+                    // Still log the message
+                    console.log('New contact message (unverified):', {
+                        name,
+                        email,
+                        tool,
+                        message,
+                    });
+                    return res.json({ success: true });
+                }
 
-//         // Build the assessment request.
-//         const request = {
-//             assessment: {
-//                 event: {
-//                     token: token,
-//                     siteKey: recaptchaKey,
-//                 },
-//             },
-//             parent: projectPath,
-//         };
+                if (score && parseFloat(score) >= 0.5) {
+                    // Here you would typically send the message via email or store it in a database
+                    console.log('New contact message:', { name, email, tool, message });
+                    return res.json({ success: true });
+                } else {
+                    return res
+                        .status(400)
+                        .json({ success: false, error: 'reCAPTCHA verification failed' });
+                }
+            })
+            .catch((error) => {
+                console.error('Error verifying reCAPTCHA:', error);
+                // Graceful degradation: allow submission if verification fails
+                console.warn('Allowing submission due to reCAPTCHA verification error');
+                console.log('New contact message (unverified due to error):', {
+                    name,
+                    email,
+                    tool,
+                    message,
+                });
+                return res.json({ success: true });
+            });
+    }
 
-//         const [response] = await client.createAssessment(request);
+    /**
+     * Create an assessment to analyze the risk of a UI action.
+     *
+     * projectID: Your Google Cloud Project ID.
+     * recaptchaSiteKey: The reCAPTCHA key associated with the site/app
+     * token: The generated token obtained from the client.
+     * recaptchaAction: Action name corresponding to the token.
+     */
+    async createAssessment({
+        projectID = this.projectID,
+        recaptchaKey = this.recaptchaKey,
+        token = 'action-token',
+        recaptchaAction = this.recaptchaAction,
+    }) {
+        if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+            console.warn(
+                'reCAPTCHA Enterprise credentials not configured. Set GOOGLE_APPLICATION_CREDENTIALS environment variable.',
+            );
+            return null;
+        }
 
-//         // Check if the token is valid.
-//         if (!response.tokenProperties.valid) {
-//             console.log(
-//                 `The CreateAssessment call failed because the token was: ${response.tokenProperties.invalidReason}`,
-//             );
-//             return null;
-//         }
+        try {
+            const client = new RecaptchaEnterpriseServiceClient();
+            const projectPath = client.projectPath(projectID);
 
-//         // Check if the expected action was executed.
-//         // The `action` property is set by user client in the grecaptcha.enterprise.execute() method.
-//         if (response.tokenProperties.action === recaptchaAction) {
-//             // Get the risk score and the reason(s).
-//             // For more information on interpreting the assessment, see:
-//             // https://cloud.google.com/recaptcha/docs/interpret-assessment
-//             console.log(`The reCAPTCHA score is: ${response.riskAnalysis.score}`);
-//             response.riskAnalysis.reasons.forEach((reason) => {
-//                 console.log(reason);
-//             });
+            // Build the assessment request.
+            const request = {
+                assessment: {
+                    event: {
+                        token: token,
+                        siteKey: recaptchaKey,
+                    },
+                },
+                parent: projectPath,
+            };
 
-//             return response.riskAnalysis.score;
-//         } else {
-//             console.log(
-//                 'The action attribute in your reCAPTCHA tag does not match the action you are expecting to score',
-//             );
-//             return null;
-//         }
-//     }
-// }
+            const [response] = await client.createAssessment(request);
+
+            // Check if the token is valid.
+            if (!response.tokenProperties.valid) {
+                console.log(
+                    `The CreateAssessment call failed because the token was: ${response.tokenProperties.invalidReason}`,
+                );
+                return null;
+            }
+
+            // Check if the expected action was executed.
+            // The `action` property is set by user client in the grecaptcha.enterprise.execute() method.
+            if (response.tokenProperties.action === recaptchaAction) {
+                // Get the risk score and the reason(s).
+                // For more information on interpreting the assessment, see:
+                // https://cloud.google.com/recaptcha/docs/interpret-assessment
+                console.log(`The reCAPTCHA score is: ${response.riskAnalysis.score}`);
+                response.riskAnalysis.reasons.forEach((reason) => {
+                    console.log(reason);
+                });
+
+                return response.riskAnalysis.score;
+            } else {
+                console.log(
+                    'The action attribute in your reCAPTCHA tag does not match the action you are expecting to score',
+                );
+                return null;
+            }
+        } catch (error) {
+            // Check if this is a credentials error
+            if (error.message && error.message.includes('Could not load the default credentials')) {
+                console.warn(
+                    'reCAPTCHA Enterprise credentials not configured. Set GOOGLE_APPLICATION_CREDENTIALS environment variable.',
+                    error.message,
+                );
+                return null; // Signal that verification should be skipped
+            }
+            // Re-throw other errors
+            throw error;
+        }
+    }
+}
 
 const wcaApi = new WcaApi();
 const statusApi = new StatusApi();
-// const contactApi = new ContactApi();
+const contactApi = new ContactApi();
 const adminSessionApi = new AdminSessionApi();
 
-// // Contact API endpoint
-// router.post('/api/contact', contactLimiter, (req, res) => contactApi.handleRequest(req, res));
+// Contact API endpoint
+router.post('/api/contact', contactLimiter, (req, res) => contactApi.handleRequest(req, res));
 
 // Admin session endpoints
 router.post('/api/admin/login', adminLoginLimiter, (req, res) =>

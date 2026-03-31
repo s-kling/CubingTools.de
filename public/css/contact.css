@@ -1,0 +1,117 @@
+.heading {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+    padding: var(--space-md);
+    background: linear-gradient(160deg, rgba(25, 25, 35, 0.92), rgba(42, 42, 49, 0.78));
+    border: 1px solid var(--input-border);
+    border-radius: var(--main-radius);
+}
+
+.heading h1 {
+    font-size: var(--font-size-xl);
+    color: var(--main-text);
+    margin: 0;
+    letter-spacing: 0.01em;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    max-width: 680px;
+}
+
+form label {
+    font-size: var(--font-size-base);
+    color: var(--main-text);
+    font-weight: 500;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+form input,
+form textarea,
+form select {
+    background-color: var(--input-background);
+    border: 1px solid var(--input-border);
+    border-radius: var(--main-radius);
+    color: var(--main-text);
+    padding: var(--space-sm) var(--space-md);
+    font-family: var(--font-main);
+    font-size: var(--font-size-base);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+form input:focus,
+form textarea:focus,
+form select:focus {
+    outline: none;
+    border-color: var(--link-color);
+    box-shadow: 0 0 0 2px rgba(63, 167, 214, 0.2);
+}
+
+form select {
+    appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--secondary-text) 50%),
+        linear-gradient(135deg, var(--secondary-text) 50%, transparent 50%);
+    background-position: calc(100% - 18px) calc(50% - 2px), calc(100% - 12px) calc(50% - 2px);
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+    padding-right: 40px;
+}
+
+form textarea {
+    resize: vertical;
+    min-height: 136px;
+    line-height: 1.45;
+}
+
+form button {
+    background-color: var(--button-background);
+    color: var(--main-text);
+    border: none;
+    border-radius: var(--main-radius);
+    padding: var(--space-sm) var(--space-md);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.12s ease;
+    align-self: flex-start;
+    min-width: 132px;
+}
+
+form button:hover {
+    background-color: var(--hover-background);
+}
+
+form button:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(63, 167, 214, 0.28);
+}
+
+form button:active {
+    opacity: 0.9;
+    transform: translateY(1px);
+}
+
+form button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+    .heading {
+        padding: var(--space-sm);
+    }
+
+    form {
+        max-width: 100%;
+    }
+
+    form button {
+        width: 100%;
+        align-self: stretch;
+    }
+}
