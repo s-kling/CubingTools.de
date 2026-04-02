@@ -1,7 +1,7 @@
 let currentPrivacyPolicyVersion = '2026-03-31';
 const GITHUB_BUG_REPORT_URL = 'https://github.com/s-kling/cubingtools.de/issues/new';
 const USER_ERROR_POPUP_COOLDOWN_MS = 20000;
-const recentUserErrorPopups = new Map();
+const recentUserFeedbackPopups = new Map();
 
 // Format error messages
 function getErrorMessage(error) {
@@ -20,22 +20,22 @@ function getErrorMessage(error) {
     return 'Unknown error';
 }
 
-// Dedupe user error popups to avoid spamming users with multiple popups for the same error in a short time frame
-function shouldSuppressUserErrorPopup(dedupeKey) {
+// Dedupe user feedback popups to avoid spamming users with multiple popups for the same message in a short time frame
+function shouldSuppressUserFeedbackPopup(dedupeKey) {
     if (!dedupeKey) {
         return false;
     }
 
     const now = Date.now();
 
-    for (const [key, timestamp] of recentUserErrorPopups.entries()) {
+    for (const [key, timestamp] of recentUserFeedbackPopups.entries()) {
         if (now - timestamp > USER_ERROR_POPUP_COOLDOWN_MS) {
-            recentUserErrorPopups.delete(key);
+            recentUserFeedbackPopups.delete(key);
         }
     }
 
-    const previousTimestamp = recentUserErrorPopups.get(dedupeKey);
-    recentUserErrorPopups.set(dedupeKey, now);
+    const previousTimestamp = recentUserFeedbackPopups.get(dedupeKey);
+    recentUserFeedbackPopups.set(dedupeKey, now);
 
     return (
         typeof previousTimestamp === 'number' &&
@@ -75,38 +75,48 @@ function buildBugReportUrl({ title, message, error, reportTitle, reportContext =
     return url.toString();
 }
 
-// Close the popup
-function closeUserErrorPopup() {
-    const popup = document.getElementById('user-error-popup');
+function setPopupContent(element, text, html) {
+    if (!element) {
+        return;
+    }
+
+    if (typeof html === 'string') {
+        element.innerHTML = html;
+        return;
+    }
+
+    element.textContent = text || '';
+}
+
+function closeUserFeedbackPopup() {
+    const popup = document.getElementById('user-feedback-popup');
 
     if (popup) {
         popup.remove();
     }
 }
 
-function ensureUserErrorPopup() {
-    let popup = document.getElementById('user-error-popup');
+function ensureUserFeedbackPopup() {
+    let popup = document.getElementById('user-feedback-popup');
 
     if (popup) {
         return popup;
     }
 
     popup = document.createElement('div');
-    popup.id = 'user-error-popup';
-    popup.className = 'user-error-popup';
+    popup.id = 'user-feedback-popup';
+    popup.className = 'user-feedback-popup user-feedback-popup--info';
     popup.innerHTML = `
-        <div class="user-error-popup__backdrop" data-close-popup="true"></div>
-        <div class="user-error-popup__dialog" role="dialog" aria-modal="true" aria-labelledby="user-error-popup-title">
-            <button type="button" class="user-error-popup__close" aria-label="Close error dialog">&times;</button>
-            <p class="user-error-popup__eyebrow">Problem detected</p>
-            <h2 id="user-error-popup-title"></h2>
-            <p class="user-error-popup__message"></p>
-            <p class="user-error-popup__hint">
-                If this looks like a bug on our side, please open a GitHub report so it can be reproduced and fixed.
-            </p>
-            <div class="user-error-popup__actions">
-                <a class="user-error-popup__report" style="width=100%" target="_blank" rel="noopener noreferrer">Open bug report</a>
-                <button type="button" class="user-error-popup__dismiss">Dismiss</button>
+        <div class="user-feedback-popup__backdrop" data-close-popup="true"></div>
+        <div class="user-feedback-popup__dialog" role="dialog" aria-modal="true" aria-labelledby="user-feedback-popup-title">
+            <button type="button" class="user-feedback-popup__close" aria-label="Close dialog">&times;</button>
+            <p class="user-feedback-popup__eyebrow">Notice</p>
+            <h2 id="user-feedback-popup-title"></h2>
+            <p class="user-feedback-popup__message"></p>
+            <p class="user-feedback-popup__hint" hidden></p>
+            <div class="user-feedback-popup__actions">
+                <a class="user-feedback-popup__primary" target="_blank" rel="noopener noreferrer" hidden></a>
+                <button type="button" class="user-feedback-popup__dismiss">Close</button>
             </div>
         </div>
     `;
@@ -114,50 +124,119 @@ function ensureUserErrorPopup() {
     popup.addEventListener('click', (event) => {
         if (
             event.target?.dataset?.closePopup === 'true' ||
-            event.target.classList.contains('user-error-popup__close') ||
-            event.target.classList.contains('user-error-popup__dismiss')
+            event.target.classList.contains('user-feedback-popup__close') ||
+            event.target.classList.contains('user-feedback-popup__dismiss')
         ) {
-            closeUserErrorPopup();
+            closeUserFeedbackPopup();
         }
     });
 
     return popup;
 }
 
-function showUserErrorPopup({
-    title = 'Something went wrong',
-    message = 'An unexpected error occurred.',
-    error = null,
-    reportTitle,
-    reportContext = '',
+function showUserFeedbackPopup({
+    title = 'Notice',
+    message = '',
+    messageHtml,
+    hint = '',
+    hintHtml,
+    variant = 'info',
+    eyebrow = 'Notice',
+    primaryActionLabel,
+    primaryActionHref,
+    primaryActionTarget = '_blank',
+    primaryActionRel = 'noopener noreferrer',
+    dismissLabel = 'Close',
     dedupeKey,
 }) {
-    if (shouldSuppressUserErrorPopup(dedupeKey)) {
+    if (shouldSuppressUserFeedbackPopup(dedupeKey)) {
         return;
     }
 
     if (!document.body) {
-        alert(`${title}\n\n${message}`);
+        alert(`${title}\n\n${message || hint || ''}`.trim());
         return;
     }
 
-    const popup = ensureUserErrorPopup();
-    popup.querySelector('#user-error-popup-title').textContent = title;
-    popup.querySelector('.user-error-popup__message').textContent = message;
-    popup.querySelector('.user-error-popup__report').href = buildBugReportUrl({
-        title,
-        message,
-        error,
-        reportTitle,
-        reportContext,
-    });
+    const popup = ensureUserFeedbackPopup();
+    const normalizedVariant = ['error', 'success', 'info'].includes(variant) ? variant : 'info';
+    const titleElement = popup.querySelector('#user-feedback-popup-title');
+    const eyebrowElement = popup.querySelector('.user-feedback-popup__eyebrow');
+    const messageElement = popup.querySelector('.user-feedback-popup__message');
+    const hintElement = popup.querySelector('.user-feedback-popup__hint');
+    const primaryActionElement = popup.querySelector('.user-feedback-popup__primary');
+    const dismissElement = popup.querySelector('.user-feedback-popup__dismiss');
+
+    popup.className = `user-feedback-popup user-feedback-popup--${normalizedVariant}`;
+    titleElement.textContent = title;
+    eyebrowElement.textContent = eyebrow;
+    setPopupContent(messageElement, message, messageHtml);
+
+    const hasHint = Boolean(hint || hintHtml);
+    setPopupContent(hintElement, hint, hintHtml);
+    hintElement.hidden = !hasHint;
+
+    const hasPrimaryAction = Boolean(primaryActionLabel && primaryActionHref);
+    primaryActionElement.hidden = !hasPrimaryAction;
+    if (hasPrimaryAction) {
+        primaryActionElement.textContent = primaryActionLabel;
+        primaryActionElement.href = primaryActionHref;
+        primaryActionElement.target = primaryActionTarget;
+        primaryActionElement.rel = primaryActionRel;
+    } else {
+        primaryActionElement.textContent = '';
+        primaryActionElement.removeAttribute('href');
+    }
+
+    dismissElement.textContent = dismissLabel;
 
     if (!document.body.contains(popup)) {
         document.body.appendChild(popup);
     }
 
-    popup.querySelector('.user-error-popup__report').focus();
+    if (hasPrimaryAction) {
+        primaryActionElement.focus();
+    } else {
+        dismissElement.focus();
+    }
 }
+
+function showUserErrorPopup({
+    title = 'Something went wrong',
+    message = 'An unexpected error occurred.',
+    messageHtml,
+    error = null,
+    reportTitle,
+    reportContext = '',
+    dedupeKey,
+}) {
+    const reportMessage =
+        typeof message === 'string' && message.trim() ? message : getErrorMessage(error);
+
+    showUserFeedbackPopup({
+        title,
+        message,
+        messageHtml,
+        hint: 'If this looks like a bug on our side, please open a GitHub report so it can be reproduced and fixed.',
+        variant: 'error',
+        eyebrow: 'Problem detected',
+        primaryActionLabel: 'Open bug report',
+        primaryActionHref: buildBugReportUrl({
+            title,
+            message: reportMessage,
+            error,
+            reportTitle,
+            reportContext,
+        }),
+        dismissLabel: 'Dismiss',
+        dedupeKey,
+    });
+}
+
+window.closeUserFeedbackPopup = closeUserFeedbackPopup;
+window.closeUserErrorPopup = closeUserFeedbackPopup;
+window.showUserFeedbackPopup = showUserFeedbackPopup;
+window.showUserErrorPopup = showUserErrorPopup;
 
 function shouldIgnoreGlobalError(error) {
     const message = getErrorMessage(error);
@@ -170,8 +249,6 @@ function shouldIgnoreGlobalError(error) {
     );
 }
 
-window.closeUserErrorPopup = closeUserErrorPopup;
-window.showUserErrorPopup = showUserErrorPopup;
 window.fetchJsonOrThrow = async function (url, options = {}) {
     const { errorContext = 'Request failed', ...fetchOptions } = options;
     const response = await fetch(url, fetchOptions);
@@ -238,7 +315,7 @@ window.addEventListener('unhandledrejection', (event) => {
 
 document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
-        closeUserErrorPopup();
+        closeUserFeedbackPopup();
     }
 });
 
@@ -334,37 +411,56 @@ document.addEventListener('DOMContentLoaded', () => {
 // }
 
 function addCookieConsentBanner() {
-    const banner = document.createElement('div');
-    banner.id = 'cookie-consent-banner';
-    banner.className = 'cookie-consent-banner';
-
     const cookiesAccepted = localStorage.getItem('cookies_accepted');
     const message = !cookiesAccepted
+        ? 'We use cookies to improve your experience. By accepting these cookies, you agree to our privacy policy.'
+        : 'Our privacy policies have changed. Please review and accept again.';
+
+    const messageHtml = !cookiesAccepted
         ? 'We use cookies to improve your experience. By accepting these cookies, you agree to our <a href="/privacy-policy" style="color: #ffd700;">privacy policy</a>.'
         : 'Our <a href="/privacy-policy" style="color: #ffd700;">privacy policies</a> have changed. Please review and accept again.';
 
-    banner.innerHTML = `
-        <div id="cookie-consent-banner">
-            <p>${message}</p>
-            <div class="inline-buttons">
-                <button id="accept-cookies" onclick="handleConsent(true)">Accept</button>
-                <button id="decline-cookies" onclick="handleConsent(false)">Decline</button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(banner);
+    showUserFeedbackPopup({
+        title: 'Cookie Consent',
+        message,
+        messageHtml,
+        variant: 'info',
+        eyebrow: 'Notice',
+        primaryActionLabel: 'Accept',
+        primaryActionHref: '#',
+        primaryActionTarget: '_self',
+        primaryActionRel: '',
+        dismissLabel: 'Decline',
+        dedupeKey: 'cookie-consent-banner',
+    });
+
+    const primaryButton = document.querySelector('.user-feedback-popup__primary');
+    const dismissButton = document.querySelector('.user-feedback-popup__dismiss');
+
+    // Have the cursor be pointer
+    primaryButton.style.cursor = 'pointer';
+    dismissButton.style.cursor = 'pointer';
+
+    if (primaryButton) {
+        primaryButton.removeAttribute('href');
+        primaryButton.removeAttribute('target');
+        primaryButton.removeAttribute('rel');
+        primaryButton.addEventListener('click', () => {
+            handleConsent(true);
+        });
+    }
+
+    if (dismissButton) {
+        dismissButton.addEventListener('click', () => {
+            handleConsent(false);
+        });
+    }
 }
 
 function handleConsent(isAccepted) {
     let acceptedVersion = isAccepted ? currentPrivacyPolicyVersion : 'false';
     localStorage.setItem('cookies_accepted', acceptedVersion);
-    const consentBanner = document.getElementById('cookie-consent-banner');
-    consentBanner.style.transition = 'opacity 0.3s ease';
-    consentBanner.style.opacity = '0';
-
-    setTimeout(() => {
-        consentBanner.remove();
-    }, 300);
+    closeUserFeedbackPopup();
 }
 
 async function loadTools() {
@@ -488,6 +584,9 @@ function setupNavbar() {
     const contactLink = document.createElement('li');
     contactLink.innerHTML = '<a href="/contact">Contact</a>';
 
+    const privacyLink = document.createElement('li');
+    privacyLink.innerHTML = '<a href="/privacy-policy">Privacy Policy</a>';
+
     const changeRelease = document.createElement('li');
     changeRelease.style.cursor = 'pointer';
 
@@ -511,6 +610,7 @@ function setupNavbar() {
 
     pages.appendChild(homeLink);
     pages.appendChild(contactLink);
+    pages.appendChild(privacyLink);
     pages.appendChild(changeRelease);
 
     navbar.appendChild(logo);
@@ -552,7 +652,7 @@ function setupFooter() {
     // Copyright
     const footerText = document.createElement('a');
     footerText.innerHTML = `© ${new Date().getFullYear()} CubingTools by Sebastian Kling`;
-    footerText.href = 'mailto:sebastian@cubingtools.de';
+    footerText.href = '/contact';
     footerText.className = 'small-screen';
 
     // Credit
@@ -561,7 +661,7 @@ function setupFooter() {
     creditText.className = 'big-screen';
 
     const name = document.createElement('a');
-    name.href = 'mailto:sebastian@cubingtools.de';
+    name.href = '/contact';
     name.innerText = 'Sebastian Kling';
     creditText.appendChild(name);
 

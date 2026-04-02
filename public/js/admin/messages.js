@@ -396,8 +396,11 @@ function renderTable() {
             row.classList.add('is-unconfirmed');
         }
 
-        const percentageUsed = message.recaptcha_score - 0.5;
-        const hue = 120 * (1 - percentageUsed);
+        // Score will always be >0.5
+        // It needs to be put in relation to a scale from 0.5 to 1
+        // So we remap the score to a 0-1 scale where 0.5 becomes 0 and 1 stays 1
+        const percentageUsed = Math.max(0, Math.min(1, (message.recaptcha_score - 0.5) * 2));
+        const hue = 120 * percentageUsed;
         const scoreCell = createCell(formatScore(message.recaptcha_score));
         scoreCell.style.color = `hsl(${hue}, 80%, 50%)`;
 

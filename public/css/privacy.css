@@ -4,14 +4,14 @@ select {
     font-size: 16px;
 }
 
-#policy-content,
-#policy-content * {
+#content,
+#content * {
     all: unset;
     display: revert;
     box-sizing: border-box;
 }
 
-#policy-content {
+#content {
     line-height: 1.6;
     color: #333;
     background-color: #fff;
@@ -21,12 +21,12 @@ select {
     overflow: auto;
 }
 
-#policy-content h1,
-#policy-content h2,
-#policy-content h3,
-#policy-content h4,
-#policy-content h5,
-#policy-content h6 {
+#content h1,
+#content h2,
+#content h3,
+#content h4,
+#content h5,
+#content h6 {
     color: #222;
     /* Headers slightly darker for emphasis */
     margin: 1.5em 0 0.5em;
@@ -35,52 +35,52 @@ select {
     font-weight: bold;
 }
 
-#policy-content h1 {
+#content h1 {
     font-size: 2em;
     border-bottom: 2px solid #ddd;
     /* Underline for h1 headers */
     padding-bottom: 0.3em;
 }
 
-#policy-content h2 {
+#content h2 {
     font-size: 1.75em;
 }
 
-#policy-content h3 {
+#content h3 {
     font-size: 1.5em;
 }
 
-#policy-content h4 {
+#content h4 {
     font-size: 1.25em;
 }
 
-#policy-content h5 {
+#content h5 {
     font-size: 1.1em;
 }
 
-#policy-content p {
+#content p {
     margin: 1em 0;
     /* Space between paragraphs */
     color: #444;
     /* Slightly lighter for readability */
 }
 
-#policy-content a {
+#content a {
     color: #007bff;
     /* Link color */
     text-decoration: underline;
     /* Standard link styling */
 }
 
-#policy-content a:hover {
+#content a:hover {
     color: #0056b3;
     /* Darker link color on hover */
     text-decoration: none;
     /* Remove underline on hover */
 }
 
-#policy-content ul,
-#policy-content ol {
+#content ul,
+#content ol {
     margin: 1em 0;
     padding-left: 2em;
     /* Indent for lists */
@@ -88,17 +88,21 @@ select {
     /* Default bullet for unordered lists */
 }
 
-#policy-content ol {
+#content ol {
     list-style: decimal;
     /* Numbered bullets for ordered lists */
 }
 
-#policy-content li {
+#content li {
     margin: 0.5em 0;
     /* Space between list items */
 }
 
-#policy-content blockquote {
+#content li::before {
+    content: '';
+}
+
+#content blockquote {
     margin: 1em 0;
     padding: 1em;
     border-left: 4px solid #ddd;
@@ -108,8 +112,8 @@ select {
     font-style: italic;
 }
 
-#policy-content pre,
-#policy-content code {
+#content pre,
+#content code {
     font-family: 'Courier New', Courier, monospace;
     /* Monospace font for code */
     background-color: #f4f4f4;
@@ -122,12 +126,12 @@ select {
     /* Horizontal scroll for long code */
 }
 
-#policy-content pre {
+#content pre {
     padding: 1em;
     margin: 1em 0;
 }
 
-#policy-content hr {
+#content hr {
     border: none;
     border-top: 1px solid #ddd;
     /* Subtle horizontal rule */
@@ -135,7 +139,7 @@ select {
     /* Space above and below */
 }
 
-#policy-content img {
+#content img {
     max-width: 100%;
     /* Ensure images fit the container */
     height: auto;

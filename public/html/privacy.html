@@ -46,7 +46,7 @@
     <link rel="stylesheet" href="../css/privacy.css">
 
     <!-- JS Files -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P" defer></script>
     <script src="../js/setupPage.js" defer></script>
     <script src="../js/privacy.js" defer></script>
@@ -67,10 +67,10 @@
                 <h1>CubingTools.de Privacy Policy</h1>
                 <a href="https://policies.google.com/privacy">Google Privacy Policy</a>
                 <p>Select a version to view:</p>
-                <select id="policy-version-dropdown"></select>
+                <select id="dropdown"></select>
                 <button onclick="localStorage.removeItem('cookies_accepted'); window.location.reload()">Reset Cookie Response</button>
 
-                <section id="policy-content">
+                <section id="content">
                     <!-- The Privacy Policy content will be dynamically injected here -->
                 </section>
             </section>

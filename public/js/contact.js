@@ -7,9 +7,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const messageField = document.getElementById('message');
     const messageCounter = document.getElementById('message-counter');
 
-    const { status } = new URLSearchParams(window.location.search);
+    const urlParams = new URLSearchParams(window.location.search);
+    const status = urlParams.get('status');
+
     if (status === 'confirmed') {
-        window.showUserErrorPopup({
+        window.showUserFeedbackPopup({
+            variant: 'success',
+            eyebrow: 'Message confirmed',
             title: 'Message confirmed',
             message:
                 'Thank you for confirming your message. We will get back to you as soon as possible.',
@@ -17,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (status === 'invalid') {
         window.showUserErrorPopup({
             title: 'Invalid confirmation link',
-            message:
+            messageHtml:
                 'The confirmation link is invalid or has already been used. If you believe this is a mistake, please contact us directly at <a href="mailto:info@cubingtools.de">info@cubingtools.de</a>.',
         });
     }
@@ -84,6 +88,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (submitButton) {
             submitButton.disabled = true;
+            submitButton.dataset.originalLabel = submitButton.textContent || 'Submit';
+            submitButton.textContent = 'Sending...';
         }
 
         try {
@@ -108,6 +114,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             contactForm.reset();
             updateMessageCounter();
+            window.showUserFeedbackPopup({
+                variant: 'success',
+                eyebrow: 'Message sent',
+                title: 'Check your inbox',
+                message: `We sent a confirmation email to ${data.email}. Please confirm your message there so we can reply.`,
+                dedupeKey: `contact-submit-success:${data.email}`,
+            });
         } catch (error) {
             console.error('Error submitting contact form:', error);
             window.showUserErrorPopup({
@@ -122,6 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             if (submitButton) {
                 submitButton.disabled = false;
+                submitButton.textContent = submitButton.dataset.originalLabel || 'Submit';
             }
         }
     });
