@@ -1,107 +1,259 @@
-# API Routes for cubingtools.de Backend
+# CubingTools.de Backend Documentation
 
-This module defines the API routes for the `cubingtools.de` backend.  
-It includes endpoints for fetching **WCA data**, **tool metadata**, and **server status**.
+This document describes the current backend behavior for version `1.2.0`, including routing, API endpoints, authentication, moderation, and operational notes.
 
-## Dependencies
+## Architecture Overview
 
-- `express`: Web framework for Node.js  
-- `axios`: Promise-based HTTP client for the browser and Node.js  
-- `path`: Utilities for working with file and directory paths  
-- `fs`: File system module for interacting with the file system  
-- `dotenv`: Loads environment variables from a `.env` file into `process.env`
+Main entry point:
+- `backend/server.js`
 
----
+Route modules:
+- `backend/API/routes.js` (public pages and tool/static route handling)
+- `backend/API/api.js` (public APIs, admin APIs, contact flow)
+- `backend/API/tools.js` (tool metadata discovery)
+- `backend/API/admin-routes.js` (admin HTML pages)
 
-## API Endpoints
+The server:
+- serves static files from `public/`
+- applies JSON/urlencoded body parsing with configured size limits
+- sanitizes string fields in request bodies
+- enforces CORS allowlist policy
+- logs requests as JSON lines in `backend/log/server.log` or `backend/log/beta.log`
 
-### WCA API
+## Dependencies (Backend-Critical)
 
-#### `GET /api/wca/:wcaId/:event`
+- `express`
+- `axios`
+- `express-rate-limit`
+- `sanitize-html`
+- `nodemailer`
+- `@google-cloud/recaptcha-enterprise`
+- `dotenv`
 
-Fetches WCA competitor data for a specific event.
+## Authentication Model (Admin)
 
-- **URL Parameters**:
-  - `wcaId`: WCA ID of the competitor (e.g., `2023ABCD01`)
-  - `event`: Event ID (e.g., `333`) or `name` for competitor name
-- **Query Parameters**:
-  - `num`: Number of solves to return (default: 12)
-  - `getsolves`: If `true`, returns all solves
-  - `getaverages`: If `true`, returns all competition averages
-- **Response**: JSON object with average, personal records, or solves/averages based on query parameters
+Admin endpoints use bearer token authentication.
 
-### Version API
+Flow:
+1. `POST /api/admin/login` with plain password in body.
+2. Server compares SHA-256 hash of provided password against `STATUS_PAGE_PASSWORD` hash from env.
+3. On success, server returns a session token.
+4. Client sends `Authorization: Bearer <token>` for protected endpoints.
+5. Token validity can be checked with `GET /api/admin/verify`.
 
-#### `GET /api/version`
+Session notes:
+- Sessions are stored in memory.
+- Default session TTL is 8 hours.
 
-Returns the application version.
+## Public API Endpoints
 
-- **Response**: `{ version: "x.x.x" }`
+### `GET /api/wca/:wcaId/:event`
 
-### Status API
+Returns WCA-derived competitor data.
 
-#### `POST /api/status`
+Path parameters:
+- `wcaId` (example: `2023ABCD01`)
+- `event` (example: `333`, or `name` for competitor name)
 
-Returns server status including uptime, memory usage, and log analytics.
+Query parameters:
+- `num` (optional, default 12)
+- `getsolves=true` returns full solves payload
+- `getaverages=true` returns event average history
 
-- **Request Body**:
-  - `password`: SHA-256 hashed password for authentication
-- **Response**: JSON object with uptime, memory usage, log file size, and traffic statistics
+Default response shape:
+- `{ average, records }`
 
-### Tools API
+Behavior notes:
+- Uses cached upstream JSON snapshots.
+- Deduplicates in-flight requests for same WCA ID.
 
-#### `GET /api/tools`
+### `GET /api/tools`
 
-Returns metadata for all available HTML tools.
+Returns tool metadata derived from HTML files in `public/tools/*/*.html`.
 
-- **Response**: JSON array of tools with `filename`, `title`, and `description`
+Response items include:
+- `filename`
+- `title`
+- `description`
+- `slogan`
+- `keywords`
 
-### Page Routes
+### `GET /api/version`
 
-#### `GET /`
-Serves the main page.
+Returns application version from `package.json`:
+- `{ version: "1.2.0" }`
 
-#### `GET /status`
-Serves the status report page.
+### `GET /events`
 
-#### `GET /privacy-policy`
-Serves the privacy policy page.
+Returns event definitions used by the grouping tool:
+- `{ events: [...] }`
 
-#### `GET /404`
-Serves the 404 error page.
+## Contact and Confirmation Endpoints
 
-### Static Asset Routes
+### `POST /api/contact`
 
-#### `GET /robots.txt`
-Serves the robots.txt file.
+Accepts contact form submissions and appeal submissions.
 
-#### `GET /sitemap.xml`
-Serves the sitemap.xml file.
+Expected body fields:
+- `name`
+- `email`
+- `message`
+- `tool` (optional)
+- `visits` (optional)
+- `isAppeal` (optional boolean-like)
+- `g-recaptcha-response` or `recaptchaToken`
 
-#### `GET /apple-touch-icon.png`
-Serves the Apple touch icon.
+Behavior:
+- Validates required fields.
+- Performs ban checks (email + hashed IP).
+- Verifies reCAPTCHA Enterprise when credentials are configured.
+- For regular contact messages, sends confirmation email and stores message as unconfirmed.
+- For appeals, stores appeal state against matching ban entry.
 
-#### `GET /googlea20166777fc211f6.html`
-Serves Google verification file.
+### `GET /contact/confirm?id=<token>`
 
-### Tool Routes
+Confirms a pending message and forwards it to destination email inbox.
 
-#### `GET /tools/:toolName`
-Serves an HTML tool page.
+Redirect behavior:
+- valid token -> `/contact?status=confirmed`
+- invalid/expired token -> `/contact?status=invalid`
 
-#### `GET /css/:cssName`
-Serves a tool's CSS file.
+## Admin API Endpoints (Protected)
 
-#### `GET /js/:jsName`
-Serves a tool's JavaScript file.
+All endpoints below require `Authorization: Bearer <token>`.
 
-#### `GET /assets/:assetName`
-Serves a tool's asset file.
+### Auth
 
-#### `GET *`
-Catch-all route that redirects to 404 with the requested path as a query parameter.
+- `POST /api/admin/login`
+- `GET /api/admin/verify`
 
----
+### Status
 
-Ensure the `.env` file contains required environment variables like `STATUS_PAGE_PASSWORD`.
+- `POST /api/admin/status`
+
+Returns:
+- uptime
+- memory usage
+- log file size
+- aggregated log analytics
+- flattened log entries for UI filtering
+
+### TODO Management
+
+- `GET /api/admin/todos`
+  - reads `md/TODO.md`
+- `POST /api/admin/todos`
+  - writes full TODO content
+
+### Message Moderation
+
+- `GET /api/admin/messages`
+  - returns `{ messages, bans }`
+- `DELETE /api/admin/messages/:id`
+  - deletes a message by ID
+
+### Ban Management
+
+- `GET /api/admin/messages/bans`
+- `POST /api/admin/messages/ban`
+  - body: `{ type: "email"|"ip", value, reason }`
+- `POST /api/admin/messages/unban`
+  - body: `{ type: "email"|"ip", value }`
+
+### Appeal Resolution
+
+- `POST /api/admin/messages/appeal/resolve`
+  - body: `{ type, value, unban, reason }`
+
+Behavior:
+- resolves pending appeal
+- optionally removes ban (`unban=true`)
+- sends approval/denial email to appeal requester
+
+## Admin Page Routes
+
+Served by `backend/API/admin-routes.js`:
+
+- `GET /admin`
+- `GET /admin/status`
+- `GET /admin/messages`
+- `GET /admin/dev-todo`
+
+## Public Page and Asset Routes
+
+Served by `backend/API/routes.js`:
+
+- `GET /`
+- `GET /privacy-policy`
+- `GET /contact`
+- `GET /contact/appeal`
+- `GET /404`
+- `GET /robots.txt`
+- `GET /sitemap.xml`
+- `GET /apple-touch-icon.png`
+- `GET /apple-touch-icon-precomposed.png`
+- `GET /googlea20166777fc211f6.html`
+- `GET /.well-known/*` (returns `204`)
+
+Tool and resource routes:
+- `GET /tools/:toolName`
+- `GET /css/:cssName`
+- `GET /js/:jsName`
+- `GET /assets/:assetName`
+
+Catch-all:
+- `GET *` serves 404 page
+
+## Rate Limiting
+
+The backend uses endpoint-specific limiters. Examples include:
+- contact requests
+- admin login and verification
+- admin status and TODO operations
+- admin message and ban operations
+- public WCA API requests
+
+All rate-limit responses are JSON with an `error` message.
+
+## Logging and Status Analytics
+
+Request logs are written as JSON lines with:
+- timestamp
+- method
+- URL
+- status code
+- duration
+- user agent
+
+Status analytics aggregate:
+- total requests
+- endpoint counts
+- method counts
+- status code counts
+- status-code-to-URL maps
+- average response time per endpoint
+- error rate
+- peak traffic by UTC hour
+
+## Required Environment Variables
+
+Set in `backend/.env`:
+
+- `STATUS_PAGE_PASSWORD` (SHA-256 hash string)
+- `EMAIL_HOST`
+- `EMAIL_USER`
+- `EMAIL_PASSWORD`
+- `EMAIL_RECEIVER`
+- `CONTACT_API_PASSWORD`
+- `GOOGLE_APPLICATION_CREDENTIALS` (for reCAPTCHA Enterprise)
+- `RECAPTCHA_PROJECT_ID`
+- `RECAPTCHA_SITE_KEY`
+- `RECAPTCHA_ACTION`
+- `CORS_WHITELIST` (optional override)
+
+## Notes
+
+- If reCAPTCHA credentials are unavailable, the contact flow degrades gracefully and allows submission while logging warnings.
+- Unconfirmed contact messages are automatically pruned after TTL expiry.
+- Bans are persisted in `backend/API/mail/bans.json`; messages are persisted in `backend/API/mail/mails.json`.
 
