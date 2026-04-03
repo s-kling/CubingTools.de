@@ -106,7 +106,7 @@ document.getElementById('contact-form')?.addEventListener('submit', async (event
         data['g-recaptcha-response'] = token;
         data['isAppeal'] = isAppeal;
 
-        if (localStorage.getItem('cookies_accepted') == 'true') {
+        if (localStorage.getItem('cookies_accepted') !== 'false') {
             data['visits'] = Number.parseInt(localStorage.getItem('visits') || '0', 10);
         }
 

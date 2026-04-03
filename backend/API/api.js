@@ -773,6 +773,7 @@ class ContactApi {
             email,
             tool,
             message,
+            visits,
             'g-recaptcha-response': recaptchaResponse,
             recaptchaToken,
             isAppeal,
@@ -792,6 +793,9 @@ class ContactApi {
         }
 
         const token = recaptchaResponse || recaptchaToken;
+        const visitsCount = Number.isFinite(Number.parseInt(visits, 10))
+            ? Number.parseInt(visits, 10)
+            : null;
 
         if (!name || !email || !message || !token) {
             return res.status(400).json({ success: false, error: 'Missing required fields' });
@@ -876,6 +880,7 @@ class ContactApi {
                             email,
                             tool,
                             message,
+                            visits: visitsCount,
                             recaptcha_score: score,
                             requestHost,
                         }).catch((error) => {
@@ -1003,7 +1008,7 @@ class ContactApi {
     }
 
     // Save pending confirmation payload until user clicks confirmation link.
-    saveMessage({ id, sec_ip, name, email, tool, message, recaptcha_score }) {
+    saveMessage({ id, sec_ip, name, email, tool, message, visits, recaptcha_score }) {
         let mails = this.readMailsFile();
         const pruneResult = this.pruneExpiredUnconfirmedMails(mails);
         mails = pruneResult.mails;
@@ -1015,6 +1020,7 @@ class ContactApi {
             email,
             tool,
             message,
+            visits,
             timestamp: new Date().toISOString(),
             recaptcha_score: recaptcha_score,
             confirmed: false,
@@ -1137,6 +1143,7 @@ class ContactApi {
         email,
         tool,
         message,
+        visits,
         recaptcha_score,
         requestHost,
     }) {
@@ -1156,6 +1163,7 @@ class ContactApi {
             email,
             tool,
             message,
+            visits,
             recaptcha_score,
             confirmed: false,
         });
@@ -1215,6 +1223,10 @@ class ContactApi {
         const safeEmail = escapeHtml(mail.email);
         const safeTool = escapeHtml(mail.tool);
         const safeMessage = escapeHtml(mail.message);
+        const safeVisits =
+            mail.visits != null && Number.isFinite(Number.parseInt(mail.visits, 10))
+                ? escapeHtml(Number.parseInt(mail.visits, 10).toString())
+                : 'N/A';
         const safeRecaptchaScore =
             mail.recaptcha_score != null ? escapeHtml(mail.recaptcha_score.toString()) : 'N/A';
 
@@ -1236,6 +1248,7 @@ class ContactApi {
                 .replace(/\$\{safeEmail\}/g, safeEmail)
                 .replace(/\$\{safeTool\}/g, safeTool || 'Other')
                 .replace(/\$\{safeMessage\}/g, safeMessage)
+                .replace(/\$\{safeVisits\}/g, safeVisits)
                 .replace(/\$\{recaptchaScore\}/g, safeRecaptchaScore);
 
             const info = await transporter.sendMail({

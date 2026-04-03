@@ -43,10 +43,12 @@
   
     <!-- CSS Stylesheets -->
     <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/index.css">
 
     <!-- JS Files -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P" defer></script>
     <script src="../js/setupPage.js" defer></script>
+    <script src="../js/index.js" defer></script>
 </head>
 
 <body>
@@ -60,81 +62,62 @@
         <div id="version"></div>
 
         <main>
-            <section class="heading">
-                <h1 id="title">Solve Smarter, Not Harder</h1>
-
-                <style>
-                    .main-tool {
-                        background-color: var(--secondary-background);
-                        padding-top: 0;
-                        padding: var(--space-md);
-                        border-radius: var(--main-radius);
-                        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
-                        transition: all 0.3s;
-                        cursor: pointer;
-                    }
-
-                    ul {
-                        line-height: 1.6;
-                    }
-
-                    li {
-                        color: var(--secondary-text);
-                        margin-left: var(--space-lg);
-                    }
-
-                    .main-tool h2 {
-                        margin-top: 0;
-                    }
-
-                    .main-tool:hover {
-                        scale: 1.02;
-                    }
-                </style>
-
-                <section class="tool-section main-tool" onclick="window.location.href='/tools/guildford'">
-                    <h2><a href="/tools/guildford">Guildford Optimizer</a></h2>
-                    <p>The Guildford Optimizer is a powerful tool that helps you plan and optimize your events for the
-                        Guildford Challenge. It takes into account various factors such as event duration, competitor
-                        availability, and resource allocation to create the most efficient schedule possible. This tool
-                        ensures that you can complete all events within the given time frame while maximizing the
-                        performance of each competitor.</p>
-                        <ul>
-                            <li>WCA Global input from WCA ID: Easily integrate your official WCA ID to get personalized and accurate data.</li>
-                            <li>Pick up time: This is the only Guildford optimizer that takes the pick up time into account.</li>
-                            <li>Multiple relays: Choose from various relay options like Mini Guildford, Guildford, Mini Guildford + FTO, Guildford + FTO, and 2x2-7x7 Relay to fit your needs.</li>
-                            <li>Quick calculation: Enjoy super-fast calculations with an average processing time of just 0.005 seconds, giving you instant results.</li>
-                            <li>Suggested events in the middle: Receive smart suggestions for events to include in between competitors, enhancing efficiency and performance.</li>
-                        </ul>
+            <section class="heading homepage">
+                <section class="home-hero">
+                    <p class="home-eyebrow">Competitive Cubing Toolkit</p>
+                    <h1 id="title">Solve Smarter, Not Harder</h1>
+                    <p>CubingTools.de is built for competitors and organizers who want better planning, faster insights, and less guesswork before competition day.</p>
+                    <div class="home-hero-links">
+                        <a href="/tools/guildford">Try Guildford Optimizer</a>
+                        <a href="/tools/grouping">Open Groupifier</a>
+                    </div>
                 </section>
 
-                <div class="tool-container">
-                    <p>Welcome to CubingTools.de, your ultimate destination for enhancing your cubing performance. Our
-                        platform offers a variety of tools designed to help you achieve your best results in competitive
-                        cubing.</p>
+                <section id="tools-carousel" class="tools-carousel" aria-label="Cubing tools carousel" tabindex="0">
+                    <div class="tools-carousel-header">
+                        <h2>Explore the tools</h2>
+                        <p>Swipe through the core suite and jump directly into the right workflow.</p>
+                    </div>
 
-                    <section class="tool-section">
-                        <h2><a href="/tools/grouping">Groupifier</a></h2>
-                        <p>The Groupifier tool is designed to streamline the process of organizing competitors into groups for
-                            cubing competitions. It ensures that each group is balanced in terms of skill level and number of
-                            participants, making the competition fair and efficient. By using advanced algorithms, the
-                            Groupifier minimizes waiting times and maximizes the use of available resources, providing a
-                            seamless experience for both organizers and competitors.</p>
-                    </section>
+                    <div class="tools-carousel-window">
+                        <div class="tools-carousel-track">
+                            <article class="tool-slide tool-slide--status" data-tool-name="Loading tools">
+                                <div class="tool-slide-status-copy">
+                                    <h3>Loading tools</h3>
+                                    <p>The homepage carousel is fetching the latest tool list.</p>
+                                </div>
+                            </article>
+                        </div>
+                    </div>
 
-                    <section class="tool-section">
-                        <h2><a href="/tools/average">WCA Average Calculator</a></h2>
-                        <p>The WCA Average Calculator tool allows you to record and analyze your solve times with ease. It provides detailed statistics based on previous competitions to show you what PR rank a specific solve is, what time is required for the target average and more.</p>
-                    </section>
+                    <div class="carousel-controls">
+                        <div class="carousel-buttons">
+                            <button type="button" data-carousel-prev aria-label="Show previous tool" hidden>&#8592;</button>
+                            <button type="button" data-carousel-next aria-label="Show next tool" hidden>&#8594;</button>
+                        </div>
+                        <div class="carousel-dots" aria-label="Carousel slide indicators" hidden></div>
+                    </div>
+                </section>
 
-                    <section class="tool-section">
-                        <h2><a href="/tools/globalCalc">Global Calculator</a></h2>
-                        <p>The Global Calculator tool allows you to calculate and compare your global rankings across different events. It provides detailed insights into your performance on a global scale, helping you understand where you stand among other competitors worldwide. You can use your WCA ID to check your official global rankings, and also upload your csTimer file to see your global performance based on your practice sessions. This tool is essential for tracking your progress and setting new goals.</p>
-                    </section>
-                </div>
+                <section class="generic-info" aria-label="General information">
+                    <article class="generic-info-card">
+                        <h3>For competitors</h3>
+                        <p>Use the tools to plan attempts, validate goals, and identify where small changes can create faster averages.</p>
+                    </article>
+                    <article class="generic-info-card">
+                        <h3>For organizers</h3>
+                        <p>Reduce manual effort in planning and keep rounds moving with practical, competition-aware utilities.</p>
+                    </article>
+                    <article class="generic-info-card">
+                        <h3>Built for speed</h3>
+                        <p>The platform focuses on quick input, fast feedback, and straightforward workflows that support real event pressure.</p>
+                    </article>
+                </section>
 
-                <h2>Admin</h2>
-                <p>For administrative purposes, we have a dedicated <a href="/admin">admin page</a> where you can monitor the server status, manage user data, and perform other essential tasks to ensure the smooth operation of CubingTools.de.</p>
+                <section class="admin-notice" aria-label="Administration">
+                    <h2>Admin</h2>
+                    <p>For administrative tasks, use the <a href="/admin">admin page</a> to monitor status, review activity, and manage operations.</p>
+                </section>
             </section>
         </main>
         <footer id="footer"></footer>

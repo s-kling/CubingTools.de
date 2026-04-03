@@ -68,6 +68,10 @@ router.get('/googlea20166777fc211f6.html', (req, res) => {
     res.sendFile(path.join(__dirname, '..', '../public/html', 'google.html'));
 });
 
+router.get('/.well-known/*', (req, res) => {
+    res.status(204).end();
+});
+
 // Serve specific tool pages
 router.get('/tools/:toolName', (req, res) => {
     const toolName = req.params.toolName;
