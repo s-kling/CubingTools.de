@@ -320,24 +320,34 @@ document.addEventListener('keydown', (event) => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
-    // // HERO
-    // const hasSeenHero = localStorage.getItem('hero_seen');
-
-    // if (!hasSeenHero) {
-    //     showHero();
-    // }
+    // COOKIE CONSENT
+    const cookiesAccepted = localStorage.getItem('cookies_accepted');
 
     const sessionId = sessionStorage.getItem('session_id');
-    if (!sessionId) {
-        sessionStorage.setItem('session_id', Date.now().toString());
+
+    if (!sessionId && cookiesAccepted !== 'false') {
         const visits = localStorage.getItem('visits')
             ? parseInt(localStorage.getItem('visits'))
             : 0;
+        sessionStorage.setItem('session_id', Date.now().toString());
         localStorage.setItem('visits', visits + 1);
-    }
 
-    // COOKIE CONSENT
-    const cookiesAccepted = localStorage.getItem('cookies_accepted');
+        if ((parseInt(visits, 10) + 1) % 15 === 0) {
+            showUserFeedbackPopup({
+                title: 'Share Your Feedback',
+                message:
+                    "You seem to enjoy using CubingTools! We'd love to hear your thoughts and suggestions.",
+                variant: 'info',
+                eyebrow: 'Feedback',
+                primaryActionLabel: 'Send Feedback',
+                primaryActionHref: '/contact',
+                primaryActionTarget: '_self',
+                primaryActionRel: '',
+                dismissLabel: 'Later',
+                dedupeKey: 'fifteenth-visit-feedback',
+            });
+        }
+    }
 
     if (cookiesAccepted === currentPrivacyPolicyVersion) {
         window.dataLayer = window.dataLayer || [];
@@ -355,60 +365,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupNavbar();
     setupFooter();
 });
-
-// function showHero() {
-//     const hero = document.createElement('section');
-//     hero.className = 'hero';
-//     hero.innerHTML = `
-//         <h1>CubingTools is back.</h1>
-//         <p>New and Improved 🚀</p>
-//         <div class="info-section">
-//             <div class="info-card" id="why-gone">
-//                 <h2>Why we were gone</h2>
-//                 <p>We took time to completely restructure the codebase, making it faster, more efficient, and easier to understand.</p>
-//             </div>
-//             <div class="info-card" id="what-changed">
-//                 <h2>What has changed</h2>
-//                 <p>Click here to check out the new features, fixes, and improvements on our GitHub release page.</p>
-//             </div>
-//             <div class="info-card" id="follow-bluesky">
-//                 <h2>Follow us on BlueSky</h2>
-//                 <p>Stay connected with CubingTools on BlueSky for news, updates, and sneak peeks into upcoming features.</p>
-//             </div>
-//         </div>
-//         `;
-//     document.body.prepend(hero);
-
-//     // Disable scroll until hero is dismissed
-//     document.body.style.overflow = 'hidden';
-
-//     const dismissHero = () => {
-//         hero.style.transition = 'opacity 0.8s ease, transform 0.8s ease';
-//         hero.style.opacity = '0';
-//         hero.style.transform = 'translateY(-40px)';
-
-//         setTimeout(() => {
-//             hero.remove();
-//             document.body.style.overflowY = 'auto';
-//             localStorage.setItem('hero_seen', 'true'); // store flag
-//         }, 800);
-
-//         document.removeEventListener('keydown', dismissHero);
-//         document.removeEventListener('click', dismissHero);
-//     };
-
-//     document.addEventListener('keydown', dismissHero);
-//     document.addEventListener('click', dismissHero);
-
-//     // Card actions
-//     document.getElementById('what-changed').addEventListener('click', () => {
-//         window.open('https://github.com/s-kling/CubingTools.de/releases/tag/Release', '_blank');
-//     });
-
-//     document.getElementById('follow-bluesky').addEventListener('click', () => {
-//         window.open('https://bsky.app/profile/cubingtools.de', '_blank');
-//     });
-// }
 
 function addCookieConsentBanner() {
     const cookiesAccepted = localStorage.getItem('cookies_accepted');
