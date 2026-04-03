@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function redirectToLogin() {
-    window.location.href = '/admin';
+    window.location.href = '/admin?then=dev-todo';
 }
 
 async function loadTodos(token) {

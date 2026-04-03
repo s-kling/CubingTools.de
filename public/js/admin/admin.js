@@ -25,6 +25,14 @@ passwordInput.addEventListener('keydown', async (event) => {
         const { token } = await response.json();
         sessionStorage.setItem(SESSION_KEY, token);
         passwordInput.value = '';
+
+        // If there is a redirect URL (i.e. ?then=status), navigate there instead of showing the dashboard
+        const { then } = Object.fromEntries(new URLSearchParams(window.location.search));
+        if (then) {
+            window.location.href = `/admin/${then}`;
+            return;
+        }
+
         showDashboard();
     } catch {
         adminError.textContent = 'Unauthorized or server error';

@@ -250,6 +250,7 @@ class StatusApi {
             memoryUsage: `${memoryUsage} MB`,
             logFileSize: `${logFileSize} KB`,
             logs: logStats,
+            logEntries: logStats.logEntries || [],
         });
     }
 
@@ -274,6 +275,7 @@ class StatusApi {
             avgResponseTimeMs: {},
             errorRate: 0,
             peakHours: {},
+            logEntries: [],
         };
 
         let totalErrors = 0;
@@ -287,6 +289,15 @@ class StatusApi {
             } catch {
                 continue;
             }
+
+            stats.logEntries.push({
+                time: entry.time || null,
+                method: entry.method || null,
+                url: entry.url || null,
+                status: entry.status ?? null,
+                durationMs: entry.durationMs ?? null,
+                userAgent: entry.userAgent || null,
+            });
 
             stats.totalRequests++;
 
