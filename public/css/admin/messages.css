@@ -68,7 +68,7 @@
 .messages-stats {
     display: grid;
     gap: var(--space-sm);
-    grid-template-columns: repeat(9, minmax(120px, 1fr));
+    grid-template-columns: repeat(11, minmax(120px, 1fr));
     padding-bottom: 5px;
     overflow-y: scroll;
 }
@@ -126,8 +126,13 @@
     background: rgba(249, 199, 79, 0.05);
 }
 
+.messages-table tr.is-appeal {
+    background: rgba(240, 113, 103, 0.08);
+}
+
 .confirmed-badge,
-.unconfirmed-badge {
+.unconfirmed-badge,
+.appeal-badge {
     display: inline-block;
     padding: 3px 9px;
     border-radius: 20px;
@@ -146,6 +151,12 @@
     background: rgba(249, 199, 79, 0.15);
     color: #f9c74f;
     border: 1px solid rgba(249, 199, 79, 0.35);
+}
+
+.appeal-badge {
+    background: rgba(240, 113, 103, 0.16);
+    color: #f07167;
+    border: 1px solid rgba(240, 113, 103, 0.38);
 }
 
 .messages-table details summary {
@@ -205,6 +216,22 @@
     margin-top: var(--space-md);
 }
 
+.ban-console {
+    margin-top: var(--space-md);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--main-radius);
+    background: rgba(0, 0, 0, 0.16);
+    padding: var(--space-sm);
+}
+
+.ban-console-table {
+    min-width: 0;
+}
+
+.ban-console-table th {
+    width: 180px;
+}
+
 .ban-lists h4 {
     margin: 0 0 var(--space-xs);
 }
@@ -228,6 +255,30 @@
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     padding-bottom: 6px;
     text-overflow: ellipsis;
+}
+
+.ban-list li.ban-item {
+    cursor: pointer;
+}
+
+.ban-list li.ban-item.is-selected {
+    background: rgba(63, 167, 214, 0.18);
+    border-radius: 8px;
+    padding: 8px;
+}
+
+.ban-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.ban-actions {
+    display: inline-flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 .ban-list li:last-child {

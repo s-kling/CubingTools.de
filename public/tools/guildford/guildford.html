@@ -6,7 +6,9 @@
     <title>Guildford Optimizer</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Tool for optimizing Guildford challenge event combinations between two competitors based on their World Cube Association (WCA) average times. The script updates the URL with form data, fetches and displays WCA data for each competitor, and calculates optimal event divisions to minimize total solve time.">
+    <meta name="description" content="Given two competitors' times across a set of fully customizable events, the optimizer calculates exactly who should solve what to get the fastest possible combined relay time.">
+    <!-- Slogan used only in the carousel -->
+    <meta name="slogan" content="Split smarter, finish faster.">
     <meta name="keywords" content="WCA, world cube association, cubing, speedcubing, tool, tools, cubingtools, cubing tool, cubing tools, mini-guildford, mini guildford challenge, guildford, guildford challenge, challenge, optimizer, guildford optimizer, mini-guildford optimizer, mini guildford optimizer, guildford optimiser, optimiser, mini guildford optimiser, mini-guildford optimiser, guildford optimiser">
     
     <!-- Other Fancy Things -->
@@ -15,7 +17,7 @@
 
     <!-- Open Graph Metadata (Facebook, LinkedIn, WhatsApp, Discord, etc.) -->
     <meta property="og:title" content="CubingTools.de Guildford Optimizer" />
-    <meta property="og:description" content="Tool for optimizing Guildford challenge event combinations between two competitors based on their World Cube Association (WCA) average times. The script updates the URL with form data, fetches and displays WCA data for each competitor, and calculates optimal event divisions to minimize total solve time." />
+    <meta property="og:description" content="Given two competitors' times across a set of fully customizable events, the optimizer calculates exactly who should solve what to get the fastest possible combined relay time." />
     <meta property="og:image" content="/assets/guildford_logo.png" />
     <meta property="og:image:alt" content="CubingTools.de Logo" />
     <meta property="og:url" content="https://cubingtools.de/tools/guildford" />
@@ -35,7 +37,7 @@
         "@context": "https://schema.org",
         "@type": "WebSite",
         "name": "CubingTools.de Guildford Optimizer",
-        "description": "Tool for optimizing Guildford challenge event combinations between two competitors based on their World Cube Association (WCA) average times. The script updates the URL with form data, fetches and displays WCA data for each competitor, and calculates optimal event divisions to minimize total solve time.",
+        "description": "Given two competitors' times across a set of fully customizable events, the optimizer calculates exactly who should solve what to get the fastest possible combined relay time.",
         "image": "https://cubingtools.de/assets/guildford_logo.png",
         "url": "https://cubingtools.de/tools/guildford"
         }
@@ -93,7 +95,7 @@
                             <option value="custom">Custom Relay</option>
                         </select>
                     </label>
-                    <div id="custom"><span id="events"></span></d>
+                    <div id="custom"><span id="events"></span></div>
                 </div>
 
                 <form id="timeForm">

@@ -28,7 +28,13 @@ router.get('/privacy-policy', (req, res) => {
     res.sendFile(path.join(__dirname, '..', '../public/html', 'privacy.html'));
 });
 
+// Serve the contact page
 router.get('/contact', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', '../public/html', 'contact.html'));
+});
+
+// Serve the ban appeal page
+router.get('/contact/appeal', (req, res) => {
     res.sendFile(path.join(__dirname, '..', '../public/html', 'contact.html'));
 });
 

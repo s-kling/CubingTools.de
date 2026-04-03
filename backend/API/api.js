@@ -12,6 +12,7 @@ const { RecaptchaEnterpriseServiceClient } = require('@google-cloud/recaptcha-en
 
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
+// Shared helper to create endpoint-specific rate limiters with a consistent payload shape.
 function createRateLimiter(windowMs, max, message, options = {}) {
     return rateLimit({
         windowMs,
@@ -84,20 +85,25 @@ const wcaLimiter = createRateLimiter(
     'Too many WCA API requests, please try again later.',
 );
 
+// Encapsulates WCA profile fetch + result aggregation helpers used by the public API.
 class WcaApi {
     constructor() {
+        // Raw GitHub-hosted JSON snapshots for WCA persons.
         this.baseUrl =
             'https://raw.githubusercontent.com/robiningelbrecht/wca-rest-api/master/api/persons';
+        // Keep fetched responses for a short period to reduce upstream requests.
         this.cacheTtlMs = 5 * 60 * 1000;
         this.responseCache = new Map();
     }
 
+    // Canonical key for cache lookups.
     normalizeWcaId(wcaId) {
         return String(wcaId || '')
             .trim()
             .toUpperCase();
     }
 
+    // Remove expired non-pending entries from in-memory cache.
     pruneExpiredCache() {
         const now = Date.now();
 
@@ -108,6 +114,7 @@ class WcaApi {
         }
     }
 
+    // Fetch competitor data with de-duplication for in-flight requests.
     async fetchCompetitorData(wcaId) {
         const cacheKey = this.normalizeWcaId(wcaId);
         const now = Date.now();
@@ -154,10 +161,12 @@ class WcaApi {
         }
     }
 
+    // Lightweight endpoint to resolve competitor name.
     getCompetitorName(data) {
         return { name: data.name };
     }
 
+    // Flatten all rounds for one event across all competitions.
     getAllResultsForEvent(data, event) {
         let allResults = [];
         for (const competition of Object.values(data.results)) {
@@ -168,12 +177,14 @@ class WcaApi {
         return allResults;
     }
 
+    // Build a latest-solves list, keeping only valid solves.
     getSolves(allResults, solvecount) {
         let solves = allResults.flatMap((result) => result.solves.reverse());
         solves = solves.filter((result) => result > 0).slice(0, solvecount);
         return solves;
     }
 
+    // Trimmed mean: drop best + worst and return seconds.
     calculateAverage(solves) {
         if (solves.length === 0) {
             return null;
@@ -184,10 +195,12 @@ class WcaApi {
         return sum / solves.length / 100; // convert ms → seconds
     }
 
+    // Return all average values for an event timeline.
     getAverages(allResults) {
         return allResults.flatMap((result) => result.average);
     }
 
+    // Pull current PRs from rank sections.
     getPersonalRecords(data, event) {
         return {
             single: data.rank.singles.find((e) => e.eventId === event)?.best || null,
@@ -195,6 +208,7 @@ class WcaApi {
         };
     }
 
+    // Main request handler for /api/wca/:wcaId/:event.
     async handleRequest(req, res) {
         const { wcaId, event } = req.params;
         const { num, getsolves, getaverages } = req.query;
@@ -228,16 +242,19 @@ class WcaApi {
     }
 }
 
+// Provides lightweight operational telemetry for the protected status page.
 class StatusApi {
     constructor() {
         this.password = process.env.STATUS_PAGE_PASSWORD || '';
     }
 
+    // Detect beta traffic to route to the beta log file.
     isBetaRequest(req) {
         const host = req?.get?.('host') || '';
         return host.includes(':8001') || host.includes('beta.cubingtools.de');
     }
 
+    // Build full status payload including summarized logs.
     handleRequest(req, res) {
         const uptime = process.uptime();
         const memoryUsage = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
@@ -254,6 +271,7 @@ class StatusApi {
         });
     }
 
+    // Parse JSON line logs and aggregate diagnostics for the dashboard.
     analyzeLogs(req) {
         const betaTest = this.isBetaRequest(req);
 
@@ -354,6 +372,7 @@ class StatusApi {
         return stats;
     }
 
+    // Return current log file size in KB.
     getLogFileSize(req) {
         try {
             const betaTest = this.isBetaRequest(req);
@@ -367,17 +386,21 @@ class StatusApi {
     }
 }
 
+// Reusable SHA-256 helper used for password and IP hashing.
 function sha256Hash(input) {
     return crypto.createHash('sha256').update(input).digest('hex');
 }
 
+// Session-backed admin auth + message moderation endpoints.
 class AdminSessionApi {
     constructor() {
         this.password = process.env.STATUS_PAGE_PASSWORD || '';
+        // In-memory token -> expiry map.
         this.sessions = new Map();
         this.SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
     }
 
+    // Remove stale sessions before issuing/validating tokens.
     _cleanExpired() {
         const now = Date.now();
         for (const [token, expiry] of this.sessions) {
@@ -385,6 +408,7 @@ class AdminSessionApi {
         }
     }
 
+    // Create a new bearer token with configured TTL.
     createSession() {
         this._cleanExpired();
         const token = crypto.randomBytes(32).toString('hex');
@@ -392,6 +416,7 @@ class AdminSessionApi {
         return token;
     }
 
+    // Validate token existence and expiration.
     verifyToken(token) {
         if (!token || typeof token !== 'string') return false;
         const expiry = this.sessions.get(token);
@@ -403,12 +428,14 @@ class AdminSessionApi {
         return true;
     }
 
+    // Extract bearer token from Authorization header.
     extractToken(req) {
         const auth = req.headers['authorization'] || '';
         if (auth.startsWith('Bearer ')) return auth.slice(7).trim();
         return null;
     }
 
+    // Authenticate admin user and issue a session token.
     handleLogin(req, res) {
         const { password } = req.body || {};
         if (!password || typeof password !== 'string') {
@@ -433,6 +460,7 @@ class AdminSessionApi {
         return res.json({ token });
     }
 
+    // Stateless endpoint to verify token validity.
     handleVerify(req, res) {
         const token = this.extractToken(req);
         if (!this.verifyToken(token)) {
@@ -441,6 +469,7 @@ class AdminSessionApi {
         return res.json({ valid: true });
     }
 
+    // Express middleware guard for protected admin routes.
     requireAuth(req, res, next) {
         const token = this.extractToken(req);
         if (!this.verifyToken(token)) {
@@ -449,12 +478,14 @@ class AdminSessionApi {
         next();
     }
 
+    // Return moderation data for admin UI.
     getAdminMessages(req, res) {
         const messages = contactApi.getMessages();
         const bans = contactApi.getBans();
         return res.json({ messages, bans });
     }
 
+    // Delete one queued/confirmed message by ID.
     deleteAdminMessage(req, res) {
         const id = String(req?.params?.id || '').trim();
         if (!id) {
@@ -469,10 +500,12 @@ class AdminSessionApi {
         return res.json({ success: true });
     }
 
+    // Return only ban-list payload.
     getAdminBans(req, res) {
         return res.json({ bans: contactApi.getBans() });
     }
 
+    // Add a new ban entry.
     addAdminBan(req, res) {
         const { type, value, reason } = req.body || {};
         const added = contactApi.addBan({ type, value, reason });
@@ -484,6 +517,7 @@ class AdminSessionApi {
         return res.json({ success: true, bans: contactApi.getBans() });
     }
 
+    // Remove an existing ban entry.
     removeAdminBan(req, res) {
         const { type, value } = req.body || {};
         const removed = contactApi.removeBan({ type, value });
@@ -494,8 +528,41 @@ class AdminSessionApi {
 
         return res.json({ success: true, bans: contactApi.getBans() });
     }
+
+    // Resolve pending appeals; optionally unban.
+    resolveAdminAppeal(req, res) {
+        const { type, value, unban, reason } = req.body || {};
+        const unbanRequested = Boolean(unban);
+        const resolutionReason = String(reason || '').trim();
+        const resolved = contactApi.resolveAppeal({
+            type,
+            value,
+            unban: unbanRequested,
+            reason: resolutionReason,
+        });
+
+        if (!resolved?.success) {
+            return res.status(404).json({ error: 'Appeal entry not found' });
+        }
+
+        contactApi
+            .sendAppealDecisionEmail({
+                appeal: resolved.appeal,
+                type: resolved.type,
+                value: resolved.value,
+                unban: resolved.unban,
+                reason: resolved.reason,
+                banReason: resolved.banReason,
+            })
+            .catch((error) => {
+                console.error('Failed to send appeal decision email:', error);
+            });
+
+        return res.json({ success: true, bans: contactApi.getBans() });
+    }
 }
 
+// Handles contact submissions, confirmation flow, and moderation storage.
 class ContactApi {
     constructor() {
         this.password = process.env.CONTACT_API_PASSWORD || '';
@@ -504,15 +571,31 @@ class ContactApi {
         this.recaptchaAction = process.env.RECAPTCHA_ACTION || '';
         this.mailsPath = path.join(__dirname, 'mail', 'mails.json');
         this.bansPath = path.join(__dirname, 'mail', 'bans.json');
+        // Pending confirmation messages auto-expire to keep storage clean.
         this.unconfirmedTtlMs = 60 * 60 * 1000;
     }
 
+    // Accept boolean-like frontend flags.
+    parseBooleanFlag(value) {
+        if (typeof value === 'boolean') {
+            return value;
+        }
+
+        const normalized = String(value || '')
+            .trim()
+            .toLowerCase();
+
+        return ['1', 'true', 'yes', 'on'].includes(normalized);
+    }
+
+    // Normalize emails for stable comparisons and storage.
     normalizeEmail(email) {
         return String(email || '')
             .trim()
             .toLowerCase();
     }
 
+    // Normalize values based on ban type.
     normalizeBanValue(type, value) {
         if (type === 'email') {
             return this.normalizeEmail(value);
@@ -527,6 +610,7 @@ class ContactApi {
         return '';
     }
 
+    // Read bans JSON with safe fallback shape.
     readBansFile() {
         const empty = { emails: [], ips: [] };
 
@@ -550,15 +634,27 @@ class ContactApi {
         }
     }
 
+    // Persist bans file in a readable JSON format.
     writeBansFile(bans) {
         fs.writeFileSync(this.bansPath, JSON.stringify(bans, null, 2), 'utf8');
     }
 
+    // Public accessor used by admin endpoints.
     getBans() {
         return this.readBansFile();
     }
 
+    // Check whether sender is blocked by email or hashed IP.
     isBanned({ email, secIp }) {
+        // All ...@cubingtools.de emails are automatically banned to prevent abuse from users of the site.
+        if (
+            String(email || '')
+                .toLowerCase()
+                .endsWith('@cubingtools.de')
+        ) {
+            return true;
+        }
+
         const bans = this.readBansFile();
         const normalizedEmail = this.normalizeEmail(email);
         const normalizedIp = this.normalizeBanValue('ip', secIp);
@@ -569,6 +665,7 @@ class ContactApi {
         return emailHit || ipHit;
     }
 
+    // Add email/IP ban entry if not already present.
     addBan({ type, value, reason }) {
         const normalizedType = String(type || '')
             .trim()
@@ -597,6 +694,7 @@ class ContactApi {
         return true;
     }
 
+    // Remove email/IP ban entry.
     removeBan({ type, value }) {
         const normalizedType = String(type || '')
             .trim()
@@ -620,6 +718,55 @@ class ContactApi {
         return true;
     }
 
+    // Resolve an appeal and optionally remove the original ban.
+    resolveAppeal({ type, value, unban = false, reason = '' }) {
+        const normalizedType = String(type || '')
+            .trim()
+            .toLowerCase();
+        const normalizedValue = this.normalizeBanValue(normalizedType, value);
+        const normalizedReason = String(reason || '').trim();
+
+        if (!normalizedValue || !['email', 'ip'].includes(normalizedType)) {
+            return { success: false };
+        }
+
+        const key = normalizedType === 'email' ? 'emails' : 'ips';
+        const bans = this.readBansFile();
+        const index = bans[key].findIndex((entry) => entry?.value === normalizedValue);
+
+        if (index === -1) {
+            return { success: false };
+        }
+
+        const current = bans[key][index] || {};
+        if (!current.appeal_pending && !current.appeal) {
+            return { success: false };
+        }
+
+        const appeal = current.appeal ? { ...current.appeal } : null;
+        const banReason = String(current.reason || '').trim();
+
+        if (unban) {
+            bans[key].splice(index, 1);
+        } else {
+            const updated = { ...current, appeal_pending: false };
+            delete updated.appeal;
+            bans[key][index] = updated;
+        }
+
+        this.writeBansFile(bans);
+        return {
+            success: true,
+            appeal,
+            type: normalizedType,
+            value: normalizedValue,
+            unban: Boolean(unban),
+            reason: normalizedReason,
+            banReason,
+        };
+    }
+
+    // Entry point for contact and confirmation endpoints.
     handleRequest(req, res) {
         const {
             name,
@@ -628,7 +775,10 @@ class ContactApi {
             message,
             'g-recaptcha-response': recaptchaResponse,
             recaptchaToken,
+            isAppeal,
         } = req.body || {};
+
+        const appealRequested = this.parseBooleanFlag(isAppeal);
 
         const { id } = req.query;
 
@@ -648,7 +798,9 @@ class ContactApi {
         }
 
         const sec_ip = sha256Hash(req.ip || 'unknown');
-        if (this.isBanned({ email, secIp: sec_ip })) {
+        const senderIsBanned = this.isBanned({ email, secIp: sec_ip });
+
+        if (senderIsBanned && !appealRequested) {
             return res.status(403).json({ success: false, error: 'Sender is banned' });
         }
 
@@ -660,23 +812,76 @@ class ContactApi {
                     console.warn(
                         'reCAPTCHA verification skipped (credentials not available). Message allowed through.',
                     );
+
+                    if (appealRequested) {
+                        const requestHost = req?.get?.('host') || '';
+                        const appealResult = this.handleAppeals(
+                            sec_ip,
+                            name,
+                            email,
+                            tool,
+                            message,
+                            null,
+                            requestHost,
+                        );
+
+                        if (!appealResult.success) {
+                            return res
+                                .status(400)
+                                .json({ success: false, error: 'User is not banned.' });
+                        }
+
+                        if (appealResult.alreadyPending) {
+                            return res.status(409).json({
+                                success: false,
+                                error: 'An appeal is already pending for this ban.',
+                            });
+                        }
+                    }
+
                     return res.json({ success: true });
                 }
 
                 if (score && parseFloat(score) >= 0.5) {
-                    // Here you would typically send the message via email or store it in a database
                     const requestHost = req?.get?.('host') || '';
-                    this.sendConfirmationEmail({
-                        sec_ip,
-                        name,
-                        email,
-                        tool,
-                        message,
-                        recaptcha_score: score,
-                        requestHost,
-                    }).catch((error) => {
-                        console.error('Failed to send confirmation email:', error);
-                    });
+
+                    // Check if the message is an appeal
+                    if (appealRequested) {
+                        const appealResult = this.handleAppeals(
+                            sec_ip,
+                            name,
+                            email,
+                            tool,
+                            message,
+                            score,
+                            requestHost,
+                        );
+
+                        if (!appealResult.success) {
+                            return res
+                                .status(400)
+                                .json({ success: false, error: 'User is not banned.' });
+                        }
+
+                        if (appealResult.alreadyPending) {
+                            return res.status(409).json({
+                                success: false,
+                                error: 'An appeal is already pending for this ban.',
+                            });
+                        }
+                    } else {
+                        this.sendConfirmationEmail({
+                            sec_ip,
+                            name,
+                            email,
+                            tool,
+                            message,
+                            recaptcha_score: score,
+                            requestHost,
+                        }).catch((error) => {
+                            console.error('Failed to send confirmation email:', error);
+                        });
+                    }
                     return res.json({ success: true });
                 } else {
                     return res
@@ -688,6 +893,33 @@ class ContactApi {
                 console.error('Error verifying reCAPTCHA:', error);
                 // Graceful degradation: allow submission if verification fails
                 console.warn('Allowing submission due to reCAPTCHA verification error');
+
+                if (appealRequested) {
+                    const requestHost = req?.get?.('host') || '';
+                    const appealResult = this.handleAppeals(
+                        sec_ip,
+                        name,
+                        email,
+                        tool,
+                        message,
+                        null,
+                        requestHost,
+                    );
+
+                    if (!appealResult.success) {
+                        return res
+                            .status(400)
+                            .json({ success: false, error: 'User is not banned.' });
+                    }
+
+                    if (appealResult.alreadyPending) {
+                        return res.status(409).json({
+                            success: false,
+                            error: 'An appeal is already pending for this ban.',
+                        });
+                    }
+                }
+
                 return res.json({ success: true });
             });
     }
@@ -770,7 +1002,7 @@ class ContactApi {
         }
     }
 
-    // Saves messages to /mail/mails.json until they are confirmed by the sender
+    // Save pending confirmation payload until user clicks confirmation link.
     saveMessage({ id, sec_ip, name, email, tool, message, recaptcha_score }) {
         let mails = this.readMailsFile();
         const pruneResult = this.pruneExpiredUnconfirmedMails(mails);
@@ -791,6 +1023,7 @@ class ContactApi {
         fs.writeFileSync(this.mailsPath, JSON.stringify(mails, null, 2), 'utf8');
     }
 
+    // Read queued messages with fault-tolerant parsing.
     readMailsFile() {
         if (!fs.existsSync(this.mailsPath)) {
             return [];
@@ -804,6 +1037,7 @@ class ContactApi {
         }
     }
 
+    // Drop unconfirmed messages older than TTL.
     pruneExpiredUnconfirmedMails(mails) {
         const cutoff = Date.now() - this.unconfirmedTtlMs;
         let changed = false;
@@ -830,6 +1064,73 @@ class ContactApi {
         return { mails: filtered, changed };
     }
 
+    // Attach appeal metadata to matching ban entries.
+    handleAppeals(sec_ip, name, email, tool, message, recaptcha_score, requestHost) {
+        // Check if IP or Email is banned
+        if (this.isBanned({ email, secIp: sec_ip })) {
+            const bans = this.readBansFile();
+            const normalizedEmail = this.normalizeEmail(email);
+            const normalizedIp = this.normalizeBanValue('ip', sec_ip);
+
+            const appealRecord = {
+                requestedAt: new Date().toISOString(),
+                name: String(name || '').trim(),
+                email: normalizedEmail,
+                tool: String(tool || '').trim() || 'other',
+                message: String(message || '').trim(),
+                recaptcha_score: recaptcha_score,
+                requestHost: String(requestHost || '').trim(),
+            };
+
+            let updated = false;
+            let alreadyPending = false;
+
+            bans.emails = bans.emails.map((entry) => {
+                if (entry.value === normalizedEmail) {
+                    if (entry.appeal_pending) {
+                        alreadyPending = true;
+                        return entry;
+                    }
+
+                    updated = true;
+                    return {
+                        ...entry,
+                        appeal_pending: true,
+                        appeal: appealRecord,
+                    };
+                }
+                return entry;
+            });
+
+            bans.ips = bans.ips.map((entry) => {
+                if (entry.value === normalizedIp) {
+                    if (entry.appeal_pending) {
+                        alreadyPending = true;
+                        return entry;
+                    }
+
+                    updated = true;
+                    return {
+                        ...entry,
+                        appeal_pending: true,
+                        appeal: appealRecord,
+                    };
+                }
+                return entry;
+            });
+
+            if (updated) {
+                this.writeBansFile(bans);
+            }
+
+            return { success: updated || alreadyPending, alreadyPending };
+        } else {
+            // Appeal attempted by someone who is not banned
+            return { success: false, alreadyPending: false };
+        }
+    }
+
+    // Send double opt-in confirmation email and queue pending message.
     async sendConfirmationEmail({
         sec_ip,
         name,
@@ -900,6 +1201,7 @@ class ContactApi {
         }
     }
 
+    // Forward a confirmed contact message to the destination inbox.
     async sendMail(mail) {
         const escapeHtml = (str) =>
             String(str)
@@ -948,6 +1250,89 @@ class ContactApi {
         }
     }
 
+    // Notify requester when an appeal has been approved or denied.
+    async sendAppealDecisionEmail({ appeal, type, value, unban, reason, banReason }) {
+        const recipientEmail = this.normalizeEmail(
+            appeal?.email || (type === 'email' ? value : ''),
+        );
+        if (!recipientEmail) {
+            return;
+        }
+
+        const escapeHtml = (str) =>
+            String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+
+        const safeName = escapeHtml(String(appeal?.name || 'there').trim() || 'there');
+        const safeTool = escapeHtml(String(appeal?.tool || 'Other').trim() || 'Other');
+        const safeAppealMessage = escapeHtml(
+            String(appeal?.message || '').trim() || 'No message provided.',
+        );
+        const safeAppealType = escapeHtml(type === 'ip' ? 'IP hash' : 'Email');
+        const safeAppealValue = escapeHtml(String(value || '').trim() || 'N/A');
+        const deniedReason =
+            String(reason || '').trim() || String(banReason || '').trim() || 'No reason provided.';
+        const safeDeniedReason = escapeHtml(deniedReason);
+
+        const isApproved = Boolean(unban);
+        const safeStatusLabel = isApproved ? 'Appeal approved' : 'Appeal denied';
+        const safeHeadline = isApproved
+            ? 'Your contact ban has been lifted.'
+            : 'Your contact ban remains active.';
+        const safeBodyMessage = isApproved
+            ? 'We reviewed your appeal and decided to remove the ban. You can use the contact form again.'
+            : 'We reviewed your appeal and decided to keep the ban in place. This decision is final. You can no longer appeal this ban.';
+        const reasonBlock = isApproved
+            ? ''
+            : ` <tr>
+                    <td style="padding:16px 24px;">
+                        <span style="font-size:11px;font-weight:600;color:#A1A1AA;text-transform:uppercase;letter-spacing:0.08em;">Reason</span><br>
+                        <span style="font-size:16px;color:#F4F4F5;line-height:1.7;white-space:pre-wrap;margin-top:6px;display:inline-block;">${safeDeniedReason}</span>
+                    </td>
+                </tr>`;
+
+        const transporter = nodemailer.createTransport({
+            host: process.env.EMAIL_HOST,
+            port: 587,
+            secure: false,
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASSWORD,
+            },
+        });
+
+        try {
+            const templatePath = path.join(__dirname, 'mail', 'appeal.html');
+            const htmlContent = fs
+                .readFileSync(templatePath, 'utf8')
+                .replace(/\$\{safeName\}/g, safeName)
+                .replace(/\$\{safeStatusLabel\}/g, safeStatusLabel)
+                .replace(/\$\{safeHeadline\}/g, safeHeadline)
+                .replace(/\$\{safeBodyMessage\}/g, safeBodyMessage)
+                .replace(/\$\{safeTool\}/g, safeTool)
+                .replace(/\$\{safeAppealType\}/g, safeAppealType)
+                .replace(/\$\{safeAppealValue\}/g, safeAppealValue)
+                .replace(/\$\{safeAppealMessage\}/g, safeAppealMessage)
+                .replace(/\$\{reasonBlock\}/g, reasonBlock);
+
+            await transporter.sendMail({
+                from: `CubingTools.de <${process.env.EMAIL_USER}>`,
+                to: recipientEmail,
+                subject: isApproved
+                    ? 'Your CubingTools appeal was approved'
+                    : 'Your CubingTools appeal was denied',
+                html: htmlContent,
+            });
+        } catch (error) {
+            console.error('Failed to send appeal decision email:', error);
+        }
+    }
+
+    // Confirm queued message by id and forward to final inbox.
     validateConfirmationLink(id) {
         if (!fs.existsSync(this.mailsPath)) {
             return false;
@@ -983,6 +1368,7 @@ class ContactApi {
         return true;
     }
 
+    // Delete message by id from local storage.
     removeMessage(id) {
         if (!fs.existsSync(this.mailsPath)) {
             return false;
@@ -1011,6 +1397,7 @@ class ContactApi {
         return true;
     }
 
+    // Return all messages after pruning expired unconfirmed entries.
     getMessages() {
         if (!fs.existsSync(this.mailsPath)) {
             return [];
@@ -1037,12 +1424,13 @@ const statusApi = new StatusApi();
 const contactApi = new ContactApi();
 const adminSessionApi = new AdminSessionApi();
 
-// Contact API endpoint
+// Public contact submission endpoint.
 router.post('/api/contact', contactLimiter, (req, res) => contactApi.handleRequest(req, res));
 
+// Public contact confirmation callback endpoint.
 router.get('/contact/confirm', (req, res) => contactApi.handleRequest(req, res));
 
-// Admin session endpoints
+// Admin authentication endpoints.
 router.post('/api/admin/login', adminLoginLimiter, (req, res) =>
     adminSessionApi.handleLogin(req, res),
 );
@@ -1050,7 +1438,7 @@ router.get('/api/admin/verify', adminVerifyLimiter, (req, res) =>
     adminSessionApi.handleVerify(req, res),
 );
 
-// Status API endpoint — requires valid session token
+// Protected status endpoint.
 router.post(
     '/api/admin/status',
     adminStatusLimiter,
@@ -1058,7 +1446,7 @@ router.post(
     (req, res) => statusApi.handleRequest(req, res),
 );
 
-// Admin todos endpoint — serves TODO.md content
+// Protected TODO read endpoint.
 router.get(
     '/api/admin/todos',
     adminTodosReadLimiter,
@@ -1073,7 +1461,7 @@ router.get(
     },
 );
 
-// Admin todos update endpoint — writes TODO.md content
+// Protected TODO write endpoint.
 router.post(
     '/api/admin/todos',
     adminTodosWriteLimiter,
@@ -1094,6 +1482,7 @@ router.post(
     },
 );
 
+// Protected moderation and ban-management endpoints.
 router.get(
     '/api/admin/messages',
     adminMessagesReadLimiter,
@@ -1129,11 +1518,27 @@ router.post(
     (req, res) => adminSessionApi.removeAdminBan(req, res),
 );
 
-// Wire class into router
+router.post(
+    '/api/admin/messages/appeal/resolve',
+    adminMessagesBanLimiter,
+    adminSessionApi.requireAuth.bind(adminSessionApi),
+    (req, res) => adminSessionApi.resolveAdminAppeal(req, res),
+);
+
+// Public WCA data endpoint.
 router.get('/api/wca/:wcaId/:event', wcaLimiter, (req, res) => wcaApi.handleRequest(req, res));
 
+// Public version endpoint for frontend/client diagnostics.
 router.get('/api/version', (req, res) => {
     res.json({ version: packageJson.version });
 });
 
 module.exports = router;
+module.exports.__internals = {
+    createRateLimiter,
+    sha256Hash,
+    WcaApi,
+    StatusApi,
+    AdminSessionApi,
+    ContactApi,
+};

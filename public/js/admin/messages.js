@@ -4,6 +4,7 @@ const state = {
     token: null,
     messages: [],
     bans: { emails: [], ips: [] },
+    selectedBan: null,
     selectedIds: new Set(),
     filters: {
         query: '',
@@ -60,6 +61,7 @@ function createDashboardSkeleton() {
                             <option value="all">All</option>
                             <option value="confirmed">Confirmed</option>
                             <option value="unconfirmed">Unconfirmed</option>
+                            <option value="appeal-pending">Appeal pending</option>
                             <option value="banned-email">Banned by email</option>
                             <option value="banned-ip">Banned by IP hash</option>
                             <option value="high-risk">High risk score (&lt; 0.75)</option>
@@ -134,6 +136,10 @@ function createDashboardSkeleton() {
                     <button type="submit">Add ban</button>
                 </form>
 
+                <div id="messages-ban-console" class="ban-console" aria-live="polite">
+                    <p class="ban-empty">Select a ban entry to inspect details and actions.</p>
+                </div>
+
                 <div class="ban-lists">
                     <div>
                         <h4>Banned Emails</h4>
@@ -193,7 +199,7 @@ function bindDashboardEvents() {
         ?.addEventListener('click', async () => await banSelected('ip'));
 
     document.getElementById('messages-select-all')?.addEventListener('change', (event) => {
-        const visible = getFilteredMessages();
+        const visible = getFilteredMessages().filter((message) => message.rowType !== 'appeal');
         const checked = Boolean(event.target.checked);
 
         if (checked) {
@@ -244,7 +250,10 @@ async function loadMessages() {
         loadingEl.style.display = 'none';
         messagesReport.style.display = 'block';
         renderDashboard();
-        setStatus(`Loaded ${state.messages.length} message(s).`, 'is-success');
+        setStatus(
+            `Loaded ${state.messages.length} message(s) and ${getAppealRows().length} appeal row(s).`,
+            'is-success',
+        );
     } catch {
         loadingEl.textContent = 'Failed to load messages data.';
     }
@@ -267,18 +276,90 @@ function cleanupSelection() {
     });
 }
 
+function getAppealRows() {
+    const rows = [];
+
+    state.bans.emails.forEach((entry) => {
+        if (!entry?.appeal_pending || !entry?.appeal) {
+            return;
+        }
+
+        rows.push({
+            id: `appeal:email:${entry.value}`,
+            rowType: 'appeal',
+            appealType: 'email',
+            banValue: entry.value,
+            confirmed: false,
+            name: entry.appeal.name || 'N/A',
+            message: entry.appeal.message || '',
+            tool: entry.appeal.tool || 'Other',
+            recaptcha_score: entry.appeal.recaptcha_score,
+            timestamp: entry.appeal.requestedAt || entry.createdAt || null,
+            email: entry.appeal.email || entry.value || 'N/A',
+            secured_ip: 'N/A',
+        });
+    });
+
+    state.bans.ips.forEach((entry) => {
+        if (!entry?.appeal_pending || !entry?.appeal) {
+            return;
+        }
+
+        rows.push({
+            id: `appeal:ip:${entry.value}`,
+            rowType: 'appeal',
+            appealType: 'ip',
+            banValue: entry.value,
+            confirmed: false,
+            name: entry.appeal.name || 'N/A',
+            message: entry.appeal.message || '',
+            tool: entry.appeal.tool || 'Other',
+            recaptcha_score: entry.appeal.recaptcha_score,
+            timestamp: entry.appeal.requestedAt || entry.createdAt || null,
+            email: entry.appeal.email || 'N/A',
+            secured_ip: entry.value || 'N/A',
+        });
+    });
+
+    return rows;
+}
+
+function getAllTableRows() {
+    return [
+        ...state.messages.map((message) => ({ ...message, rowType: 'message' })),
+        ...getAppealRows(),
+    ];
+}
+
 function getFilteredMessages() {
     const bannedEmails = new Set(state.bans.emails.map((entry) => entry.value));
     const bannedIps = new Set(state.bans.ips.map((entry) => entry.value));
+    const appealEmails = new Set(
+        state.bans.emails
+            .filter((entry) => entry?.appeal_pending)
+            .map((entry) => normalizeEmail(entry?.appeal?.email || entry?.value)),
+    );
+    const appealIps = new Set(
+        state.bans.ips
+            .filter((entry) => entry?.appeal_pending)
+            .map((entry) => normalizeIp(entry?.value)),
+    );
     const query = state.filters.query;
 
-    const filtered = state.messages.filter((message) => {
+    const filtered = getAllTableRows().filter((message) => {
         const email = normalizeEmail(message.email);
         const ip = normalizeIp(message.secured_ip);
         const score = parseFloat(message.recaptcha_score);
+        const isAppeal = message.rowType === 'appeal';
 
         if (state.filters.category === 'banned-email' && !bannedEmails.has(email)) return false;
         if (state.filters.category === 'banned-ip' && !bannedIps.has(ip)) return false;
+        if (state.filters.category === 'appeal-pending') {
+            const hasPendingAppeal = appealEmails.has(email) || appealIps.has(ip);
+            if (!hasPendingAppeal) return false;
+        }
+        if (state.filters.category === 'confirmed' && isAppeal) return false;
+        if (state.filters.category === 'unconfirmed' && isAppeal) return false;
         if (state.filters.category === 'confirmed' && !message.confirmed) return false;
         if (state.filters.category === 'unconfirmed' && message.confirmed) return false;
         if (state.filters.category === 'high-risk' && !(Number.isFinite(score) && score < 0.75)) {
@@ -341,20 +422,26 @@ function renderStats() {
     if (!statsEl) return;
 
     const visible = getFilteredMessages();
+    const appeals = getAppealRows();
     const uniqueEmails = new Set(state.messages.map((msg) => normalizeEmail(msg.email))).size;
     const uniqueIps = new Set(state.messages.map((msg) => normalizeIp(msg.secured_ip))).size;
     const confirmedCount = state.messages.filter((msg) => msg.confirmed).length;
     const unconfirmedCount = state.messages.length - confirmedCount;
+    const appealPendingCount =
+        state.bans.emails.filter((entry) => entry?.appeal_pending).length +
+        state.bans.ips.filter((entry) => entry?.appeal_pending).length;
 
     statsEl.innerHTML = `
         <article class="stat card"><h3>Total messages</h3><p>${state.messages.length}</p></article>
         <article class="stat card"><h3>Visible</h3><p>${visible.length}</p></article>
         <article class="stat card"><h3>Confirmed</h3><p>${confirmedCount}</p></article>
         <article class="stat card"><h3>Pending</h3><p>${unconfirmedCount}</p></article>
+        <article class="stat card"><h3>Appeal rows</h3><p>${appeals.length}</p></article>
         <article class="stat card"><h3>Unique emails</h3><p>${uniqueEmails}</p></article>
         <article class="stat card"><h3>Unique IP hashes</h3><p>${uniqueIps}</p></article>
         <article class="stat card"><h3>Banned emails</h3><p>${state.bans.emails.length}</p></article>
         <article class="stat card"><h3>Banned IP hashes</h3><p>${state.bans.ips.length}</p></article>
+        <article class="stat card"><h3>Appeals pending</h3><p>${appealPendingCount}</p></article>
         <article class="stat card"><h3>Selected</h3><p>${state.selectedIds.size}</p></article>
     `;
 }
@@ -385,12 +472,19 @@ function renderTable() {
         const row = document.createElement('tr');
         const normalizedEmail = normalizeEmail(message.email);
         const normalizedIp = normalizeIp(message.secured_ip);
+        const isAppeal = message.rowType === 'appeal';
 
         if (bannedEmails.has(normalizedEmail) || bannedIps.has(normalizedIp)) {
             row.classList.add('is-banned');
         }
 
-        if (message.confirmed) {
+        if (isAppeal) {
+            row.classList.add('is-appeal');
+        }
+
+        if (isAppeal) {
+            row.classList.add('is-unconfirmed');
+        } else if (message.confirmed) {
             row.classList.add('is-confirmed');
         } else {
             row.classList.add('is-unconfirmed');
@@ -402,10 +496,12 @@ function renderTable() {
         const percentageUsed = Math.max(0, Math.min(1, (message.recaptcha_score - 0.5) * 2));
         const hue = 120 * percentageUsed;
         const scoreCell = createCell(formatScore(message.recaptcha_score));
-        scoreCell.style.color = `hsl(${hue}, 80%, 50%)`;
+        if (Number.isFinite(Number.parseFloat(message.recaptcha_score))) {
+            scoreCell.style.color = `hsl(${hue}, 80%, 50%)`;
+        }
 
-        row.appendChild(createSelectCell(message.id));
-        row.appendChild(createStatusCell(message.confirmed));
+        row.appendChild(createSelectCell(message));
+        row.appendChild(createStatusCell(message));
         row.appendChild(createCell(message.name || 'N/A'));
         row.appendChild(createMessageCell(message.message));
         row.appendChild(createCell(message.tool || 'Other'));
@@ -413,23 +509,29 @@ function renderTable() {
         row.appendChild(createCell(formatDate(message.timestamp)));
         row.appendChild(createCell(message.email || 'N/A'));
         row.appendChild(createIpCell(message.secured_ip));
-        row.appendChild(createActionCell(message));
+        row.appendChild(isAppeal ? createAppealActionCell(message) : createActionCell(message));
         tbody.appendChild(row);
     });
 
     updateSelectAllCheckbox(visible);
 }
 
-function createSelectCell(id) {
+function createSelectCell(message) {
     const cell = document.createElement('td');
+
+    if (message.rowType === 'appeal') {
+        cell.textContent = '-';
+        return cell;
+    }
+
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
-    checkbox.checked = state.selectedIds.has(id);
+    checkbox.checked = state.selectedIds.has(message.id);
     checkbox.addEventListener('change', () => {
         if (checkbox.checked) {
-            state.selectedIds.add(id);
+            state.selectedIds.add(message.id);
         } else {
-            state.selectedIds.delete(id);
+            state.selectedIds.delete(message.id);
         }
         renderStats();
         updateSelectAllCheckbox(getFilteredMessages());
@@ -455,19 +557,149 @@ function createIpCell(value) {
         return cell;
     }
 
-    const isLongHash = rawValue.length > 18;
-    const displayValue = isLongHash ? `${rawValue.slice(0, 10)}...${rawValue.slice(-6)}` : rawValue;
+    const displayValue = getCompactHashDisplay(rawValue);
 
     cell.textContent = displayValue;
     cell.title = rawValue;
     return cell;
 }
 
-function createStatusCell(confirmed) {
+function getCompactHashDisplay(value) {
+    const rawValue = String(value || '').trim();
+    if (!rawValue) {
+        return 'N/A';
+    }
+
+    const isLongHash = rawValue.length > 18;
+    return isLongHash ? `${rawValue.slice(0, 10)}...${rawValue.slice(-6)}` : rawValue;
+}
+
+function getBanEntryHoverText(entry) {
+    const reason = String(entry?.reason || '').trim();
+    return reason ? `Reason: ${reason}` : '';
+}
+
+function getBanEntry(type, value) {
+    const key = type === 'email' ? 'emails' : 'ips';
+    return (
+        state.bans[key].find((entry) => String(entry?.value || '') === String(value || '')) || null
+    );
+}
+
+function getSelectedBanEntry() {
+    const selected = state.selectedBan;
+    if (!selected) {
+        return null;
+    }
+
+    const entry = getBanEntry(selected.type, selected.value);
+    if (!entry) {
+        state.selectedBan = null;
+        return null;
+    }
+
+    return {
+        type: selected.type,
+        value: selected.value,
+        entry,
+    };
+}
+
+function renderBanConsole() {
+    const consoleEl = document.getElementById('messages-ban-console');
+    if (!consoleEl) return;
+
+    const selected = getSelectedBanEntry();
+    consoleEl.textContent = '';
+
+    if (!selected) {
+        const empty = document.createElement('p');
+        empty.className = 'ban-empty';
+        empty.textContent = 'Select a ban entry to inspect details and actions.';
+        consoleEl.appendChild(empty);
+        return;
+    }
+
+    const { type, value, entry } = selected;
+    const table = document.createElement('table');
+    table.className = 'messages-table ban-console-table';
+
+    const tbody = document.createElement('tbody');
+
+    const addRow = (label, rowValue) => {
+        const row = document.createElement('tr');
+        const th = document.createElement('th');
+        const td = document.createElement('td');
+
+        th.textContent = label;
+        td.textContent = String(rowValue || 'N/A');
+
+        row.append(th, td);
+        tbody.appendChild(row);
+    };
+
+    addRow('Type', type === 'email' ? 'Email' : 'IP hash');
+    addRow('Value', type === 'ip' ? getCompactHashDisplay(value) : value);
+    addRow('Full value', value);
+    addRow('Created', formatDate(entry.createdAt));
+    addRow('Reason', entry.reason || 'N/A');
+    addRow('Appeal pending', entry.appeal_pending ? 'Yes' : 'No');
+
+    if (entry.appeal) {
+        addRow('Appeal requested', formatDate(entry.appeal.requestedAt));
+        addRow('Appeal sender', entry.appeal.name || 'N/A');
+        addRow('Appeal email', entry.appeal.email || 'N/A');
+        addRow('Appeal score', formatScore(entry.appeal.recaptcha_score));
+        addRow('Appeal host', entry.appeal.requestHost || 'N/A');
+        addRow('Appeal message', entry.appeal.message || 'N/A');
+    }
+
+    table.appendChild(tbody);
+    consoleEl.appendChild(table);
+
+    const actions = document.createElement('div');
+    actions.className = 'actions-row';
+
+    if (entry.appeal_pending) {
+        const resolveButton = document.createElement('button');
+        resolveButton.type = 'button';
+        resolveButton.textContent = 'Resolve';
+        resolveButton.addEventListener('click', async () => {
+            const reason = prompt('Reason for resolving this appeal (optional):', '');
+            await resolveAppeal(type, value, false, reason);
+        });
+
+        const approveButton = document.createElement('button');
+        approveButton.type = 'button';
+        approveButton.textContent = 'Approve & unban';
+        approveButton.addEventListener('click', async () => {
+            await resolveAppeal(type, value, true);
+        });
+
+        actions.append(resolveButton, approveButton);
+    }
+
+    const unbanButton = document.createElement('button');
+    unbanButton.type = 'button';
+    unbanButton.textContent = 'Unban';
+    unbanButton.addEventListener('click', async () => {
+        await removeBan(type, value);
+    });
+
+    actions.appendChild(unbanButton);
+    consoleEl.appendChild(actions);
+}
+
+function createStatusCell(message) {
     const cell = document.createElement('td');
     const badge = document.createElement('span');
-    badge.className = confirmed ? 'confirmed-badge' : 'unconfirmed-badge';
-    badge.textContent = confirmed ? 'Confirmed' : 'Pending';
+    if (message.rowType === 'appeal') {
+        badge.className = 'appeal-badge';
+        badge.textContent = 'Appeal';
+    } else {
+        badge.className = message.confirmed ? 'confirmed-badge' : 'unconfirmed-badge';
+        badge.textContent = message.confirmed ? 'Confirmed' : 'Pending';
+    }
     cell.appendChild(badge);
     return cell;
 }
@@ -518,18 +750,49 @@ function createActionCell(message) {
     return cell;
 }
 
+function createAppealActionCell(message) {
+    const cell = document.createElement('td');
+    cell.className = 'row-actions';
+
+    const resolveButton = document.createElement('button');
+    resolveButton.type = 'button';
+    resolveButton.textContent = 'Resolve';
+    resolveButton.addEventListener('click', async () => {
+        const reason = prompt('Reason for resolving this appeal (optional):', '');
+        if (reason === null) {
+            return;
+        }
+
+        await resolveAppeal(message.appealType, message.banValue, false, reason);
+    });
+
+    const approveButton = document.createElement('button');
+    approveButton.type = 'button';
+    approveButton.textContent = 'Approve & unban';
+    approveButton.addEventListener('click', async () => {
+        await resolveAppeal(message.appealType, message.banValue, true);
+    });
+
+    cell.append(resolveButton, approveButton);
+    return cell;
+}
+
 function updateSelectAllCheckbox(visibleMessages) {
     const selectAll = document.getElementById('messages-select-all');
     if (!selectAll) return;
 
-    if (visibleMessages.length === 0) {
+    const selectableMessages = visibleMessages.filter((message) => message.rowType !== 'appeal');
+
+    if (selectableMessages.length === 0) {
         selectAll.checked = false;
         selectAll.indeterminate = false;
         return;
     }
 
-    const selectedVisible = visibleMessages.filter((message) => state.selectedIds.has(message.id));
-    selectAll.checked = selectedVisible.length === visibleMessages.length;
+    const selectedVisible = selectableMessages.filter((message) =>
+        state.selectedIds.has(message.id),
+    );
+    selectAll.checked = selectedVisible.length === selectableMessages.length;
     selectAll.indeterminate = selectedVisible.length > 0 && !selectAll.checked;
 }
 
@@ -538,6 +801,7 @@ function renderBans() {
     const ipsEl = document.getElementById('messages-banned-ips');
     if (!emailsEl || !ipsEl) return;
 
+    renderBanConsole();
     renderBanList(emailsEl, state.bans.emails, 'email');
     renderBanList(ipsEl, state.bans.ips, 'ip');
 }
@@ -556,21 +820,85 @@ function renderBanList(container, entries, type) {
     entries.forEach((entry) => {
         const li = document.createElement('li');
         const label = document.createElement('span');
-        const button = document.createElement('button');
+        const labelText = document.createElement('span');
 
         const value = String(entry.value || '');
-        const reason = String(entry.reason || '').trim();
-        label.textContent = reason ? `${value} (${reason})` : value;
+        const hasAppeal = Boolean(entry?.appeal_pending);
+        const displayValue = type === 'ip' ? getCompactHashDisplay(value) : value || 'N/A';
+        const hoverText = getBanEntryHoverText(entry);
 
-        button.type = 'button';
-        button.textContent = 'Unban';
-        button.addEventListener('click', async () => {
-            await removeBan(type, value);
+        li.classList.add('ban-item');
+        li.setAttribute('role', 'button');
+        li.tabIndex = 0;
+
+        const isSelected =
+            state.selectedBan?.type === type && String(state.selectedBan?.value || '') === value;
+        if (isSelected) {
+            li.classList.add('is-selected');
+        }
+
+        const selectEntry = () => {
+            state.selectedBan = { type, value };
+            renderBans();
+        };
+
+        li.addEventListener('click', selectEntry);
+        li.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') {
+                return;
+            }
+            event.preventDefault();
+            selectEntry();
         });
 
-        li.append(label, button);
+        label.className = 'ban-label';
+        labelText.textContent = displayValue;
+        label.appendChild(labelText);
+
+        if (hoverText) {
+            label.title = hoverText;
+        }
+
+        if (hasAppeal) {
+            const appealBadge = document.createElement('span');
+            appealBadge.className = 'appeal-badge';
+            appealBadge.textContent = 'Appeal';
+            label.appendChild(appealBadge);
+        }
+
+        li.appendChild(label);
         container.appendChild(li);
     });
+}
+
+async function resolveAppeal(type, value, unban, reason = '') {
+    try {
+        const response = await fetch('/api/admin/messages/appeal/resolve', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.token}`,
+            },
+            body: JSON.stringify({ type, value, unban, reason }),
+        });
+
+        if (response.status === 401) {
+            redirectToLogin();
+            return;
+        }
+
+        if (!response.ok) throw new Error('Failed to resolve appeal');
+
+        const data = await response.json();
+        state.bans = normalizeBans(data.bans);
+        renderDashboard();
+        setStatus(
+            unban ? 'Appeal approved and sender unbanned.' : 'Appeal marked as resolved.',
+            'is-success',
+        );
+    } catch {
+        setStatus('Failed to resolve appeal.', 'is-error');
+    }
 }
 
 async function deleteMessage(id) {
