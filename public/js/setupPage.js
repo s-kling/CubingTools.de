@@ -319,7 +319,7 @@ document.addEventListener('keydown', (event) => {
     }
 });
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // COOKIE CONSENT
     const cookiesAccepted = localStorage.getItem('cookies_accepted');
 
@@ -327,7 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!sessionId && cookiesAccepted !== 'false') {
         const visits = localStorage.getItem('visits')
-            ? parseInt(localStorage.getItem('visits'))
+            ? parseInt(localStorage.getItem('visits'), 10)
             : 0;
         sessionStorage.setItem('session_id', Date.now().toString());
         localStorage.setItem('visits', visits + 1);
@@ -361,9 +361,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     loadTools();
-    addVersionTag();
+    const packageVersion = await addVersionTag();
     setupNavbar();
-    setupFooter();
+    setupFooter(packageVersion);
 });
 
 function addCookieConsentBanner() {
@@ -479,24 +479,29 @@ async function loadTools() {
 
 async function addVersionTag() {
     const versionElement = document.createElement('a');
+    let version = '...';
     versionElement.className = 'version-tag';
     versionElement.innerText = 'Loading...';
     versionElement.href = 'https://github.com/s-kling/cubingtools.de/releases/';
 
     try {
         const response = await fetch('/api/version');
-        const version = await response.json();
+        const versionData = await response.json();
+        version = versionData.version || 'unknown';
 
         versionElement.innerText =
             window.location.port == 8001 || window.location.hostname === 'beta.cubingtools.de'
-                ? `BETA ${version.version}`
-                : `v${version.version}`;
+                ? `BETA ${version}`
+                : `v${version}`;
     } catch (error) {
         console.error('Error loading version:', error);
         versionElement.innerText = 'Error loading version';
     }
 
     document.getElementById('version').appendChild(versionElement);
+
+    console.log(version);
+    return version;
 }
 
 function setupNavbar() {
@@ -514,7 +519,7 @@ function setupNavbar() {
     }
     logoImage.alt = 'CubingTools.de';
     logoImage.className = 'logo-image';
-    logoImage.style.maxHeight = '50px'; // Limit the size to match the text logo
+    logoImage.style.maxHeight = '50px';
 
     logo.style.display = 'flex';
     logo.style.alignItems = 'center';
@@ -531,6 +536,25 @@ function setupNavbar() {
     const hamburgerIcon = document.createElement('i');
     hamburgerIcon.className = 'fas fa-bars';
     label.appendChild(hamburgerIcon);
+
+    // Dark mode toggle
+    const themeToggle = document.createElement('li');
+    const themeToggleButton = document.createElement('button');
+    themeToggleButton.type = 'button';
+    themeToggleButton.className = 'theme-toggle';
+    themeToggleButton.setAttribute('aria-label', 'Toggle dark mode');
+    const isDark = localStorage.getItem('theme') === 'dark';
+    themeToggleButton.innerHTML = `<i class="fas fa-${isDark ? 'sun' : 'moon'}"></i>`;
+
+    themeToggleButton.addEventListener('click', () => {
+        const html = document.documentElement;
+        const newTheme = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        themeToggleButton.innerHTML = `<i class="fas fa-${newTheme === 'dark' ? 'sun' : 'moon'}"></i>`;
+    });
+
+    themeToggle.appendChild(themeToggleButton);
 
     const pages = document.createElement('ul');
 
@@ -568,11 +592,16 @@ function setupNavbar() {
     pages.appendChild(contactLink);
     pages.appendChild(privacyLink);
     pages.appendChild(changeRelease);
+    pages.appendChild(themeToggle);
 
     navbar.appendChild(logo);
     navbar.appendChild(hamburger);
     navbar.appendChild(label);
     navbar.appendChild(pages);
+
+    // Apply saved theme on page load
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
 
     // Hide navbar when clicking outside of it
     document.addEventListener('click', (event) => {
@@ -598,7 +627,7 @@ function setupNavbar() {
     });
 }
 
-function setupFooter() {
+function setupFooter(packageVersion) {
     const footer = document.getElementById('footer');
     footer.innerHTML = '';
 
@@ -607,7 +636,7 @@ function setupFooter() {
 
     // Copyright
     const footerText = document.createElement('a');
-    footerText.innerHTML = `© ${new Date().getFullYear()} CubingTools by Sebastian Kling`;
+    footerText.innerHTML = `${window.location.hostname} v${packageVersion} by Sebastian Kling`;
     footerText.href = '/contact';
     footerText.className = 'small-screen';
 

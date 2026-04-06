@@ -49,8 +49,8 @@
 .row-actions button,
 .ban-form button,
 .ban-list button {
-    background: white;
-    color: black;
+    background: var(--main-lighter);
+    color: var(--main-text);
     border-radius: var(--main-radius);
     padding: 8px 12px;
     cursor: pointer;
@@ -102,7 +102,7 @@
 
 .messages-table th,
 .messages-table td {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    border-bottom: 1px solid var(--card-border);
     padding: 10px 8px;
     vertical-align: top;
     text-align: left;
@@ -143,19 +143,19 @@
 
 .confirmed-badge {
     background: rgba(137, 211, 77, 0.18);
-    color: #89d34d;
+    color: var(--color-success-text);
     border: 1px solid rgba(137, 211, 77, 0.35);
 }
 
 .unconfirmed-badge {
     background: rgba(249, 199, 79, 0.15);
-    color: #f9c74f;
+    color: var(--color-warning-text);
     border: 1px solid rgba(249, 199, 79, 0.35);
 }
 
 .appeal-badge {
     background: rgba(240, 113, 103, 0.16);
-    color: #f07167;
+    color: var(--error);
     border: 1px solid rgba(240, 113, 103, 0.38);
 }
 
@@ -218,9 +218,9 @@
 
 .ban-console {
     margin-top: var(--space-md);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--card-border);
     border-radius: var(--main-radius);
-    background: rgba(0, 0, 0, 0.16);
+    background: rgba(0, 0, 0, 0.06);
     padding: var(--space-sm);
 }
 
@@ -240,9 +240,9 @@
     list-style: none;
     margin: 0;
     padding: var(--space-xs);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--card-border);
     border-radius: var(--main-radius);
-    background: rgba(0, 0, 0, 0.16);
+    background: rgba(0, 0, 0, 0.06);
     display: grid;
     gap: 8px;
 }
@@ -252,7 +252,7 @@
     justify-content: space-between;
     align-items: center;
     gap: var(--space-xs);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid var(--card-border);
     padding-bottom: 6px;
     text-overflow: ellipsis;
 }

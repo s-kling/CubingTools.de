@@ -13,11 +13,11 @@ select {
 
 #content {
     line-height: 1.6;
-    color: #333;
-    background-color: #fff;
+    color: var(--main-text);
+    background-color: var(--secondary-background);
     padding: 20px;
     border-radius: 5px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-sm);
     overflow: auto;
 }
 
@@ -27,18 +27,15 @@ select {
 #content h4,
 #content h5,
 #content h6 {
-    color: #222;
-    /* Headers slightly darker for emphasis */
+    color: var(--main-text);
     margin: 1.5em 0 0.5em;
-    /* Space before/after headers */
     line-height: 1.2;
     font-weight: bold;
 }
 
 #content h1 {
     font-size: 2em;
-    border-bottom: 2px solid #ddd;
-    /* Underline for h1 headers */
+    border-bottom: 2px solid var(--input-border);
     padding-bottom: 0.3em;
 }
 
@@ -60,23 +57,17 @@ select {
 
 #content p {
     margin: 1em 0;
-    /* Space between paragraphs */
-    color: #444;
-    /* Slightly lighter for readability */
+    color: var(--secondary-text);
 }
 
 #content a {
-    color: #007bff;
-    /* Link color */
+    color: var(--link-color);
     text-decoration: underline;
-    /* Standard link styling */
 }
 
 #content a:hover {
-    color: #0056b3;
-    /* Darker link color on hover */
+    color: var(--link-color);
     text-decoration: none;
-    /* Remove underline on hover */
 }
 
 #content ul,
@@ -105,25 +96,21 @@ select {
 #content blockquote {
     margin: 1em 0;
     padding: 1em;
-    border-left: 4px solid #ddd;
-    /* Standard Markdown blockquote style */
-    background-color: #f9f9f9;
-    color: #666;
+    border-left: 4px solid var(--input-border);
+    background-color: var(--main-lighter);
+    color: var(--secondary-text);
     font-style: italic;
 }
 
 #content pre,
 #content code {
     font-family: 'Courier New', Courier, monospace;
-    /* Monospace font for code */
-    background-color: #f4f4f4;
-    color: #d63384;
-    /* Highlighted code text color */
-    border: 1px solid #e0e0e0;
+    background-color: var(--main-lighter);
+    color: var(--link-color);
+    border: 1px solid var(--input-border);
     border-radius: 5px;
     padding: 0.5em;
     overflow-x: auto;
-    /* Horizontal scroll for long code */
 }
 
 #content pre {
@@ -133,10 +120,8 @@ select {
 
 #content hr {
     border: none;
-    border-top: 1px solid #ddd;
-    /* Subtle horizontal rule */
+    border-top: 1px solid var(--input-border);
     margin: 2em 0;
-    /* Space above and below */
 }
 
 #content img {

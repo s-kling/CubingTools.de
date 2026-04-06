@@ -10,7 +10,7 @@
     padding: var(--space-xxs) var(--space-sm);
     border: 1px solid transparent;
     border-radius: var(--main-radius);
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--surface-overlay);
     color: var(--secondary-text);
     font-size: 0.95em;
 }
@@ -89,9 +89,9 @@
     list-style: none;
     margin: 0;
     padding: 0 var(--space-sm);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--card-border);
     border-radius: var(--main-radius);
-    background: rgba(0, 0, 0, 0.18);
+    background: rgba(0, 0, 0, 0.08);
 }
 
 .todo-item {
@@ -99,7 +99,7 @@
     align-items: center;
     gap: var(--space-sm);
     padding: 10px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid var(--card-border);
     transition: background-color 0.15s ease;
 }
 
@@ -108,7 +108,7 @@
 }
 
 .todo-item:hover {
-    background-color: rgba(255, 255, 255, 0.03);
+    background-color: var(--subtle-hover);
 }
 
 .todo-item::before {
@@ -172,6 +172,11 @@
     .todo-section {
         padding: var(--space-sm);
     }
+}
+
+[data-theme="dark"] .todo-section {
+    background: var(--secondary-background);
+    box-shadow: var(--shadow-md);
 }
 
 @media (max-width: 700px) {

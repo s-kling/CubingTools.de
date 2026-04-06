@@ -13,8 +13,8 @@ main .heading {
     margin: var(--main-margin) auto;
     padding: calc(var(--main-padding) * 1.25);
     border-radius: var(--main-radius);
-    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+    background: var(--card-bg);
+    box-shadow: var(--shadow-md);
 }
 
 /* ---------- Typography ---------- */
@@ -38,11 +38,11 @@ main .heading p {
 #event-selection,
 #competitor-setup,
 #grouping-results {
-    background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+    background: var(--subtle-hover);
     padding: var(--space-md);
     border-radius: calc(var(--main-radius) + 2px);
     margin-bottom: var(--space-lg);
-    border: 1px solid rgba(255,255,255,0.03);
+    border: 1px solid var(--card-border);
 }
 
 /* Section headings inside cards */
@@ -108,7 +108,7 @@ button {
     transition: background 0.15s ease, transform 0.06s ease;
 }
 button:active { transform: translateY(1px); }
-button:hover { background: var(--hover-background); }
+button:hover { background: var(--button-hover); color: var(--hover-text); }
 
 .inline-btn {
     display: flex;
@@ -164,17 +164,16 @@ button:hover { background: var(--hover-background); }
 /* ---------- Full-row section titles + cuts between groups ---------- */
 /* Make titles span the entire grid row inside #event-checkboxes */
 #event-checkboxes .event-section-title {
-    grid-column: 1 / -1;            /* span all columns in the parent grid */
-    display: block;                 /* ensure block-level behavior */
-    width: 100%;                    /* full width */
-    padding: calc(var(--space-xs)) var(--space-sm); /* vertical + horizontal padding */
+    grid-column: 1 / -1;
+    display: block;
+    width: 100%;
+    padding: calc(var(--space-xs)) var(--space-sm);
     font-weight: 700;
     font-size: 0.95rem;
     color: var(--main-text);
-    background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));
+    background: var(--surface-overlay);
     border-top-left-radius: calc(var(--main-radius) - 2px);
     border-top-right-radius: calc(var(--main-radius) - 2px);
-    box-shadow: 0 1px 0 rgba(255,255,255,0.01) inset;
     position: relative;
     z-index: 2;
 }
@@ -186,8 +185,7 @@ button:hover { background: var(--hover-background); }
     display: block;
     height: 1px;
     width: 100%;
-    background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.03), rgba(255,255,255,0.02));
-    box-shadow: 0 8px 16px rgba(0,0,0,0.25);
+    background: var(--card-border);
     opacity: 0.9;
 }
 
@@ -203,7 +201,7 @@ button:hover { background: var(--hover-background); }
 
 /* Optional: make the title slightly dim on hover for affordance if interactive later */
 #event-checkboxes .event-section-title:hover {
-    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    background: var(--subtle-hover);
 }
 
 /* Safety: if the event-checkboxes container is nested inside a different width context,
@@ -301,13 +299,13 @@ button:hover { background: var(--hover-background); }
     font-weight: 700;
     color: var(--secondary-text);
     padding: var(--space-xs) var(--space-sm);
-    border-bottom: 1px solid rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--card-border);
     font-size: var(--font-size-base);
 }
 
 #competitor-list tbody td {
     padding: calc(var(--space-xs) + 4px) var(--space-sm);
-    border-bottom: 1px dashed rgba(255,255,255,0.02);
+    border-bottom: 1px dashed var(--card-border);
     color: var(--main-text);
     vertical-align: middle;
 }
@@ -315,16 +313,16 @@ button:hover { background: var(--hover-background); }
 /* delete button */
 .delete-btn {
     background: transparent;
-    border: 1px solid rgba(255,255,255,0.04);
+    border: 1px solid var(--card-border);
     color: var(--link-color);
     padding: calc(var(--space-xxs) + 6px) var(--space-sm);
     border-radius: var(--main-radius);
 }
-.delete-btn:hover { background: rgba(255,255,255,0.02); }
+.delete-btn:hover { background: var(--subtle-hover); }
 
 .competitor-name-input {
     background: transparent;
-    border: 1px dashed rgba(255,255,255,0.04);
+    border: 1px dashed var(--card-border);
     color: var(--main-text);
     padding: 4px 6px;
     border-radius: var(--main-radius);
@@ -342,8 +340,8 @@ button:hover { background: var(--hover-background); }
 .event-group {
     border-radius: var(--main-radius);
     padding: var(--space-sm);
-    background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));
-    border: 1px solid rgba(255,255,255,0.03);
+    background: var(--subtle-hover);
+    border: 1px solid var(--card-border);
     min-width: 0;
 }
 
@@ -377,7 +375,7 @@ button:hover { background: var(--hover-background); }
 .event-group button.copy-tag,
 .event-group button.edit-tag {
     background: transparent;
-    border: 1px solid rgba(255,255,255,0.03);
+    border: 1px solid var(--card-border);
     padding: 6px 8px;
     border-radius: calc(var(--main-radius) - 2px);
     font-size: 0.82rem;
@@ -404,11 +402,11 @@ button:hover { background: var(--hover-background); }
 /* competitor assignment cards */
 .competitor-assignments {
     margin-top: var(--space-md);
-    background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+    background: var(--subtle-hover);
     padding: var(--space-sm);
     border-radius: var(--main-radius);
-    border: 1px solid rgba(255,255,255,0.02);
-    overflow-x: scroll;
+    border: 1px solid var(--card-border);
+    overflow-x: auto;
     grid-column: 1 / -1;
     width: 100%;
 }
@@ -416,12 +414,12 @@ button:hover { background: var(--hover-background); }
 .competitor-title h4 { margin: 0; font-size: var(--font-size-base); }
 .competitor-title p { margin: 0; color: var(--secondary-text); font-size: 0.9rem; }
 
-.competitor-table { width: 100%; border-collapse: collapse; margin-top: var(--space-xs); }
+.competitor-table { width: 100%; border-collapse: collapse; margin-top: var(--space-xs); min-width: 360px; }
 .competitor-table tr th, .competitor-table tr td {
     padding: var(--space-xxs) var(--space-sm);
     text-align: left;
     font-size: 0.95rem;
-    border-bottom: 1px dashed rgba(255,255,255,0.02);
+    border-bottom: 1px dashed var(--card-border);
 }
 
 /* ---------- Modal ---------- */
@@ -438,6 +436,8 @@ button:hover { background: var(--hover-background); }
     background: var(--secondary-background);
     padding: var(--space-md);
     width: min(900px, 96%);
+    max-height: 90vh;
+    overflow-y: auto;
     border-radius: calc(var(--main-radius) + 2px);
     color: var(--main-text);
     box-shadow: 0 20px 40px rgba(0,0,0,0.75);

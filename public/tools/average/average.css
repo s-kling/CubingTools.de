@@ -87,11 +87,11 @@ ul li::before {
 }
 
 #averages-list .times span.best {
-    color: var(--success, #2ecc71);
+    color: var(--success);
 }
 
 #averages-list .times span.worst {
-    color: var(--error, #e74c3c);
+    color: var(--error);
 }
 
 .timer-area {

@@ -103,6 +103,11 @@ class WcaApi {
             .toUpperCase();
     }
 
+    // Validate that a WCA ID matches the official format (e.g. 2014SMIT01).
+    isValidWcaId(wcaId) {
+        return /^[0-9]{4}[A-Z]{4}[0-9]{2}$/.test(wcaId);
+    }
+
     // Remove expired non-pending entries from in-memory cache.
     pruneExpiredCache() {
         const now = Date.now();
@@ -213,15 +218,21 @@ class WcaApi {
         const { wcaId, event } = req.params;
         const { num, getsolves, getaverages } = req.query;
 
+        const normalizedId = this.normalizeWcaId(wcaId);
+        if (!this.isValidWcaId(normalizedId)) {
+            return res.status(400).json({ error: 'Invalid WCA ID format' });
+        }
+
         try {
-            const data = await this.fetchCompetitorData(wcaId);
+            const data = await this.fetchCompetitorData(normalizedId);
 
             if (event === 'name') {
                 return res.json(this.getCompetitorName(data));
             }
 
             const allResults = this.getAllResultsForEvent(data, event);
-            const solvecount = parseInt(num, 10) || 12;
+            const rawNum = Number.parseInt(num, 10);
+            const solvecount = Number.isFinite(rawNum) && rawNum > 0 ? Math.min(rawNum, 200) : 12;
 
             if (getsolves) {
                 return res.json({
@@ -389,6 +400,17 @@ class StatusApi {
 // Reusable SHA-256 helper used for password and IP hashing.
 function sha256Hash(input) {
     return crypto.createHash('sha256').update(input).digest('hex');
+}
+
+// Simple RFC-5321-aware email format check (local@domain.tld).
+function isValidEmail(email) {
+    return (
+        typeof email === 'string' &&
+        email.length <= 320 &&
+        /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/.test(
+            email,
+        )
+    );
 }
 
 // Session-backed admin auth + message moderation endpoints.
@@ -801,6 +823,25 @@ class ContactApi {
             return res.status(400).json({ success: false, error: 'Missing required fields' });
         }
 
+        // Field length limits to prevent oversized payloads being stored.
+        if (
+            String(name).length > 100 ||
+            String(email).length > 320 ||
+            String(message).length > 5000 ||
+            (tool && String(tool).length > 100)
+        ) {
+            return res
+                .status(400)
+                .json({
+                    success: false,
+                    error: 'One or more fields exceed the maximum allowed length',
+                });
+        }
+
+        if (!isValidEmail(String(email))) {
+            return res.status(400).json({ success: false, error: 'Invalid email address' });
+        }
+
         const sec_ip = sha256Hash(req.ip || 'unknown');
         const senderIsBanned = this.isBanned({ email, secIp: sec_ip });
 
@@ -1198,9 +1239,13 @@ class ContactApi {
                 .replace(/\$\{safeTool\}/g, safeTool || 'Other')
                 .replace(/\$\{safeMessage\}/g, safeMessage);
 
+            // Strip control characters before inserting into email headers.
+            const headerName = name.replace(/[\r\n\0]/g, '');
+            const headerEmail = String(email || '').replace(/[\r\n\0]/g, '');
+
             const info = await transporter.sendMail({
                 from: `CubingTools.de <${process.env.EMAIL_USER}>`,
-                to: `${name}, <${email}>`,
+                to: `${headerName}, <${headerEmail}>`,
                 subject: 'Confirmation of your message to CubingTools',
                 html: htmlContent,
             });
@@ -1251,9 +1296,13 @@ class ContactApi {
                 .replace(/\$\{safeVisits\}/g, safeVisits)
                 .replace(/\$\{recaptchaScore\}/g, safeRecaptchaScore);
 
+            // Strip control characters before inserting into email headers.
+            const headerReplyName = String(mail.name || '').replace(/[\r\n\0]/g, '');
+            const headerReplyEmail = String(mail.email || '').replace(/[\r\n\0]/g, '');
+
             const info = await transporter.sendMail({
                 from: `CubingTools.de <${process.env.EMAIL_USER}>`,
-                replyTo: `${mail.name} <${mail.email}>`,
+                replyTo: `${headerReplyName} <${headerReplyEmail}>`,
                 to: `Sebastian <${process.env.EMAIL_RECEIVER}>`,
                 subject: 'New contact message from CubingTools.de',
                 html: htmlContent,
@@ -1347,6 +1396,11 @@ class ContactApi {
 
     // Confirm queued message by id and forward to final inbox.
     validateConfirmationLink(id) {
+        // Confirmation IDs are 32-character lowercase hex strings.
+        if (!id || !/^[0-9a-f]{32}$/.test(String(id))) {
+            return false;
+        }
+
         if (!fs.existsSync(this.mailsPath)) {
             return false;
         }

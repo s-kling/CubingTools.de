@@ -8,7 +8,7 @@
     overflow: hidden;
     padding: clamp(1.2rem, 2.5vw, 2.8rem);
     border-radius: 18px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--card-border);
     background:
         radial-gradient(circle at 8% 15%, rgba(63, 167, 214, 0.26), transparent 48%),
         radial-gradient(circle at 92% 12%, rgba(99, 102, 241, 0.24), transparent 42%),
@@ -31,7 +31,7 @@
     letter-spacing: 0.12em;
     text-transform: uppercase;
     font-weight: 700;
-    color: #8ecbe4;
+    color: var(--link-color);
     font-size: 0.82rem;
 }
 
@@ -57,7 +57,7 @@
     min-height: 2.65rem;
     padding: 0 var(--space-md);
     border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
+    border: 1px solid var(--card-border);
     color: var(--main-text);
     transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 }
@@ -109,8 +109,8 @@
     grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
     gap: var(--space-md);
     align-items: stretch;
-    background: rgba(42, 42, 49, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--card-bg) !important;
+    border: 1px solid var(--card-border);
     border-radius: 14px;
     padding: clamp(1rem, 2vw, 1.6rem);
 }
@@ -137,7 +137,7 @@
 
 .tool-slide-status-copy p {
     margin: 0;
-    color: #c2c7d1;
+    color: var(--secondary-text);
 }
 
 .tool-slide-copy h3 {
@@ -162,10 +162,10 @@
 .tool-pill-list li {
     margin: 0;
     padding: 6px 10px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
+    border: 1px solid var(--card-border);
     border-radius: 999px;
-    color: #c7d8e6;
-    background: rgba(0, 0, 0, 0.24);
+    color: var(--secondary-text);
+    background: var(--subtle-hover);
 }
 
 .tool-pill-list li::before {
@@ -184,9 +184,9 @@
 }
 
 .tool-slide-side p {
-    margin: 0;
+    margin: auto;
     font-size: 0.95rem;
-    color: #b0c0ce;
+    color: var(--secondary-text);
 }
 
 .tool-slide-side a {
@@ -197,7 +197,7 @@
     border-radius: 10px;
     border: 1px solid rgba(63, 167, 214, 0.45);
     background: rgba(63, 167, 214, 0.14);
-    color: #d5effc;
+    color: var(--link-color);
     font-weight: 600;
     width: 100%;
     margin-top: auto;
@@ -226,13 +226,13 @@
 .carousel-buttons button {
     min-width: 2.8rem;
     min-height: 2.5rem;
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--subtle-hover);
     color: var(--main-text);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid var(--card-border);
 }
 
 .carousel-buttons button:hover {
-    background: rgba(255, 255, 255, 0.18);
+    background: var(--hover-background);
 }
 
 .carousel-dots {
@@ -245,7 +245,7 @@
     width: 0.9rem;
     height: 0.9rem;
     border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.26);
+    border: 1px solid var(--card-border);
     background: transparent;
     padding: 0;
 }
@@ -264,8 +264,8 @@
 .generic-info-card {
     padding: var(--space-md);
     border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: linear-gradient(160deg, rgba(42, 42, 49, 0.9), rgba(17, 20, 28, 0.85));
+    border: 1px solid var(--card-border);
+    background: var(--card-bg);
 }
 
 .generic-info-card h3 {
@@ -275,7 +275,7 @@
 
 .generic-info-card p {
     margin: 0;
-    color: #c2c7d1;
+    color: var(--secondary-text);
 }
 
 .admin-notice {
@@ -287,6 +287,31 @@
 
 .admin-notice h2 {
     margin-top: 0;
+}
+
+[data-theme="light"] {
+    .home-hero {
+        background:
+            radial-gradient(circle at 8% 15%, rgba(63, 167, 214, 0.10), transparent 48%),
+            radial-gradient(circle at 92% 12%, rgba(99, 102, 241, 0.10), transparent 42%),
+            linear-gradient(150deg, var(--secondary-background), var(--main-lighter));
+    }
+
+    .home-hero::after {
+        background: radial-gradient(circle, rgba(63, 167, 214, 0.08), transparent 70%);
+    }
+
+    .tools-carousel {
+        background: var(--secondary-background);
+    }
+
+    .tool-slide {
+        background: var(--main-background);
+    }
+
+    .tool-slide-side {
+        background: rgba(0, 0, 0, 0.04);
+    }
 }
 
 @media (max-width: 880px) {

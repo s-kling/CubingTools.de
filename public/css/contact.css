@@ -16,7 +16,7 @@ main {
         linear-gradient(160deg, rgba(25, 25, 35, 0.92), rgba(42, 42, 49, 0.78)),
         radial-gradient(120% 120% at 0% 0%, rgba(79, 70, 229, 0.08), transparent);
 
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--card-border);
     border-radius: var(--main-radius);
 
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
@@ -51,8 +51,7 @@ form label {
 form input,
 form textarea,
 form select {
-    background:
-        linear-gradient(180deg, rgba(50, 50, 62, 0.95), rgba(50, 50, 62, 0.85));
+    background: var(--input-background);
 
     border: 1px solid var(--input-border);
     border-radius: var(--main-radius);
@@ -186,7 +185,7 @@ form button {
 
 /* hover = lift */
 form button:hover {
-    background: var(--hover-background);
+    background: var(--button-hover);
     transform: translateY(-1px);
 }
 
@@ -196,6 +195,11 @@ form button:focus-visible {
     box-shadow:
         0 0 0 2px rgba(63, 167, 214, 0.28),
         0 4px 14px rgba(79, 70, 229, 0.3);
+}
+
+[data-theme="dark"] .heading {
+    background: var(--secondary-background);
+    box-shadow: var(--shadow-md);
 }
 
 /* active = press */

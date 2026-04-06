@@ -39,8 +39,8 @@
 	text-align: center;
 	border-radius: calc(var(--main-radius) * 3);
 	padding: clamp(24px, 5vw, 48px);
-	background: linear-gradient(170deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01));
-	border: 1px solid rgba(255, 255, 255, 0.1);
+	background: var(--card-bg);
+	border: 1px solid var(--card-border);
 	box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
 	backdrop-filter: blur(4px);
 }
@@ -150,4 +150,9 @@
 		border-radius: calc(var(--main-radius) * 2);
 		padding: clamp(18px, 6vw, 30px);
 	}
+}
+
+[data-theme="dark"].error-card {
+	background: var(--secondary-background);
+	box-shadow: var(--shadow-md);
 }

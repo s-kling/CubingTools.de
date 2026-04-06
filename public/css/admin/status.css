@@ -51,8 +51,8 @@
 }
 
 .actions-row button {
-    background: white;
-    color: black;
+    background: var(--main-lighter);
+    color: var(--main-text);
     border-radius: var(--main-radius);
     padding: 8px 12px;
     cursor: pointer;
@@ -131,7 +131,7 @@
 
 .status-table th,
 .status-table td {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    border-bottom: 1px solid var(--card-border);
     padding: 9px 8px;
     text-align: left;
     vertical-align: top;
@@ -148,7 +148,7 @@
 }
 
 .status-explorer-row:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--subtle-hover);
 }
 
 .status-details-table {
@@ -182,7 +182,7 @@
 }
 
 .status-list li {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    border-bottom: 1px solid var(--card-border);
     padding-bottom: 7px;
     line-height: 1.35;
 }
@@ -206,7 +206,7 @@
     list-style: none;
     margin: 8px 0 0;
     padding-left: 12px;
-    border-left: 2px solid rgba(255, 255, 255, 0.12);
+    border-left: 2px solid var(--card-border);
 }
 
 .status-details li {

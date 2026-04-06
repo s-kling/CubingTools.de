@@ -158,12 +158,12 @@ function handleAddingEvents() {
                 }
 
                 events = customRelay;
-                addEventInputs();
+                await addEventInputs();
 
-                document.getElementById(`c1-${event}`).value =
-                    competitor1AllEventTimes[event] || '';
-                document.getElementById(`c2-${event}`).value =
-                    competitor2AllEventTimes[event] || '';
+                const c1Input = document.getElementById(`c1-${event}`);
+                const c2Input = document.getElementById(`c2-${event}`);
+                if (c1Input) c1Input.value = competitor1AllEventTimes[event] || '';
+                if (c2Input) c2Input.value = competitor2AllEventTimes[event] || '';
             } finally {
                 isProcessing = false;
             }
@@ -183,7 +183,7 @@ function isDNF(value) {
 let competitor1Times = {};
 let competitor2Times = {};
 
-function addEventInputs() {
+async function addEventInputs() {
     const competitor1Events = document.getElementById('c1-times');
     const competitor2Events = document.getElementById('c2-times');
 

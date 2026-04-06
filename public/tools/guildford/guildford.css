@@ -2,6 +2,7 @@ form {
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
+    margin-top: var(--space-sm);
 }
 
 button:not(#accept-cookies):not(#decline-cookies) {
@@ -63,18 +64,19 @@ button:not(#accept-cookies):not(#decline-cookies) {
 #events {
     display: flex;
     justify-content: space-evenly;
-    overflow-x: scroll;
+    overflow-x: auto;
 }
 
 .cubing-icon {
-    color: gray;
-    margin-top: 5px;
+    color: var(--secondary-text);
+    margin: 5px;
+    margin-bottom: 0;
     font-size: calc(var(--font-size-base) + 7px);
     cursor: pointer;
 }
 
 .selected {
-    color: white;
+    color: var(--button-background);
 }
 
 .info {
@@ -122,7 +124,7 @@ button:not(#accept-cookies):not(#decline-cookies) {
     border-radius: var(--main-radius);
     color: var(--secondary-text);
     width: auto;
-    overflow-x: scroll;
+    overflow-x: auto;
 }
 
 #combination-history h3 {
