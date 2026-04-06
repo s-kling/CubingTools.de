@@ -130,9 +130,14 @@
     background: rgba(240, 113, 103, 0.08);
 }
 
+.messages-table tr.is-done {
+    background: rgba(160, 100, 220, 0.1);
+}
+
 .confirmed-badge,
 .unconfirmed-badge,
-.appeal-badge {
+.appeal-badge,
+.done-badge {
     display: inline-block;
     padding: 3px 9px;
     border-radius: 20px;
@@ -157,6 +162,12 @@
     background: rgba(240, 113, 103, 0.16);
     color: var(--error);
     border: 1px solid rgba(240, 113, 103, 0.38);
+}
+
+.done-badge {
+    background: rgba(160, 100, 220, 0.16);
+    color: #b47ee8;
+    border: 1px solid rgba(160, 100, 220, 0.38);
 }
 
 .messages-table details summary {
@@ -192,6 +203,26 @@
 .messages-empty {
     color: var(--secondary-text);
     font-style: italic;
+}
+
+.assigned-badge {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.ban-prefill-select,
+.assign-select {
+    padding: 6px 8px;
+    border-radius: var(--main-radius);
+    border: 1px solid var(--input-border);
+    background: var(--input-background);
+    color: var(--main-text);
+    font-size: 0.85rem;
+    cursor: pointer;
 }
 
 .messages-ban-manager {

@@ -1,6 +1,6 @@
 {
   "name": "cubingtools",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "main": "backend/server.js",
   "scripts": {
     "debug": "node inspect backend/server.js",
@@ -15,6 +15,7 @@
   "dependencies": {
     "@google-cloud/recaptcha-enterprise": "^6.4.0",
     "axios": "^1.7.9",
+    "bcrypt": "^6.0.0",
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
     "express-rate-limit": "^8.3.1",

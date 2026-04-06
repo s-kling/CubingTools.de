@@ -41,6 +41,7 @@
     --input-background: #F0F0F0;
     --input-border: #D0D0D0;
     --button-background: #4F46E5;
+    --button-color: #FFFFFF;
     --button-hover: #3730a3;
     --card-bg: rgba(255, 255, 255, 0.85);
     --card-border: rgba(0, 0, 0, 0.08);
@@ -76,8 +77,9 @@
     --link-underline: #D6D6D6;
     --input-background: #32323E;
     --input-border: #4A4A5C;
-    --button-background: #FFFFFF;
-    --button-hover: #6158ff;
+    --button-background: #4F46E5;
+    --button-color: #FFFFFF;
+    --button-hover: #3730a3;
     --card-bg: rgba(42, 42, 49, 0.6);
     --card-border: rgba(255, 255, 255, 0.08);
     --subtle-hover: rgba(255, 255, 255, 0.05);

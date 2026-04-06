@@ -29,7 +29,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             redirectToLogin();
             return;
         }
+        const data = await verify.json();
         state.token = token;
+        initAdminNav(data.role, 'status', data.username, data.color);
         createDashboardSkeleton();
         bindDashboardEvents();
         await loadStatus(token);

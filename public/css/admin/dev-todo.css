@@ -60,7 +60,7 @@
     line-height: 1;
     padding: 0;
     border: 1px solid var(--input-border);
-    background: linear-gradient(180deg, var(--button-background) 0%, #3f38c7 100%);
+    background: var(--button-background);
     color: var(--main-text);
     font-weight: 600;
     width: 34px;
@@ -72,8 +72,7 @@
 
 .todo-add-btn:hover {
     transform: translateY(-1px);
-    filter: brightness(1.05);
-    box-shadow: 0 6px 16px rgba(79, 70, 229, 0.32);
+    background: var(--button-hover);
 }
 
 .todo-add-btn:active {
@@ -174,7 +173,7 @@
     }
 }
 
-[data-theme="dark"] .todo-section {
+[data-theme="light"] .todo-section {
     background: var(--secondary-background);
     box-shadow: var(--shadow-md);
 }

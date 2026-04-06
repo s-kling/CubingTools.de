@@ -21,7 +21,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             redirectToLogin();
             return;
         }
+        const data = await verify.json();
         state.token = token;
+        initAdminNav(data.role, 'dev-todo', data.username, data.color);
         await loadTodos(token);
     } catch {
         redirectToLogin();

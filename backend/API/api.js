@@ -5,8 +5,11 @@ const router = express.Router();
 const path = require('path');
 const packageJson = require('../../package.json');
 const crypto = require('crypto');
+const bcrypt = require('bcrypt');
 const fs = require('fs');
 const nodemailer = require('nodemailer');
+
+const BCRYPT_ROUNDS = 12;
 
 const { RecaptchaEnterpriseServiceClient } = require('@google-cloud/recaptcha-enterprise');
 
@@ -77,6 +80,24 @@ const adminMessagesBanLimiter = createRateLimiter(
     15 * 60 * 1000,
     40,
     'Too many ban requests, please try again later.',
+);
+
+const adminChangePasswordLimiter = createRateLimiter(
+    15 * 60 * 1000,
+    5,
+    'Too many password change attempts, please try again later.',
+);
+
+const adminUsersReadLimiter = createRateLimiter(
+    15 * 60 * 1000,
+    60,
+    'Too many user list requests, please try again later.',
+);
+
+const adminUsersWriteLimiter = createRateLimiter(
+    15 * 60 * 1000,
+    20,
+    'Too many user management requests, please try again later.',
 );
 
 const wcaLimiter = createRateLimiter(
@@ -416,38 +437,52 @@ function isValidEmail(email) {
 // Session-backed admin auth + message moderation endpoints.
 class AdminSessionApi {
     constructor() {
-        this.password = process.env.STATUS_PAGE_PASSWORD || '';
-        // In-memory token -> expiry map.
+        this.usersPath = path.join(__dirname, '..', 'secret', 'users.json');
+        // In-memory token -> { expiry, username, role } map.
         this.sessions = new Map();
         this.SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
+    }
+
+    // Load users from the JSON file.
+    _loadUsers() {
+        try {
+            return JSON.parse(fs.readFileSync(this.usersPath, 'utf8'));
+        } catch {
+            return [];
+        }
+    }
+
+    // Persist users to the JSON file.
+    _saveUsers(users) {
+        fs.writeFileSync(this.usersPath, JSON.stringify(users, null, 4), 'utf8');
     }
 
     // Remove stale sessions before issuing/validating tokens.
     _cleanExpired() {
         const now = Date.now();
-        for (const [token, expiry] of this.sessions) {
-            if (now > expiry) this.sessions.delete(token);
+        for (const [token, session] of this.sessions) {
+            if (now > session.expiry) this.sessions.delete(token);
         }
     }
 
     // Create a new bearer token with configured TTL.
-    createSession() {
+    createSession(username, role) {
         this._cleanExpired();
         const token = crypto.randomBytes(32).toString('hex');
-        this.sessions.set(token, Date.now() + this.SESSION_TTL_MS);
+        this.sessions.set(token, { expiry: Date.now() + this.SESSION_TTL_MS, username, role });
         return token;
     }
 
-    // Validate token existence and expiration.
+    // Validate token and return session metadata or null.
     verifyToken(token) {
-        if (!token || typeof token !== 'string') return false;
-        const expiry = this.sessions.get(token);
-        if (!expiry) return false;
-        if (Date.now() > expiry) {
+        if (!token || typeof token !== 'string') return null;
+        const session = this.sessions.get(token);
+        if (!session) return null;
+        if (Date.now() > session.expiry) {
             this.sessions.delete(token);
-            return false;
+            return null;
         }
-        return true;
+        return session;
     }
 
     // Extract bearer token from Authorization header.
@@ -458,46 +493,333 @@ class AdminSessionApi {
     }
 
     // Authenticate admin user and issue a session token.
-    handleLogin(req, res) {
-        const { password } = req.body || {};
-        if (!password || typeof password !== 'string') {
-            return res.status(400).json({ error: 'Password required' });
+    async handleLogin(req, res) {
+        const { username, password } = req.body || {};
+        if (
+            !username ||
+            typeof username !== 'string' ||
+            !password ||
+            typeof password !== 'string'
+        ) {
+            return res.status(400).json({ error: 'Username and password required' });
         }
 
-        const hashedInput = sha256Hash(password);
+        const normalizedUsername = username.trim().toLowerCase();
+        const users = this._loadUsers();
+        const user = users.find((u) => u.username.toLowerCase() === normalizedUsername);
+        if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
         let isValid = false;
         try {
-            const a = Buffer.from(hashedInput, 'hex');
-            const b = Buffer.from(this.password, 'hex');
-            if (a.length === b.length && a.length > 0) {
-                isValid = crypto.timingSafeEqual(a, b);
-            }
+            isValid = await bcrypt.compare(password, user.password);
         } catch {
             isValid = false;
         }
 
+        console.log(isValid);
+
         if (!isValid) return res.status(401).json({ error: 'Unauthorized' });
 
-        const token = this.createSession();
-        return res.json({ token });
+        const token = this.createSession(user.username, user.role);
+        return res.json({
+            token,
+            role: user.role,
+            requiresPasswordChange: Boolean(user.firstLogin),
+        });
     }
 
     // Stateless endpoint to verify token validity.
     handleVerify(req, res) {
         const token = this.extractToken(req);
-        if (!this.verifyToken(token)) {
+        const session = this.verifyToken(token);
+        if (!session) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
-        return res.json({ valid: true });
+        const users = this._loadUsers();
+        const user = users.find((u) => u.username === session.username);
+        return res.json({
+            valid: true,
+            role: session.role,
+            username: session.username,
+            color: user?.color || '#888888',
+            requiresPasswordChange: Boolean(user?.firstLogin),
+        });
     }
 
-    // Express middleware guard for protected admin routes.
+    // Update the current user's display color.
+    updateUserColor(req, res) {
+        const token = this.extractToken(req);
+        const session = this.verifyToken(token);
+        if (!session) return res.status(401).json({ error: 'Unauthorized' });
+
+        const { color } = req.body || {};
+        if (!color || typeof color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(color)) {
+            return res.status(400).json({ error: 'Invalid color. Must be a 6-digit hex color.' });
+        }
+
+        const users = this._loadUsers();
+        const idx = users.findIndex((u) => u.username === session.username);
+        if (idx === -1) return res.status(404).json({ error: 'User not found' });
+
+        users[idx].color = color;
+        this._saveUsers(users);
+        return res.json({ success: true, color });
+    }
+
+    // Update any user's display color (admin only).
+    updateAnyUserColor(req, res) {
+        const { username } = req.params;
+        if (!username || typeof username !== 'string') {
+            return res.status(400).json({ error: 'Username is required' });
+        }
+
+        const { color } = req.body || {};
+        if (!color || typeof color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(color)) {
+            return res.status(400).json({ error: 'Invalid color. Must be a 6-digit hex color.' });
+        }
+
+        const users = this._loadUsers();
+        const idx = users.findIndex(
+            (u) => u.username.toLowerCase() === username.trim().toLowerCase(),
+        );
+        if (idx === -1) return res.status(404).json({ error: 'User not found' });
+
+        users[idx].color = color;
+        this._saveUsers(users);
+        return res.json({ success: true, color });
+    }
+
+    // Express middleware guard for protected admin routes (any role).
     requireAuth(req, res, next) {
         const token = this.extractToken(req);
-        if (!this.verifyToken(token)) {
+        const session = this.verifyToken(token);
+        if (!session) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
+        req.adminUser = { username: session.username, role: session.role };
         next();
+    }
+
+    // Express middleware guard restricted to admin role only.
+    requireAdmin(req, res, next) {
+        const token = this.extractToken(req);
+        const session = this.verifyToken(token);
+        if (!session) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        if (session.role !== 'admin') {
+            return res.status(403).json({ error: 'Forbidden: admin access required' });
+        }
+        req.adminUser = { username: session.username, role: session.role };
+        next();
+    }
+
+    // Update the current user's password and clear the first-login flag.
+    async handleChangePassword(req, res) {
+        const token = this.extractToken(req);
+        const session = this.verifyToken(token);
+        if (!session) return res.status(401).json({ error: 'Unauthorized' });
+
+        const { newPassword } = req.body || {};
+        if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 8) {
+            return res.status(400).json({ error: 'New password must be at least 8 characters' });
+        }
+
+        const users = this._loadUsers();
+        const idx = users.findIndex((u) => u.username === session.username);
+        if (idx === -1) return res.status(404).json({ error: 'User not found' });
+
+        users[idx].password = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+        users[idx].firstLogin = false;
+        this._saveUsers(users);
+
+        return res.json({ success: true });
+    }
+
+    // Return list of users (passwords omitted) for admin UI.
+    listUsers(req, res) {
+        const users = this._loadUsers();
+        const safe = users.map(({ password: _pw, ...rest }) => rest);
+        return res.json({ users: safe });
+    }
+
+    // Return usernames and colors (any authenticated user, for assignment dropdowns).
+    listUsernames(req, res) {
+        const users = this._loadUsers();
+        return res.json({
+            users: users.map((u) => ({ username: u.username, color: u.color || '#888888' })),
+        });
+    }
+
+    // Add a new user (admin only).
+    async addUser(req, res) {
+        const { username, role } = req.body || {};
+        if (!username || typeof username !== 'string' || !username.trim()) {
+            return res.status(400).json({ error: 'Username is required' });
+        }
+        const normalizedRole = String(role || 'operator').trim();
+        if (!['admin', 'operator'].includes(normalizedRole)) {
+            return res.status(400).json({ error: 'Role must be "admin" or "operator"' });
+        }
+
+        const users = this._loadUsers();
+        const exists = users.some(
+            (u) => u.username.toLowerCase() === username.trim().toLowerCase(),
+        );
+        if (exists) {
+            return res.status(409).json({ error: 'Username already exists' });
+        }
+
+        // Generate a random color for the user
+        const randomColor = `#${crypto.randomBytes(3).toString('hex')}`;
+
+        const defaultPasswordHash = await bcrypt.hash('cubingtools', BCRYPT_ROUNDS);
+        users.push({
+            username: username.trim(),
+            password: defaultPasswordHash,
+            role: normalizedRole,
+            color: randomColor,
+            firstLogin: true,
+        });
+        this._saveUsers(users);
+        return res.status(201).json({ success: true });
+    }
+
+    // Delete a user by username (admin only, cannot delete self).
+    deleteUser(req, res) {
+        const { username } = req.params;
+        const session = this.verifyToken(this.extractToken(req));
+        if (!username || typeof username !== 'string') {
+            return res.status(400).json({ error: 'Username is required' });
+        }
+        if (session && session.username.toLowerCase() === username.trim().toLowerCase()) {
+            return res.status(400).json({ error: 'Cannot delete your own account' });
+        }
+
+        const users = this._loadUsers();
+        const idx = users.findIndex(
+            (u) => u.username.toLowerCase() === username.trim().toLowerCase(),
+        );
+        if (idx === -1) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        users.splice(idx, 1);
+        this._saveUsers(users);
+        // Invalidate any active sessions for the deleted user.
+        for (const [token, s] of this.sessions) {
+            if (s.username.toLowerCase() === username.trim().toLowerCase()) {
+                this.sessions.delete(token);
+            }
+        }
+        return res.json({ success: true });
+    }
+
+    // Update a user's role (admin only, cannot demote self).
+    updateUserRole(req, res) {
+        const { username } = req.params;
+        const { role } = req.body || {};
+        const session = this.verifyToken(this.extractToken(req));
+
+        if (!username || typeof username !== 'string') {
+            return res.status(400).json({ error: 'Username is required' });
+        }
+        if (!['admin', 'operator'].includes(role)) {
+            return res.status(400).json({ error: 'Role must be "admin" or "operator"' });
+        }
+        if (session && session.username.toLowerCase() === username.trim().toLowerCase()) {
+            return res.status(400).json({ error: 'Cannot change your own role' });
+        }
+
+        const users = this._loadUsers();
+        const idx = users.findIndex(
+            (u) => u.username.toLowerCase() === username.trim().toLowerCase(),
+        );
+        if (idx === -1) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        users[idx].role = role;
+        this._saveUsers(users);
+        return res.json({ success: true });
+    }
+
+    // Reset a user's password to the default and flag firstLogin (admin only).
+    async resetUserPassword(req, res) {
+        const { username } = req.params;
+        if (!username || typeof username !== 'string') {
+            return res.status(400).json({ error: 'Username is required' });
+        }
+
+        const users = this._loadUsers();
+        const idx = users.findIndex(
+            (u) => u.username.toLowerCase() === username.trim().toLowerCase(),
+        );
+        if (idx === -1) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        users[idx].password = await bcrypt.hash('cubingtools', BCRYPT_ROUNDS);
+        users[idx].firstLogin = true;
+        this._saveUsers(users);
+        return res.json({ success: true });
+    }
+
+    // Assign or unassign a message to a specific admin user.
+    handleAssignMessage(req, res) {
+        const id = String(req?.params?.id || '').trim();
+        if (!id) {
+            return res.status(400).json({ error: 'Message id required' });
+        }
+
+        const { assignedTo } = req.body || {};
+        const normalizedAssignee = String(assignedTo || '').trim() || null;
+
+        if (normalizedAssignee) {
+            const users = this._loadUsers();
+            const exists = users.some(
+                (u) => u.username.toLowerCase() === normalizedAssignee.toLowerCase(),
+            );
+            if (!exists) {
+                return res.status(404).json({ error: 'User not found' });
+            }
+        }
+
+        const updated = contactApi.assignMessage(id, normalizedAssignee);
+        if (!updated) {
+            return res.status(404).json({ error: 'Message not found' });
+        }
+
+        return res.json({ success: true });
+    }
+
+    // Mark or unmark a message as done (admin or assigned user only).
+    handleMarkMessageDone(req, res) {
+        const id = String(req?.params?.id || '').trim();
+        if (!id) {
+            return res.status(400).json({ error: 'Message id required' });
+        }
+
+        const { done } = req.body || {};
+        const isDone = Boolean(done);
+        const { username, role } = req.adminUser;
+
+        const messages = contactApi.getMessages();
+        const message = messages.find((m) => m.id === id);
+        if (!message) {
+            return res.status(404).json({ error: 'Message not found' });
+        }
+
+        if (role !== 'admin' && message.assignedTo !== username) {
+            return res.status(403).json({ error: 'Not authorized to mark this message done' });
+        }
+
+        const updated = contactApi.markMessageDone(id, isDone);
+        if (!updated) {
+            return res.status(404).json({ error: 'Message not found' });
+        }
+
+        return res.json({ success: true });
     }
 
     // Return moderation data for admin UI.
@@ -530,7 +852,9 @@ class AdminSessionApi {
     // Add a new ban entry.
     addAdminBan(req, res) {
         const { type, value, reason } = req.body || {};
-        const added = contactApi.addBan({ type, value, reason });
+        const session = this.verifyToken(this.extractToken(req));
+        const user = session?.username || 'unknown';
+        const added = contactApi.addBan({ type, value, user, reason });
 
         if (!added) {
             return res.status(400).json({ error: 'Invalid ban payload' });
@@ -688,7 +1012,7 @@ class ContactApi {
     }
 
     // Add email/IP ban entry if not already present.
-    addBan({ type, value, reason }) {
+    addBan({ type, value, user, reason }) {
         const normalizedType = String(type || '')
             .trim()
             .toLowerCase();
@@ -709,6 +1033,7 @@ class ContactApi {
         bans[key].push({
             value: normalizedValue,
             reason: String(reason || '').trim(),
+            user: String(user || '').trim(),
             createdAt: new Date().toISOString(),
         });
 
@@ -830,12 +1155,10 @@ class ContactApi {
             String(message).length > 5000 ||
             (tool && String(tool).length > 100)
         ) {
-            return res
-                .status(400)
-                .json({
-                    success: false,
-                    error: 'One or more fields exceed the maximum allowed length',
-                });
+            return res.status(400).json({
+                success: false,
+                error: 'One or more fields exceed the maximum allowed length',
+            });
         }
 
         if (!isValidEmail(String(email))) {
@@ -1464,6 +1787,40 @@ class ContactApi {
         return true;
     }
 
+    // Set or clear the assignedTo field on a message.
+    assignMessage(id, assignedTo) {
+        if (!id || !/^[0-9a-f]{32}$/.test(String(id))) {
+            return false;
+        }
+
+        const mails = this.readMailsFile();
+        const idx = mails.findIndex((mail) => mail.id === id);
+        if (idx === -1) {
+            return false;
+        }
+
+        mails[idx] = { ...mails[idx], assignedTo: String(assignedTo || '').trim() || null };
+        fs.writeFileSync(this.mailsPath, JSON.stringify(mails, null, 2), 'utf8');
+        return true;
+    }
+
+    // Set or clear the done status on a message; returns { success, assignedTo } or false.
+    markMessageDone(id, done) {
+        if (!id || !/^[0-9a-f]{32}$/.test(String(id))) {
+            return false;
+        }
+
+        const mails = this.readMailsFile();
+        const idx = mails.findIndex((mail) => mail.id === id);
+        if (idx === -1) {
+            return false;
+        }
+
+        mails[idx] = { ...mails[idx], status: done ? 'done' : null };
+        fs.writeFileSync(this.mailsPath, JSON.stringify(mails, null, 2), 'utf8');
+        return { assignedTo: mails[idx].assignedTo || null };
+    }
+
     // Return all messages after pruning expired unconfirmed entries.
     getMessages() {
         if (!fs.existsSync(this.mailsPath)) {
@@ -1503,6 +1860,61 @@ router.post('/api/admin/login', adminLoginLimiter, (req, res) =>
 );
 router.get('/api/admin/verify', adminVerifyLimiter, (req, res) =>
     adminSessionApi.handleVerify(req, res),
+);
+
+// Protected password change endpoint (any authenticated user).
+router.post('/api/admin/change-password', adminChangePasswordLimiter, (req, res) =>
+    adminSessionApi.handleChangePassword(req, res),
+);
+
+// User management endpoints (admin only).
+router.get(
+    '/api/admin/users',
+    adminUsersReadLimiter,
+    adminSessionApi.requireAdmin.bind(adminSessionApi),
+    (req, res) => adminSessionApi.listUsers(req, res),
+);
+
+router.post(
+    '/api/admin/users',
+    adminUsersWriteLimiter,
+    adminSessionApi.requireAdmin.bind(adminSessionApi),
+    (req, res) => adminSessionApi.addUser(req, res),
+);
+
+router.delete(
+    '/api/admin/users/:username',
+    adminUsersWriteLimiter,
+    adminSessionApi.requireAdmin.bind(adminSessionApi),
+    (req, res) => adminSessionApi.deleteUser(req, res),
+);
+
+router.patch(
+    '/api/admin/users/:username/role',
+    adminUsersWriteLimiter,
+    adminSessionApi.requireAdmin.bind(adminSessionApi),
+    (req, res) => adminSessionApi.updateUserRole(req, res),
+);
+
+router.post(
+    '/api/admin/users/:username/reset-password',
+    adminUsersWriteLimiter,
+    adminSessionApi.requireAdmin.bind(adminSessionApi),
+    (req, res) => adminSessionApi.resetUserPassword(req, res),
+);
+
+router.patch(
+    '/api/admin/users/me/color',
+    adminUsersWriteLimiter,
+    adminSessionApi.requireAuth.bind(adminSessionApi),
+    (req, res) => adminSessionApi.updateUserColor(req, res),
+);
+
+router.patch(
+    '/api/admin/users/:username/color',
+    adminUsersWriteLimiter,
+    adminSessionApi.requireAdmin.bind(adminSessionApi),
+    (req, res) => adminSessionApi.updateAnyUserColor(req, res),
 );
 
 // Protected status endpoint.
@@ -1560,7 +1972,7 @@ router.get(
 router.delete(
     '/api/admin/messages/:id',
     adminMessagesWriteLimiter,
-    adminSessionApi.requireAuth.bind(adminSessionApi),
+    adminSessionApi.requireAdmin.bind(adminSessionApi),
     (req, res) => adminSessionApi.deleteAdminMessage(req, res),
 );
 
@@ -1590,6 +2002,27 @@ router.post(
     adminMessagesBanLimiter,
     adminSessionApi.requireAuth.bind(adminSessionApi),
     (req, res) => adminSessionApi.resolveAdminAppeal(req, res),
+);
+
+router.patch(
+    '/api/admin/messages/:id/assign',
+    adminMessagesWriteLimiter,
+    adminSessionApi.requireAuth.bind(adminSessionApi),
+    (req, res) => adminSessionApi.handleAssignMessage(req, res),
+);
+
+router.patch(
+    '/api/admin/messages/:id/done',
+    adminMessagesWriteLimiter,
+    adminSessionApi.requireAuth.bind(adminSessionApi),
+    (req, res) => adminSessionApi.handleMarkMessageDone(req, res),
+);
+
+router.get(
+    '/api/admin/users/names',
+    adminUsersReadLimiter,
+    adminSessionApi.requireAuth.bind(adminSessionApi),
+    (req, res) => adminSessionApi.listUsernames(req, res),
 );
 
 // Public WCA data endpoint.

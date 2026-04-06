@@ -500,7 +500,6 @@ async function addVersionTag() {
 
     document.getElementById('version').appendChild(versionElement);
 
-    console.log(version);
     return version;
 }
 

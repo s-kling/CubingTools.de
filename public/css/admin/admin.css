@@ -1,0 +1,353 @@
+/* =========================================================
+   Admin shared styles — subnav + login/dashboard page
+   ========================================================= */
+
+/* ---------- Admin secondary navigation ---------- */
+.admin-subnav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-md);
+    margin-bottom: var(--space-md);
+    background: var(--secondary-background);
+    border: 1px solid var(--card-border);
+    border-radius: var(--main-radius);
+    box-shadow: var(--shadow-sm);
+    flex-wrap: wrap;
+}
+
+.admin-subnav__links {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    flex-wrap: wrap;
+}
+
+.admin-subnav__sep {
+    display: inline-block;
+    width: 1px;
+    height: 16px;
+    background: var(--card-border);
+    margin: 0 var(--space-xxs);
+    align-self: center;
+}
+
+.admin-subnav__link {
+    padding: 6px 12px;
+    border-radius: var(--main-radius);
+    color: var(--secondary-text);
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: background 0.14s ease, color 0.14s ease;
+}
+
+.admin-subnav__link:hover {
+    background: var(--hover-background);
+    color: var(--hover-text);
+}
+
+.admin-subnav__link.is-active {
+    background: var(--main-lighter);
+    color: var(--main-text);
+    font-weight: 600;
+}
+
+.admin-subnav__home {
+    font-weight: 600;
+    color: var(--main-text);
+}
+
+.admin-subnav__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex-shrink: 0;
+}
+
+.admin-subnav__role {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--secondary-text);
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--main-lighter);
+    border: 1px solid var(--card-border);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.admin-subnav__user {
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 999px;
+    letter-spacing: 0.02em;
+}
+
+.admin-subnav__logout {
+    padding: 6px 14px;
+    border-radius: var(--main-radius);
+    border: 1px solid var(--card-border);
+    background: transparent;
+    color: var(--secondary-text);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+
+.admin-subnav__logout:hover {
+    background: var(--error);
+    border-color: var(--error);
+    color: #fff;
+}
+
+/* ---------- Login form ---------- */
+#admin-auth {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    max-width: 380px;
+    margin-top: var(--space-md);
+    padding: var(--space-lg);
+    background: var(--secondary-background);
+    border: 1px solid var(--card-border);
+    border-radius: var(--main-radius);
+    box-shadow: var(--shadow-md);
+}
+
+#admin-auth label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 0.875rem;
+    color: var(--secondary-text);
+    font-weight: 500;
+}
+
+#admin-auth input {
+    padding: 10px 12px;
+    border-radius: var(--main-radius);
+    border: 1px solid var(--input-border);
+    background: var(--input-background);
+    color: var(--main-text);
+    font-size: 0.95rem;
+    transition: border-color 0.14s ease;
+}
+
+#admin-auth input:focus {
+    outline: none;
+    border-color: var(--button-background);
+}
+
+/* Login button — injected by setupPage.js or hand-written; target the button inside auth */
+#admin-auth > button,
+#admin-auth button[type="button"],
+#admin-auth button[type="submit"] {
+    margin-top: var(--space-xs);
+    padding: 10px 20px;
+    border-radius: var(--main-radius);
+    border: none;
+    background: var(--button-background);
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background 0.16s ease, transform 0.12s ease;
+}
+
+#admin-auth > button:hover,
+#admin-auth button:hover {
+    background: var(--button-hover);
+    transform: translateY(-1px);
+}
+
+/* ---------- Change-password form ---------- */
+#admin-change-password {
+    max-width: 380px;
+    margin-top: var(--space-md);
+    padding: var(--space-lg);
+    background: var(--secondary-background);
+    border: 1px solid var(--card-border);
+    border-radius: var(--main-radius);
+    box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+#admin-change-password label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 0.875rem;
+    color: var(--secondary-text);
+    font-weight: 500;
+}
+
+#admin-change-password input {
+    padding: 10px 12px;
+    border-radius: var(--main-radius);
+    border: 1px solid var(--input-border);
+    background: var(--input-background);
+    color: var(--main-text);
+    font-size: 0.95rem;
+    transition: border-color 0.14s ease;
+}
+
+#admin-change-password input:focus {
+    outline: none;
+    border-color: var(--button-background);
+}
+
+#admin-change-password-btn {
+    margin-top: var(--space-xs);
+    padding: 10px 20px;
+    border-radius: var(--main-radius);
+    border: none;
+    background: var(--button-background);
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background 0.16s ease, transform 0.12s ease;
+}
+
+#admin-change-password-btn:hover {
+    background: var(--button-hover);
+    transform: translateY(-1px);
+}
+
+/* ---------- Dashboard ---------- */
+#dashboard {
+    margin-top: var(--space-md);
+}
+
+#dashboard h2 {
+    margin-bottom: var(--space-md);
+    font-size: 1.25rem;
+    color: var(--secondary-text);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+/* ---------- Admin cards ---------- */
+.admin-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: var(--space-md);
+}
+
+.admin-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    padding: var(--space-md) var(--space-lg);
+    background: var(--secondary-background);
+    border: 1px solid var(--card-border);
+    border-radius: var(--main-radius);
+    box-shadow: var(--shadow-sm);
+    text-decoration: none;
+    color: var(--main-text);
+    transition: box-shadow 0.16s ease, transform 0.16s ease, border-color 0.16s ease;
+}
+
+.admin-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+    border-color: var(--button-background);
+}
+
+.admin-card h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--main-text);
+}
+
+.admin-card p {
+    font-size: 0.85rem;
+    color: var(--secondary-text);
+    line-height: 1.5;
+}
+
+/* ---------- Assigned-message notifications ---------- */
+.admin-notifications {
+    margin-top: var(--space-md);
+}
+
+.admin-notifications h3 {
+    margin: 0 0 var(--space-sm);
+    font-size: 0.875rem;
+    color: var(--secondary-text);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.admin-notification-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--card-border);
+    border-radius: var(--main-radius);
+    background: rgba(63, 167, 214, 0.06);
+    margin-top: var(--space-xs);
+}
+
+.admin-notification-card strong {
+    font-size: 0.95rem;
+    color: var(--main-text);
+}
+
+.admin-notification-tool {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--secondary-text);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.admin-notification-card p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--secondary-text);
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+.admin-reply-link {
+    display: inline-block;
+    margin-top: var(--space-xs);
+    font-size: 0.875rem;
+    color: var(--button-background);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.admin-reply-link:hover {
+    text-decoration: underline;
+}
+
+/* ---------- Dashboard color picker ---------- */
+.admin-color-section {
+    display: inline-flex;
+    margin-top: var(--space-md);
+}
+
+.admin-color-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--secondary-text);
+}
+
+.admin-color-status {
+    font-size: 0.8rem;
+    color: var(--success);
+    min-width: 40px;
+}

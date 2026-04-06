@@ -22,4 +22,9 @@ router.get('/admin/dev-todo', (req, res) => {
     res.sendFile(path.join(__dirname, '..', '../public/html/admin', 'dev-todo.html'));
 });
 
+// Serve the user management page
+router.get('/admin/users', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', '../public/html/admin', 'users.html'));
+});
+
 module.exports = router;

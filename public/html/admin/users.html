@@ -3,12 +3,12 @@
 
 <head>
     <!-- Basic Metadata -->
-    <title>CT.de • Server Status</title>
+    <title>CT.de • User Management</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="CubingTools.de is a hub for competitive cubing, providing tools to track solve times, analyze competitors, and optimize event performance with features like grouping, average calculators, and event algorithms.">
+    <meta name="description" content="CubingTools.de Admin — Manage admin users.">
     <meta name="keywords" content="WCA, world cube association, cubing, speedcubing, tool, tools, cubingtools, cubing tool, cubing tools">
-  
+
     <!-- Other Fancy Things -->
     <link rel="icon" href="../../assets/favicon.ico" type="image/x-icon">
     <link rel="apple-touch-icon" href="../../assets/logo_no_text.png">
@@ -16,13 +16,13 @@
     <!-- CSS Stylesheets -->
     <link rel="stylesheet" href="../../css/global.css">
     <link rel="stylesheet" href="../../css/admin/admin.css">
-    <link rel="stylesheet" href="../../css/admin/status.css">
+    <link rel="stylesheet" href="../../css/admin/users.css">
 
     <!-- JS Files -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P" defer></script>
     <script src="../../js/setupPage.js" defer></script>
     <script src="../../js/admin/admin-nav.js" defer></script>
-    <script src="../../js/admin/status.js" defer></script>
+    <script src="../../js/admin/users.js" defer></script>
 </head>
 
 <body>
@@ -37,14 +37,15 @@
 
         <main>
             <section class="heading">
-                <h1>Server Status</h1>
+                <h1>User Management</h1>
                 <p>
-                    Check the current status of our servers, including uptime,
-                    memory usage, and log statistics.
+                    Create and manage admin users. Only admins can access this page.
+                    New users are created with the default password <strong>cubingtools</strong>
+                    and must change it on first login.
                 </p>
 
-                <p id="status-loading">Verifying session…</p>
-                <div id="status-report" style="display: none;"></div>
+                <p id="users-loading">Verifying session…</p>
+                <div id="users-dashboard" style="display: none;"></div>
             </section>
         </main>
         <footer id="footer"></footer>

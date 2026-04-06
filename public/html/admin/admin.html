@@ -14,10 +14,13 @@
 
     <!-- CSS Stylesheets -->
     <link rel="stylesheet" href="../../css/global.css">
+    <link rel="stylesheet" href="../../css/admin/admin.css">
+    <link rel="stylesheet" href="../../css/admin/admin.css">
 
     <!-- JS Files -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P" defer></script>
     <script src="../../js/setupPage.js" defer></script>
+    <script src="../../js/admin/admin-nav.js" defer></script>
     <script src="../../js/admin/admin.js" defer></script>
 </head>
 
@@ -40,10 +43,29 @@
 
                 <div id="admin-auth">
                     <label>
-                        Enter Admin Password:
-                        <input type="password" id="admin-password" placeholder="Password" />
+                        Username:
+                        <input type="text" id="admin-username" placeholder="Username" autocomplete="username" />
+                    </label>
+                    <label>
+                        Password:
+                        <input type="password" id="admin-password" placeholder="Password" autocomplete="current-password" />
                     </label>
                     <p id="admin-error" style="color: red; display: none;"></p>
+                </div>
+
+                <div id="admin-change-password" style="display: none;">
+                    <h2>Change Password</h2>
+                    <p>You must set a new password before continuing.</p>
+                    <label>
+                        New Password:
+                        <input type="password" id="admin-new-password" placeholder="New password (min. 8 characters)" autocomplete="new-password" />
+                    </label>
+                    <label>
+                        Confirm Password:
+                        <input type="password" id="admin-confirm-password" placeholder="Confirm new password" autocomplete="new-password" />
+                    </label>
+                    <button id="admin-change-password-btn" type="button">Change Password</button>
+                    <p id="admin-change-error" style="color: red; display: none;"></p>
                 </div>
 
                 <div id="dashboard" style="display: none;"></div>

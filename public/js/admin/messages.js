@@ -2,7 +2,11 @@ const SESSION_KEY = 'admin-token';
 
 const state = {
     token: null,
+    role: null,
+    username: null,
+    color: null,
     messages: [],
+    users: [],
     bans: { emails: [], ips: [] },
     selectedBan: null,
     selectedIds: new Set(),
@@ -28,7 +32,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             redirectToLogin();
             return;
         }
+        const verifyData = await verify.json();
         state.token = token;
+        state.role = verifyData.role || null;
+        state.username = verifyData.username || null;
+        state.color = verifyData.color || null;
+        initAdminNav(state.role, 'messages', state.username, state.color);
         createDashboardSkeleton();
         bindDashboardEvents();
         await loadMessages();
@@ -66,6 +75,9 @@ function createDashboardSkeleton() {
                             <option value="banned-ip">Banned by IP hash</option>
                             <option value="high-risk">High risk score (&lt; 0.75)</option>
                             <option value="unscored">No score</option>
+                            <option value="assigned">Assigned to me</option>
+                            <option value="done">Done</option>
+                            <option value="not-done">Not done</option>
                         </select>
                     </label>
 
@@ -83,7 +95,7 @@ function createDashboardSkeleton() {
 
                 <div class="actions-row">
                     <button id="messages-refresh" type="button">Refresh</button>
-                    <button id="messages-delete-selected" type="button">Delete selected</button>
+                    ${state.role === 'admin' ? '<button id="messages-delete-selected" type="button">Delete selected</button>' : ''}
                     <button id="messages-ban-email-selected" type="button">Ban selected emails</button>
                     <button id="messages-ban-ip-selected" type="button">Ban selected IP hashes</button>
                     <button id="messages-clear-selection" type="button">Clear selection</button>
@@ -98,6 +110,7 @@ function createDashboardSkeleton() {
                         <tr>
                             <th><input type="checkbox" id="messages-select-all" aria-label="Select all visible messages" /></th>
                             <th>Status</th>
+                            <th>Assigned</th>
                             <th>Sender</th>
                             <th>Message</th>
                             <th>Tool</th>
@@ -247,6 +260,16 @@ async function loadMessages() {
         state.bans = normalizeBans(data.bans);
         cleanupSelection();
 
+        try {
+            const usersRes = await fetch('/api/admin/users/names', {
+                headers: { Authorization: `Bearer ${state.token}` },
+            });
+            if (usersRes.ok) {
+                const usersData = await usersRes.json();
+                state.users = Array.isArray(usersData.users) ? usersData.users : [];
+            }
+        } catch {}
+
         loadingEl.style.display = 'none';
         messagesReport.style.display = 'block';
         renderDashboard();
@@ -287,6 +310,7 @@ function getAppealRows() {
         rows.push({
             id: `appeal:email:${entry.value}`,
             rowType: 'appeal',
+            banningUser: entry.user || 'unknown',
             appealType: 'email',
             banValue: entry.value,
             confirmed: false,
@@ -308,6 +332,7 @@ function getAppealRows() {
         rows.push({
             id: `appeal:ip:${entry.value}`,
             rowType: 'appeal',
+            banningUser: entry.user || 'unknown',
             appealType: 'ip',
             banValue: entry.value,
             confirmed: false,
@@ -371,6 +396,15 @@ function getFilteredMessages() {
         ) {
             return false;
         }
+
+        if (state.filters.category === 'assigned') {
+            if (isAppeal || message.assignedTo !== state.username) return false;
+        }
+
+        if (state.filters.category === 'done' && (isAppeal || message.status !== 'done'))
+            return false;
+        if (state.filters.category === 'not-done' && (isAppeal || message.status === 'done'))
+            return false;
 
         if (!query) return true;
 
@@ -456,7 +490,7 @@ function renderTable() {
     if (visible.length === 0) {
         const row = document.createElement('tr');
         const cell = document.createElement('td');
-        cell.colSpan = 10;
+        cell.colSpan = 11;
         cell.className = 'messages-empty';
         cell.textContent = 'No messages match the current filters.';
         row.appendChild(cell);
@@ -484,6 +518,8 @@ function renderTable() {
 
         if (isAppeal) {
             row.classList.add('is-unconfirmed');
+        } else if (message.status === 'done') {
+            row.classList.add('is-done');
         } else if (message.confirmed) {
             row.classList.add('is-confirmed');
         } else {
@@ -502,6 +538,7 @@ function renderTable() {
 
         row.appendChild(createSelectCell(message));
         row.appendChild(createStatusCell(message));
+        row.appendChild(createAssignedCell(message));
         row.appendChild(createCell(message.name || 'N/A'));
         row.appendChild(createMessageCell(message.message));
         row.appendChild(createCell(message.tool || 'Other'));
@@ -509,7 +546,12 @@ function renderTable() {
         row.appendChild(createCell(formatDate(message.timestamp)));
         row.appendChild(createCell(message.email || 'N/A'));
         row.appendChild(createIpCell(message.secured_ip));
-        row.appendChild(isAppeal ? createAppealActionCell(message) : createActionCell(message));
+        if (message.status !== 'done') {
+            row.appendChild(isAppeal ? createAppealActionCell(message) : createActionCell(message));
+        } else {
+            // If the message is marked as done, only display the undone button
+            row.appendChild(createUndoneActionCell(message));
+        }
         tbody.appendChild(row);
     });
 
@@ -564,6 +606,20 @@ function createIpCell(value) {
     return cell;
 }
 
+function createAssignedCell(message) {
+    const cell = document.createElement('td');
+    if (message.rowType === 'appeal' || !message.assignedTo) {
+        cell.textContent = '\u2014';
+        return cell;
+    }
+    const badge = document.createElement('span');
+    badge.className = 'assigned-badge';
+    applyUserColorStyles(badge, getUserColor(message.assignedTo));
+    badge.textContent = message.assignedTo;
+    cell.appendChild(badge);
+    return cell;
+}
+
 function getCompactHashDisplay(value) {
     const rawValue = String(value || '').trim();
     if (!rawValue) {
@@ -584,6 +640,11 @@ function getBanEntry(type, value) {
     return (
         state.bans[key].find((entry) => String(entry?.value || '') === String(value || '')) || null
     );
+}
+
+function getUserColor(user) {
+    const found = state.users.find((u) => u.username === user);
+    return found?.color || '#888888';
 }
 
 function getSelectedBanEntry() {
@@ -641,6 +702,7 @@ function renderBanConsole() {
     addRow('Type', type === 'email' ? 'Email' : 'IP hash');
     addRow('Value', type === 'ip' ? getCompactHashDisplay(value) : value);
     addRow('Full value', value);
+    addRow('Banned by', entry.user || 'N/A');
     addRow('Created', formatDate(entry.createdAt));
     addRow('Reason', entry.reason || 'N/A');
     addRow('Appeal pending', entry.appeal_pending ? 'Yes' : 'No');
@@ -696,6 +758,9 @@ function createStatusCell(message) {
     if (message.rowType === 'appeal') {
         badge.className = 'appeal-badge';
         badge.textContent = 'Appeal';
+    } else if (message.status === 'done') {
+        badge.className = 'done-badge';
+        badge.textContent = 'Done';
     } else {
         badge.className = message.confirmed ? 'confirmed-badge' : 'unconfirmed-badge';
         badge.textContent = message.confirmed ? 'Confirmed' : 'Pending';
@@ -725,28 +790,87 @@ function createActionCell(message) {
     const cell = document.createElement('td');
     cell.className = 'row-actions';
 
-    const deleteButton = document.createElement('button');
-    deleteButton.type = 'button';
-    deleteButton.textContent = 'Delete';
-    deleteButton.addEventListener('click', async () => {
-        await deleteMessage(message.id);
+    if (state.role === 'admin') {
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.textContent = 'Delete';
+        deleteButton.addEventListener('click', async () => {
+            await deleteMessage(message.id);
+        });
+        cell.appendChild(deleteButton);
+    }
+
+    const banSelect = document.createElement('select');
+    banSelect.className = 'ban-prefill-select';
+    [
+        ['', 'Ban'],
+        ['email', 'Ban Email'],
+        ['ip', 'Ban IP hash'],
+    ].forEach(([val, label]) => {
+        const opt = document.createElement('option');
+        opt.value = val;
+        opt.textContent = label;
+        banSelect.appendChild(opt);
+    });
+    banSelect.addEventListener('change', () => {
+        const banType = banSelect.value;
+        if (!banType) return;
+        const banValue =
+            banType === 'email' ? normalizeEmail(message.email) : normalizeIp(message.secured_ip);
+        prefillBanForm(banType, banValue, `Banned from message ${message.id}`);
+        banSelect.value = '';
     });
 
-    const banEmailButton = document.createElement('button');
-    banEmailButton.type = 'button';
-    banEmailButton.textContent = 'Ban Email';
-    banEmailButton.addEventListener('click', async () => {
-        await addBan('email', message.email, `Banned from message ${message.id}`);
+    const assignSelect = document.createElement('select');
+    assignSelect.className = 'assign-select';
+    const unassignOpt = document.createElement('option');
+    unassignOpt.value = '';
+    unassignOpt.textContent = '\u2014 Assign to \u2014';
+    assignSelect.appendChild(unassignOpt);
+    state.users.forEach((uname) => {
+        const opt = document.createElement('option');
+        opt.value = uname.username;
+        opt.textContent = uname.username;
+        if (uname.username === message.assignedTo) opt.selected = true;
+        assignSelect.appendChild(opt);
     });
 
-    const banIpButton = document.createElement('button');
-    banIpButton.type = 'button';
-    banIpButton.textContent = 'Ban IP';
-    banIpButton.addEventListener('click', async () => {
-        await addBan('ip', message.secured_ip, `Banned from message ${message.id}`);
+    const assignBtn = document.createElement('button');
+    assignBtn.type = 'button';
+    assignBtn.textContent = message.assignedTo ? 'Reassign' : 'Assign';
+    assignBtn.addEventListener('click', async () => {
+        await assignMessage(message.id, assignSelect.value || null);
     });
 
-    cell.append(deleteButton, banEmailButton, banIpButton);
+    cell.append(banSelect, assignSelect, assignBtn);
+
+    const canMarkDone = state.role === 'admin' || message.assignedTo === state.username;
+    if (canMarkDone) {
+        const isDone = message.status === 'done';
+        const doneBtn = document.createElement('button');
+        doneBtn.type = 'button';
+        doneBtn.textContent = 'Mark done';
+        doneBtn.addEventListener('click', async () => {
+            await markMessageDone(message.id, !isDone);
+        });
+        cell.appendChild(doneBtn);
+    }
+
+    return cell;
+}
+
+function createUndoneActionCell(message) {
+    const cell = document.createElement('td');
+    cell.className = 'row-actions';
+
+    const undoneButton = document.createElement('button');
+    undoneButton.type = 'button';
+    undoneButton.textContent = 'Mark not done';
+    undoneButton.addEventListener('click', async () => {
+        await markMessageDone(message.id, false);
+    });
+
+    cell.appendChild(undoneButton);
     return cell;
 }
 
@@ -1063,6 +1187,72 @@ async function removeBan(type, value) {
         setStatus('Ban removed.', 'is-success');
     } catch {
         setStatus('Failed to remove ban.', 'is-error');
+    }
+}
+
+function prefillBanForm(type, value, reason = '') {
+    const typeEl = document.getElementById('messages-ban-type');
+    const valueEl = document.getElementById('messages-ban-value');
+    const reasonEl = document.getElementById('messages-ban-reason');
+    if (typeEl) typeEl.value = type;
+    if (valueEl) valueEl.value = value;
+    if (reasonEl) reasonEl.value = reason;
+    document
+        .querySelector('.messages-ban-manager')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function markMessageDone(id, done) {
+    try {
+        const response = await fetch(`/api/admin/messages/${encodeURIComponent(id)}/done`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.token}`,
+            },
+            body: JSON.stringify({ done }),
+        });
+
+        if (response.status === 401) {
+            redirectToLogin();
+            return;
+        }
+
+        if (!response.ok) throw new Error('Failed');
+
+        const msg = state.messages.find((m) => m.id === id);
+        if (msg) msg.status = done ? 'done' : null;
+        renderDashboard();
+        setStatus(done ? 'Marked as done.' : 'Marked as not done.', 'is-success');
+    } catch {
+        setStatus('Failed to update done status.', 'is-error');
+    }
+}
+
+async function assignMessage(id, username) {
+    try {
+        const response = await fetch(`/api/admin/messages/${encodeURIComponent(id)}/assign`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.token}`,
+            },
+            body: JSON.stringify({ assignedTo: username || null }),
+        });
+
+        if (response.status === 401) {
+            redirectToLogin();
+            return;
+        }
+
+        if (!response.ok) throw new Error('Failed');
+
+        const msg = state.messages.find((m) => m.id === id);
+        if (msg) msg.assignedTo = username || null;
+        renderDashboard();
+        setStatus(username ? `Assigned to ${username}.` : 'Assignment removed.', 'is-success');
+    } catch {
+        setStatus('Failed to assign message.', 'is-error');
     }
 }
 
