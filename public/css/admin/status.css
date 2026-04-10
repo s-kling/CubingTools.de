@@ -202,6 +202,31 @@
     text-decoration: underline;
 }
 
+.peak-hour-bar-cell,
+.log-count-bar-cell {
+    min-width: 160px;
+    padding-right: var(--space-sm);
+}
+
+.peak-hour-bar,
+.log-count-bar {
+    background: var(--main-lighter);
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 0.9em;
+    font-weight: 600;
+    min-width: 28px;
+    white-space: nowrap;
+    display: inline-block;
+    text-align: left;
+}
+
+.log-count-bar-pct {
+    font-size: 0.82em;
+    font-weight: 400;
+    color: var(--secondary-text);
+}
+
 .status-details {
     list-style: none;
     margin: 8px 0 0;

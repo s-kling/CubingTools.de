@@ -16,7 +16,6 @@ const debug = process.argv.includes('--debug');
 
 const defaultCorsWhitelist = [
     'https://cubingtools.de',
-    'https://www.cubingtools.de',
     'https://beta.cubingtools.de',
     'http://localhost:8000',
     'http://localhost:8001',

@@ -211,7 +211,7 @@ button:hover { background: var(--button-hover); color: var(--hover-text); }
 
 
 .event-checkbox.unchecked { opacity: 0.92; }
-.event-checkbox:hover { transform: translateY(-3px); box-shadow: 0 8px 18px rgba(0,0,0,0.45); }
+.event-checkbox:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
 .event-checkbox.checked {
     background: linear-gradient(180deg, rgba(79,70,229,0.08), rgba(79,70,229,0.03));
     border-color: var(--button-background);

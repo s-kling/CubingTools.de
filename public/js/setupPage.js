@@ -599,7 +599,7 @@ function setupNavbar() {
     navbar.appendChild(pages);
 
     // Apply saved theme on page load
-    const savedTheme = localStorage.getItem('theme') || 'light';
+    const savedTheme = localStorage.getItem('theme') || 'dark';
     document.documentElement.setAttribute('data-theme', savedTheme);
 
     // Hide navbar when clicking outside of it

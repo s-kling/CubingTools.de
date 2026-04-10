@@ -77,6 +77,7 @@ function buildDashboard() {
                             <th>Color</th>
                             <th>Role</th>
                             <th>First Login</th>
+                            <th>Last Login</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -116,6 +117,7 @@ async function loadUsers() {
         state.users = Array.isArray(data.users) ? data.users : [];
         renderTable();
         setStatus(`Loaded ${state.users.length} user(s).`, 'is-success');
+        loadTaskPanel();
     } catch {
         setStatus('Failed to load users.', 'is-error');
     }
@@ -129,7 +131,7 @@ function renderTable() {
     if (state.users.length === 0) {
         const row = document.createElement('tr');
         const cell = document.createElement('td');
-        cell.colSpan = 5;
+        cell.colSpan = 6;
         cell.className = 'users-empty';
         cell.textContent = 'No users found.';
         row.appendChild(cell);
@@ -190,6 +192,17 @@ function renderTable() {
         firstLoginCell.textContent = user.firstLogin ? 'Yes' : 'No';
         firstLoginCell.className = user.firstLogin ? 'users-first-login' : '';
 
+        const lastLoginCell = document.createElement('td');
+        if (user.lastLogin) {
+            const date = new Date(user.lastLogin);
+            lastLoginCell.textContent = date.toLocaleString('de-DE');
+            lastLoginCell.title = date.toISOString();
+            lastLoginCell.style.color = getLastLoginColor(user.lastLogin);
+        } else {
+            lastLoginCell.textContent = 'Never';
+            lastLoginCell.className = 'users-first-login';
+        }
+
         const actionsCell = document.createElement('td');
         actionsCell.className = 'users-actions';
 
@@ -213,7 +226,7 @@ function renderTable() {
         });
 
         actionsCell.append(resetBtn, deleteBtn);
-        row.append(usernameCell, colorCell, roleCell, firstLoginCell, actionsCell);
+        row.append(usernameCell, colorCell, roleCell, firstLoginCell, lastLoginCell, actionsCell);
         tbody.appendChild(row);
     });
 }
@@ -347,9 +360,208 @@ async function updateColor(username, color) {
     }
 }
 
+function getLastLoginColor(lastLogin) {
+    const days = (Date.now() - new Date(lastLogin).getTime()) / 86_400_000;
+    const t = 1 / (1 + days / 14);
+    // Interpolate: t=1 (today) → neutral gray, t→0 (old) → red (#f07167)
+    const r = Math.round(170 * t + 240 * (1 - t));
+    const g = Math.round(170 * t + 113 * (1 - t));
+    const b = Math.round(170 * t + 103 * (1 - t));
+    return `rgb(${r}, ${g}, ${b})`;
+}
+
 function setStatus(message, type) {
     const el = document.getElementById('users-status');
     if (!el) return;
     el.textContent = message;
     el.className = `users-status ${type || ''}`.trim();
+}
+
+async function loadTaskPanel() {
+    const token = state.token;
+    if (!token) return;
+
+    let tasks = [];
+    let completions = {};
+
+    try {
+        const [tasksRes, completionsRes] = await Promise.all([
+            fetch('/api/admin/tasks', { headers: { Authorization: `Bearer ${token}` } }),
+            fetch('/api/admin/tasks/completions', {
+                headers: { Authorization: `Bearer ${token}` },
+            }),
+        ]);
+        if (tasksRes.ok) tasks = (await tasksRes.json()).tasks || [];
+        if (completionsRes.ok) completions = (await completionsRes.json()).completions || {};
+    } catch {
+        return;
+    }
+
+    if (!tasks.length) return;
+
+    function isDue(task) {
+        const history = completions[task.id];
+        if (!Array.isArray(history) || !history.length) return true;
+        const diffDays = (Date.now() - new Date(history[0].completedAt).getTime()) / 86_400_000;
+        if (task.frequency === 'daily') return diffDays >= 1;
+        if (task.frequency === 'weekly') return diffDays >= 7;
+        if (task.frequency === 'monthly') return diffDays >= 30;
+        return true;
+    }
+
+    function timeAgo(iso) {
+        if (!iso) return '';
+        const diffMs = Date.now() - new Date(iso).getTime();
+        const m = Math.floor(diffMs / 60000);
+        if (m < 2) return 'just now';
+        if (m < 60) return `${m}m ago`;
+        const h = Math.floor(m / 60);
+        if (h < 24) return `${h}h ago`;
+        return `${Math.floor(h / 24)}d ago`;
+    }
+
+    const dashboard = document.getElementById('users-dashboard');
+    if (!dashboard) return;
+
+    // Remove stale panel
+    document.querySelector('.users-task-panel')?.remove();
+
+    const dueTasks = tasks.filter(isDue);
+    const sorted = [...tasks].sort((a, b) => Number(!isDue(a)) - Number(!isDue(b)));
+
+    const panel = document.createElement('section');
+    panel.className = 'users-task-panel card';
+
+    const header = document.createElement('div');
+    header.className = 'users-task-panel__header';
+
+    const title = document.createElement('h3');
+    title.className = 'users-task-panel__title';
+    title.textContent = 'Periodic Task Status';
+    header.appendChild(title);
+
+    if (dueTasks.length > 0) {
+        const badge = document.createElement('span');
+        badge.className = 'admin-badge';
+        badge.textContent = String(dueTasks.length);
+        badge.title = `${dueTasks.length} task${dueTasks.length !== 1 ? 's' : ''} currently due`;
+        header.appendChild(badge);
+    }
+
+    panel.appendChild(header);
+
+    const table = document.createElement('table');
+    table.className = 'users-task-table';
+
+    const thead = document.createElement('thead');
+    thead.innerHTML = `<tr>
+        <th>Task</th>
+        <th>Freq</th>
+        <th>Category</th>
+        <th>Status</th>
+        <th>Last completion</th>
+        <th>History</th>
+    </tr>`;
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+
+    sorted.forEach((task) => {
+        const due = isDue(task);
+        const history = Array.isArray(completions[task.id]) ? completions[task.id] : [];
+        const latest = history[0] || null;
+
+        const tr = document.createElement('tr');
+        tr.className = due ? 'users-task-row--due' : 'users-task-row--done';
+
+        // Task name
+        const nameCell = document.createElement('td');
+        nameCell.className = 'users-task-name';
+        const nameText = document.createElement('span');
+        nameText.textContent = task.title;
+        const roleLabel =
+            task.role === 'both' ? 'All' : task.role === 'admin' ? 'Admin' : 'Operator';
+        const roleTag = document.createElement('span');
+        roleTag.className = 'admin-task-tag';
+        roleTag.style.marginLeft = '6px';
+        roleTag.textContent = roleLabel;
+        nameCell.append(nameText, roleTag);
+
+        // Frequency
+        const freqCell = document.createElement('td');
+        const freqTag = document.createElement('span');
+        freqTag.className = `admin-task-tag admin-task-tag--${task.frequency}`;
+        freqTag.textContent = task.frequency;
+        freqCell.appendChild(freqTag);
+
+        // Category
+        const catCell = document.createElement('td');
+        catCell.textContent = task.category;
+        catCell.className = 'users-task-category';
+
+        // Status
+        const statusCell = document.createElement('td');
+        const statusBadge = document.createElement('span');
+        statusBadge.className = due
+            ? 'users-task-status users-task-status--due'
+            : 'users-task-status users-task-status--done';
+        statusBadge.textContent = due ? 'Due' : 'Done';
+        statusCell.appendChild(statusBadge);
+
+        // Last completion
+        const lastCell = document.createElement('td');
+        if (latest) {
+            const userBadge = document.createElement('span');
+            userBadge.className = 'users-task-user';
+            const user = state.users.find(
+                (u) => u.username.toLowerCase() === latest.username.toLowerCase(),
+            );
+            if (user?.color) applyUserColorStyles(userBadge, user.color);
+            userBadge.textContent = latest.username;
+
+            const when = document.createElement('span');
+            when.className = 'users-task-when';
+            when.textContent = timeAgo(latest.completedAt);
+            when.title = new Date(latest.completedAt).toLocaleString('de-DE');
+
+            lastCell.append(userBadge, ' ', when);
+        } else {
+            lastCell.textContent = '—';
+            lastCell.className = 'users-task-none';
+        }
+
+        // Recent completions (up to 4 unique users, latest per user)
+        const histCell = document.createElement('td');
+        histCell.className = 'users-task-hist';
+        const seenUsers = new Set();
+        const recentPerUser = [];
+        for (const entry of history) {
+            if (seenUsers.has(entry.username)) continue;
+            seenUsers.add(entry.username);
+            recentPerUser.push(entry);
+            if (recentPerUser.length >= 4) break;
+        }
+        recentPerUser.forEach((entry) => {
+            const chip = document.createElement('span');
+            chip.className = 'users-task-chip';
+            const user = state.users.find(
+                (u) => u.username.toLowerCase() === entry.username.toLowerCase(),
+            );
+            if (user?.color) applyUserColorStyles(chip, user.color);
+            chip.textContent = entry.username;
+            chip.title = `${entry.username} — ${new Date(entry.completedAt).toLocaleString('de-DE')}`;
+            histCell.appendChild(chip);
+        });
+        if (!recentPerUser.length) {
+            histCell.textContent = '—';
+            histCell.className = 'users-task-none';
+        }
+
+        tr.append(nameCell, freqCell, catCell, statusCell, lastCell, histCell);
+        tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    panel.appendChild(table);
+    dashboard.appendChild(panel);
 }

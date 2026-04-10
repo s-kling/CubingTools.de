@@ -108,4 +108,64 @@ function initAdminNav(role, currentPage, username, color) {
         const main = document.querySelector('main');
         if (main) main.prepend(nav);
     }
+
+    // Load notification badges asynchronously after the nav is in the DOM
+    loadNavBadges();
+}
+
+async function loadNavBadges() {
+    const token = sessionStorage.getItem('admin-token');
+    if (!token) return;
+
+    function setSubnavBadge(pageId, text, tooltip) {
+        const nav = document.querySelector('.admin-subnav');
+        if (!nav) return;
+        const link = nav.querySelector(`.admin-subnav__link[href="/admin/${pageId}"]`);
+        if (!link) return;
+        link.querySelector('.admin-badge')?.remove();
+        if (!text) return;
+        const badge = document.createElement('span');
+        badge.className = 'admin-badge';
+        badge.textContent = text;
+        if (tooltip) badge.title = tooltip;
+        link.appendChild(badge);
+    }
+
+    // Messages badge: non-done message count
+    try {
+        const res = await fetch('/api/admin/messages', {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+            const data = await res.json();
+            const pending = (Array.isArray(data.messages) ? data.messages : []).filter(
+                (m) => m.status !== 'done',
+            ).length;
+            if (pending > 0) {
+                const text = pending > 99 ? '99+' : String(pending);
+                const noun = pending === 1 ? 'message' : 'messages';
+                setSubnavBadge('messages', text, `${pending} ${noun} pending review`);
+            }
+        }
+    } catch {}
+
+    // Status badge: elevated error rate
+    try {
+        const res = await fetch('/api/admin/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: '{}',
+        });
+        if (res.ok) {
+            const data = await res.json();
+            const errorRate = parseFloat(data.logs?.errorRate) || 0;
+            if (errorRate > 1) {
+                setSubnavBadge(
+                    'status',
+                    '!',
+                    `Error rate ${data.logs?.errorRate} exceeds 1% threshold`,
+                );
+            }
+        }
+    } catch {}
 }

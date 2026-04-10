@@ -22,6 +22,37 @@
     --font-size-lg: clamp(16px, 18px, 20px);
     --font-size-xl: clamp(28px, 32px, 36px);
 
+    /* Default Colors (Dark mode) */
+    --main-background: #000000;
+    --secondary-background: #191923;
+    --main-lighter: #2A2A31;
+    --main-text: #F4F4F5;
+    --secondary-text: #A1A1AA;
+    --hover-text: #FFFFFF;
+    --hover-background: #3B3B46;
+    --link-color: #3FA7D6;
+    --link-underline: #D6D6D6;
+    --input-background: #32323E;
+    --input-border: #4A4A5C;
+    --button-background: #4F46E5;
+    --button-color: #FFFFFF;
+    --button-hover: #3730a3;
+    --card-bg: rgba(42, 42, 49, 0.6);
+    --card-border: rgba(255, 255, 255, 0.08);
+    --subtle-hover: rgba(255, 255, 255, 0.05);
+    --surface-overlay: rgba(255, 255, 255, 0.02);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.15);
+    --popup-bg-from: rgba(42, 42, 49, 0.98);
+    --popup-bg-to: rgba(25, 25, 35, 0.98);
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.50);
+    --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.40);
+    --success: #2ecc71;
+    --error: #e74c3c;
+    --warning: #f39c12;
+    --color-warning-text: #f6c15c;
+    --color-success-text: #4ade80;
+    --color-info-text: #7dd3fc;
+
     /* Padding & Margin */
     --main-padding: 16px;
     --main-margin: 8px;

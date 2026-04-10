@@ -7,6 +7,16 @@ const adminAuth = document.getElementById('admin-auth');
 const adminChangePasswordSection = document.getElementById('admin-change-password');
 const dashboard = document.getElementById('dashboard');
 
+function formatTimeAgo(date) {
+    const diffMs = Date.now() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 2) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${Math.floor(diffHours / 24)}d ago`;
+}
+
 async function attemptLogin() {
     adminError.style.display = 'none';
 
@@ -173,6 +183,10 @@ function showDashboard(role, username, color) {
         appendColorPicker(role, username, color);
         loadAssignedNotifications(username);
     }
+
+    if (role) loadPeriodicTasks(role, username);
+    const _dashToken = sessionStorage.getItem(SESSION_KEY);
+    if (_dashToken) loadDashboardBadges(_dashToken);
 }
 
 function appendColorPicker(role, username, currentColor) {
@@ -247,16 +261,20 @@ async function loadAssignedNotifications(username) {
         const assigned = (Array.isArray(data.messages) ? data.messages : []).filter(
             (m) => m.assignedTo === username,
         );
-        if (!assigned.length) return;
+
+        // Filter out messages with status done
+        const filteredAssigned = assigned.filter((m) => m.status !== 'done');
+
+        if (!filteredAssigned.length) return;
 
         const notifSection = document.createElement('section');
         notifSection.className = 'admin-notifications card';
 
         const heading = document.createElement('h3');
-        heading.textContent = `Assigned to you (${assigned.length})`;
+        heading.textContent = `Assigned to you (${filteredAssigned.length})`;
         notifSection.appendChild(heading);
 
-        assigned.forEach((msg) => {
+        filteredAssigned.forEach((msg) => {
             const card = document.createElement('div');
             card.className = 'admin-notification-card';
 
@@ -284,6 +302,184 @@ async function loadAssignedNotifications(username) {
         });
 
         dashboard.appendChild(notifSection);
+    } catch {}
+}
+
+function setCardBadge(pageId, value) {
+    const card = document.querySelector(`.admin-card[href="/admin/${pageId}"]`);
+    if (!card) return;
+    card.querySelector('.admin-badge')?.remove();
+    if (!value && value !== 0) return;
+    const badge = document.createElement('span');
+    badge.className = 'admin-badge admin-badge--card';
+    badge.setAttribute('aria-label', `${value} pending`);
+    badge.textContent = typeof value === 'number' && value > 99 ? '99+' : String(value);
+    card.appendChild(badge);
+}
+
+async function loadPeriodicTasks(role, username) {
+    const token = sessionStorage.getItem(SESSION_KEY);
+    if (!token) return;
+
+    let tasks = [];
+    let completions = {};
+
+    try {
+        const [tasksRes, completionsRes] = await Promise.all([
+            fetch('/api/admin/tasks', { headers: { Authorization: `Bearer ${token}` } }),
+            fetch('/api/admin/tasks/completions', {
+                headers: { Authorization: `Bearer ${token}` },
+            }),
+        ]);
+        if (tasksRes.ok) tasks = (await tasksRes.json()).tasks || [];
+        if (completionsRes.ok) completions = (await completionsRes.json()).completions || {};
+    } catch {
+        return;
+    }
+
+    const relevant = tasks.filter(
+        (t) => (t.role === 'both' || t.role === role) && t.applicable !== false,
+    );
+    if (!relevant.length) return;
+
+    function isDue(task) {
+        const history = completions[task.id];
+        if (!Array.isArray(history) || !history.length) return true;
+        const diffDays = (Date.now() - new Date(history[0].completedAt).getTime()) / 86_400_000;
+        if (task.frequency === 'daily') return diffDays >= 1;
+        if (task.frequency === 'weekly') return diffDays >= 7;
+        if (task.frequency === 'monthly') return diffDays >= 30;
+        return true;
+    }
+
+    const dueTasks = relevant.filter(isDue);
+    document.querySelector('.admin-tasks')?.remove();
+
+    const section = document.createElement('section');
+    section.className = 'admin-tasks card';
+
+    const header = document.createElement('div');
+    header.className = 'admin-tasks__header';
+
+    const heading = document.createElement('h3');
+    heading.className = 'admin-tasks__title';
+    heading.textContent = 'Periodic Tasks';
+    header.appendChild(heading);
+
+    if (dueTasks.length > 0) {
+        const badge = document.createElement('span');
+        badge.className = 'admin-badge';
+        badge.textContent = String(dueTasks.length);
+        badge.setAttribute('aria-label', `${dueTasks.length} tasks due`);
+        header.appendChild(badge);
+    }
+
+    section.appendChild(header);
+
+    const list = document.createElement('div');
+    list.className = 'admin-task-list';
+
+    const sorted = [...relevant].sort((a, b) => Number(!isDue(a)) - Number(!isDue(b)));
+
+    sorted.forEach((task) => {
+        const due = isDue(task);
+        const history = completions[task.id];
+        const latest = Array.isArray(history) && history.length ? history[0] : null;
+
+        const card = document.createElement('div');
+        card.className = `admin-task-card${due ? ' admin-task-card--due' : ' admin-task-card--done'}`;
+
+        const body = document.createElement('div');
+        body.className = 'admin-task-card__body';
+
+        const title = document.createElement('div');
+        title.className = 'admin-task-card__title';
+        title.textContent = task.title;
+
+        const desc = document.createElement('p');
+        desc.className = 'admin-task-card__desc';
+        desc.textContent = task.description;
+
+        const tags = document.createElement('div');
+        tags.className = 'admin-task-card__tags';
+
+        const freqTag = document.createElement('span');
+        freqTag.className = `admin-task-tag admin-task-tag--${task.frequency}`;
+        freqTag.textContent = task.frequency;
+
+        const catTag = document.createElement('span');
+        catTag.className = 'admin-task-tag';
+        catTag.textContent = task.category;
+
+        const roleMap = { admin: 'Admin', operator: 'Operator', both: 'All' };
+        const roleTag = document.createElement('span');
+        roleTag.className = 'admin-task-tag';
+        roleTag.textContent = roleMap[task.role] || task.role;
+
+        tags.append(freqTag, catTag, roleTag);
+        body.append(title, desc, tags);
+
+        const action = document.createElement('button');
+        action.type = 'button';
+
+        if (!due && latest) {
+            action.className = 'admin-task-card__action admin-task-card__action--done';
+            action.textContent = `Done ${formatTimeAgo(new Date(latest.completedAt))} by ${latest.username}`;
+            action.disabled = true;
+        } else {
+            action.className = 'admin-task-card__action';
+            action.textContent = 'Mark done';
+            action.addEventListener('click', async () => {
+                action.disabled = true;
+                action.textContent = 'Saving…';
+                try {
+                    const res = await fetch(
+                        `/api/admin/tasks/${encodeURIComponent(task.id)}/complete`,
+                        { method: 'POST', headers: { Authorization: `Bearer ${token}` } },
+                    );
+                    if (res.ok) await loadPeriodicTasks(role, username);
+                } catch {
+                    action.disabled = false;
+                    action.textContent = 'Mark done';
+                }
+            });
+        }
+
+        card.append(body, action);
+        list.appendChild(card);
+    });
+
+    section.appendChild(list);
+    dashboard.appendChild(section);
+}
+
+async function loadDashboardBadges(token) {
+    // Messages card: badge with count of non-done messages
+    try {
+        const res = await fetch('/api/admin/messages', {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+            const data = await res.json();
+            const pending = (Array.isArray(data.messages) ? data.messages : []).filter(
+                (m) => m.status !== 'done',
+            ).length;
+            if (pending > 0) setCardBadge('messages', pending);
+        }
+    } catch {}
+
+    // Status card: flag elevated error rate
+    try {
+        const res = await fetch('/api/admin/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({}),
+        });
+        if (res.ok) {
+            const data = await res.json();
+            const errorRate = parseFloat(data.logs?.errorRate) || 0;
+            if (errorRate > 1) setCardBadge('status', '!');
+        }
     } catch {}
 }
 

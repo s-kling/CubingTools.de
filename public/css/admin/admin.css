@@ -241,6 +241,7 @@
 }
 
 .admin-card {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--space-xs);
@@ -350,4 +351,316 @@
     font-size: 0.8rem;
     color: var(--success);
     min-width: 40px;
+}
+
+/* ---------- Page-level alert banners ---------- */
+
+.admin-page-alert {
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--main-radius);
+    border: 1px solid transparent;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    margin-bottom: 0;
+}
+
+.admin-page-alert--error {
+    background: rgba(231, 76, 60, 0.10);
+    border-color: rgba(231, 76, 60, 0.35);
+    color: var(--error);
+}
+
+.admin-page-alert--warning {
+    background: rgba(243, 156, 18, 0.09);
+    border-color: rgba(243, 156, 18, 0.35);
+    color: var(--color-warning-text);
+}
+
+/* ---------- Users page — task panel ---------- */
+
+.users-task-panel {
+    overflow-x: auto;
+}
+
+.users-task-panel__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    margin-bottom: var(--space-md);
+}
+
+.users-task-panel__title {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--secondary-text);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.users-task-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.users-task-table th,
+.users-task-table td {
+    padding: 9px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--input-border);
+    vertical-align: middle;
+}
+
+.users-task-table th {
+    color: var(--secondary-text);
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.users-task-table tr:last-child td {
+    border-bottom: none;
+}
+
+.users-task-row--due {
+    background: rgba(243, 156, 18, 0.035);
+}
+
+.users-task-name {
+    font-weight: 500;
+    color: var(--main-text);
+    white-space: nowrap;
+}
+
+.users-task-category {
+    color: var(--secondary-text);
+    font-size: 0.8rem;
+}
+
+.users-task-none {
+    color: var(--secondary-text);
+    opacity: 0.5;
+}
+
+.users-task-status {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.users-task-status--due {
+    background: rgba(243, 156, 18, 0.15);
+    color: var(--warning);
+    border: 1px solid rgba(243, 156, 18, 0.35);
+}
+
+.users-task-status--done {
+    background: rgba(46, 204, 113, 0.1);
+    color: var(--success);
+    border: 1px solid rgba(46, 204, 113, 0.3);
+}
+
+.users-task-user {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--main-lighter);
+    color: var(--secondary-text);
+    border: 1px solid var(--card-border);
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+.users-task-when {
+    font-size: 0.75rem;
+    color: var(--secondary-text);
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.users-task-hist {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+}
+
+.users-task-chip {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: var(--main-lighter);
+    color: var(--secondary-text);
+    border: 1px solid var(--card-border);
+    white-space: nowrap;
+    cursor: default;
+}
+
+/* ---------- Notification badges ---------- */
+
+.admin-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    line-height: 1;
+    background: var(--error);
+    color: #fff;
+    vertical-align: middle;
+    margin-left: 5px;
+    pointer-events: none;
+    flex-shrink: 0;
+}
+
+.admin-badge--card {
+    position: absolute;
+    top: -7px;
+    right: -7px;
+    margin-left: 0;
+}
+
+/* ---------- Periodic tasks ---------- */
+
+.admin-tasks {
+    margin-top: var(--space-md);
+}
+
+.admin-tasks__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    margin-bottom: var(--space-md);
+}
+
+.admin-tasks__title {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--secondary-text);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.admin-task-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.admin-task-card {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--card-border);
+    border-radius: var(--main-radius);
+    background: var(--secondary-background);
+    transition: border-color 0.14s ease;
+}
+
+.admin-task-card--due {
+    border-color: rgba(243, 156, 18, 0.45);
+    background: rgba(243, 156, 18, 0.035);
+}
+
+.admin-task-card--done {
+    opacity: 0.5;
+}
+
+.admin-task-card__body {
+    flex: 1;
+    min-width: 0;
+}
+
+.admin-task-card__title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--main-text);
+    margin-bottom: 3px;
+}
+
+.admin-task-card__desc {
+    margin: 0 0 var(--space-xs);
+    font-size: 0.8rem;
+    color: var(--secondary-text);
+    line-height: 1.5;
+}
+
+.admin-task-card__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.admin-task-tag {
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: var(--main-lighter);
+    color: var(--secondary-text);
+    border: 1px solid var(--card-border);
+}
+
+.admin-task-tag--daily {
+    background: rgba(63, 167, 214, 0.12);
+    color: var(--link-color);
+    border-color: rgba(63, 167, 214, 0.25);
+}
+
+.admin-task-tag--weekly {
+    background: rgba(139, 92, 246, 0.12);
+    color: #8b5cf6;
+    border-color: rgba(139, 92, 246, 0.25);
+}
+
+.admin-task-tag--monthly {
+    background: rgba(243, 156, 18, 0.12);
+    color: var(--warning);
+    border-color: rgba(243, 156, 18, 0.25);
+}
+
+.admin-task-card__action {
+    flex-shrink: 0;
+    align-self: center;
+    padding: 5px 14px;
+    border-radius: var(--main-radius);
+    border: 1px solid var(--card-border);
+    background: transparent;
+    color: var(--secondary-text);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+    white-space: nowrap;
+}
+
+.admin-task-card__action:hover:not(:disabled) {
+    background: var(--success);
+    border-color: var(--success);
+    color: #fff;
+}
+
+.admin-task-card__action--done {
+    background: rgba(46, 204, 113, 0.1);
+    border-color: rgba(46, 204, 113, 0.3);
+    color: var(--success);
+    cursor: default;
 }

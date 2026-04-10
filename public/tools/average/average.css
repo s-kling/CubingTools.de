@@ -220,7 +220,7 @@ ul li::before {
 
 .penalty-btn:hover {
     transform: scale(1.1);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    box-shadow: var(--shadow-sm);
 }
 
 .penalty-btn:active {
@@ -229,52 +229,52 @@ ul li::before {
 
 /* Button colors by type */
 .penalty-btn.confirm {
-    border-color: #2ecc71;
-    color: #2ecc71;
+    border-color: var(--success);
+    color: var(--success);
 }
 
 .penalty-btn.confirm:hover {
-    background: #2ecc71;
+    background: var(--success);
     color: var(--main-background);
 }
 
 .penalty-btn.plus2 {
-    border-color: #f39c12;
-    color: #f39c12;
+    border-color: var(--warning);
+    color: var(--warning);
 }
 
 .penalty-btn.plus2:hover {
-    background: #f39c12;
+    background: var(--warning);
     color: var(--main-background);
 }
 
 .penalty-btn.dnf {
-    border-color: #e74c3c;
-    color: #e74c3c;
+    border-color: var(--error);
+    color: var(--error);
 }
 
 .penalty-btn.dnf:hover {
-    background: #e74c3c;
+    background: var(--error);
     color: var(--main-background);
 }
 
 .penalty-btn.edit {
-    border-color: #3498db;
-    color: #3498db;
+    border-color: var(--link-color);
+    color: var(--link-color);
 }
 
 .penalty-btn.edit:hover {
-    background: #3498db;
+    background: var(--link-color);
     color: var(--main-background);
 }
 
 .penalty-btn.delete {
-    border-color: #95a5a6;
-    color: #95a5a6;
+    border-color: var(--secondary-text);
+    color: var(--secondary-text);
 }
 
 .penalty-btn.delete:hover {
-    background: #95a5a6;
+    background: var(--secondary-text);
     color: var(--main-background);
 }
 

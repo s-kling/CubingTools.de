@@ -360,7 +360,8 @@ class StatusApi {
             // Status codes
             stats.statusCodes[entry.status] = (stats.statusCodes[entry.status] || 0) + 1;
 
-            if (entry.status >= 400) totalErrors++;
+            // Count error but exclude 404 spam
+            if (entry.status >= 400 && entry.status !== 404) totalErrors++;
 
             // Status code → URLs
             if (!stats.statusCodeUrls[entry.status]) {
@@ -438,6 +439,8 @@ function isValidEmail(email) {
 class AdminSessionApi {
     constructor() {
         this.usersPath = path.join(__dirname, '..', 'secret', 'users.json');
+        this.taskCompletionsPath = path.join(__dirname, '..', 'secret', 'task-completions.json');
+        this.tasksPath = path.join(__dirname, '..', 'secret', 'tasks.json');
         // In-memory token -> { expiry, username, role } map.
         this.sessions = new Map();
         this.SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
@@ -516,9 +519,11 @@ class AdminSessionApi {
             isValid = false;
         }
 
-        console.log(isValid);
-
         if (!isValid) return res.status(401).json({ error: 'Unauthorized' });
+
+        const idx = users.findIndex((u) => u.username === user.username);
+        users[idx].lastLogin = new Date().toISOString();
+        this._saveUsers(users);
 
         const token = this.createSession(user.username, user.role);
         return res.json({
@@ -905,6 +910,75 @@ class AdminSessionApi {
             });
 
         return res.json({ success: true, bans: contactApi.getBans() });
+    }
+
+    // Read per-task completion history from disk.
+    _loadTaskCompletions() {
+        try {
+            return JSON.parse(fs.readFileSync(this.taskCompletionsPath, 'utf8'));
+        } catch {
+            return {};
+        }
+    }
+
+    // Persist task completions to disk.
+    _saveTaskCompletions(completions) {
+        fs.writeFileSync(this.taskCompletionsPath, JSON.stringify(completions, null, 4), 'utf8');
+    }
+
+    // Evaluate whether a task's data condition is currently satisfied.
+    _evaluateCondition(condition) {
+        if (!condition) return true;
+        const messages = contactApi.getMessages();
+        const confirmedMessages = messages.filter((m) => m.confirmed);
+        switch (condition) {
+            case 'hasPendingMessages':
+                return confirmedMessages.some((m) => m.status !== 'done');
+            case 'hasMessages':
+                return confirmedMessages.length > 0;
+            case 'hasBans': {
+                const bans = contactApi.getBans();
+                return bans.emails.length > 0 || bans.ips.length > 0;
+            }
+            default:
+                return true;
+        }
+    }
+
+    // Return task definitions from the tasks JSON file, enriched with live applicability.
+    handleGetTasks(req, res) {
+        try {
+            const tasks = JSON.parse(fs.readFileSync(this.tasksPath, 'utf8'));
+            const enriched = tasks.map((task) => ({
+                ...task,
+                applicable: this._evaluateCondition(task.condition),
+            }));
+            return res.json({ tasks: enriched });
+        } catch {
+            return res.status(500).json({ error: 'Failed to load tasks.' });
+        }
+    }
+
+    // Return all completion history for all tasks.
+    handleGetTaskCompletions(req, res) {
+        const completions = this._loadTaskCompletions();
+        return res.json({ completions });
+    }
+
+    // Record a task completion for the authenticated user.
+    handleMarkTaskDone(req, res) {
+        const taskId = String(req?.params?.taskId || '').trim();
+        if (!taskId) return res.status(400).json({ error: 'Missing task ID.' });
+
+        const { username } = req.adminUser;
+        const completions = this._loadTaskCompletions();
+        if (!Array.isArray(completions[taskId])) completions[taskId] = [];
+        completions[taskId].unshift({ username, completedAt: new Date().toISOString() });
+        // Keep at most 100 entries per task to prevent unbounded growth.
+        if (completions[taskId].length > 100)
+            completions[taskId] = completions[taskId].slice(0, 100);
+        this._saveTaskCompletions(completions);
+        return res.json({ success: true });
     }
 }
 
@@ -1307,15 +1381,20 @@ class ContactApi {
         token = 'action-token',
         recaptchaAction = this.recaptchaAction,
     }) {
-        if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+        const serviceAccountPath = path.join(__dirname, '..', 'secret', 'service-account.json');
+        const hasEnvCredentials = Boolean(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+        const hasFileCredentials = fs.existsSync(serviceAccountPath);
+
+        if (!hasEnvCredentials && !hasFileCredentials) {
             console.warn(
-                'reCAPTCHA Enterprise credentials not configured. Set GOOGLE_APPLICATION_CREDENTIALS environment variable.',
+                'reCAPTCHA Enterprise credentials not configured. Set GOOGLE_APPLICATION_CREDENTIALS or provide backend/secret/service-account.json.',
             );
             return null;
         }
 
         try {
-            const client = new RecaptchaEnterpriseServiceClient();
+            const clientOptions = hasEnvCredentials ? {} : { keyFilename: serviceAccountPath };
+            const client = new RecaptchaEnterpriseServiceClient(clientOptions);
             const projectPath = client.projectPath(projectID);
 
             // Build the assessment request.
@@ -1361,7 +1440,7 @@ class ContactApi {
             // Check if this is a credentials error
             if (error.message && error.message.includes('Could not load the default credentials')) {
                 console.warn(
-                    'reCAPTCHA Enterprise credentials not configured. Set GOOGLE_APPLICATION_CREDENTIALS environment variable.',
+                    'reCAPTCHA Enterprise credentials not configured. Set GOOGLE_APPLICATION_CREDENTIALS or provide backend/secret/service-account.json.',
                     error.message,
                 );
                 return null; // Signal that verification should be skipped
@@ -2023,6 +2102,30 @@ router.get(
     adminUsersReadLimiter,
     adminSessionApi.requireAuth.bind(adminSessionApi),
     (req, res) => adminSessionApi.listUsernames(req, res),
+);
+
+// Protected task definition endpoint.
+router.get(
+    '/api/admin/tasks',
+    adminTodosReadLimiter,
+    adminSessionApi.requireAuth.bind(adminSessionApi),
+    (req, res) => adminSessionApi.handleGetTasks(req, res),
+);
+
+// Protected task completion history endpoint.
+router.get(
+    '/api/admin/tasks/completions',
+    adminTodosReadLimiter,
+    adminSessionApi.requireAuth.bind(adminSessionApi),
+    (req, res) => adminSessionApi.handleGetTaskCompletions(req, res),
+);
+
+// Protected endpoint to record a task completion.
+router.post(
+    '/api/admin/tasks/:taskId/complete',
+    adminTodosWriteLimiter,
+    adminSessionApi.requireAuth.bind(adminSessionApi),
+    (req, res) => adminSessionApi.handleMarkTaskDone(req, res),
 );
 
 // Public WCA data endpoint.

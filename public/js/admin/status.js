@@ -87,6 +87,8 @@ function createDashboardSkeleton() {
                 </div>
             </section>
 
+            <div id="status-alert" class="admin-page-alert" style="display:none" role="alert"></div>
+
             <section class="status-stats" id="status-stats"></section>
 
             <section class="status-explorer card status-controls">
@@ -103,6 +105,7 @@ function createDashboardSkeleton() {
                             <option value="all">All sources</option>
                             <option value="endpoints">Endpoints</option>
                             <option value="statusCodes">Status codes</option>
+                            <option value="errors">Errors</option>
                             <option value="methods">HTTP methods</option>
                             <option value="userAgents">User agents</option>
                             <option value="tools">Tools</option>
@@ -323,6 +326,30 @@ function renderStatus() {
         `;
     }
 
+    const alertEl = document.getElementById('status-alert');
+    if (alertEl) {
+        const errorRate = parseFloat(logs.errorRate) || 0;
+        const issues = [];
+        if (errorRate > 1) {
+            issues.push(
+                `<strong>High error rate:</strong> ${logs.errorRate} — exceeds the 1% alert threshold.`,
+            );
+        }
+        const memMb = parseFloat(data.memoryUsage) || 0;
+        if (memMb > 400) {
+            issues.push(
+                `<strong>High memory usage:</strong> ${data.memoryUsage} — consider restarting the server.`,
+            );
+        }
+        if (issues.length > 0) {
+            alertEl.className = 'admin-page-alert admin-page-alert--error';
+            alertEl.innerHTML = issues.join('<br>');
+            alertEl.style.display = 'block';
+        } else {
+            alertEl.style.display = 'none';
+        }
+    }
+
     renderLogExplorer();
 }
 
@@ -340,6 +367,14 @@ function getLogExplorerEntries() {
         key,
         count,
     }));
+
+    const errors = Object.entries(logs.statusCodes || {})
+        .filter(([key]) => key.startsWith('4') || key.startsWith('5'))
+        .map(([key, count]) => ({
+            source: 'errors',
+            key,
+            count,
+        }));
 
     const methods = Object.entries(logs.methods || {}).map(([key, count]) => ({
         source: 'methods',
@@ -391,6 +426,7 @@ function getLogExplorerEntries() {
     const allEntries = [
         ...endpoints,
         ...statusCodes,
+        ...errors,
         ...methods,
         ...userAgents,
         ...toolEntries,
@@ -463,6 +499,10 @@ function renderLogExplorer() {
         return;
     }
 
+    const maxCount = Math.max(...visible.map((entry) => entry.count), 1);
+
+    const totalCount = allMatches.reduce((sum, entry) => sum + entry.count, 0);
+
     visible.forEach((entry) => {
         const row = document.createElement('tr');
         row.className = 'status-explorer-row';
@@ -479,7 +519,18 @@ function renderLogExplorer() {
         sourceCell.textContent = formatLogSource(entry.source);
         keyCell.textContent = entry.key;
         keyCell.className = 'status-log-key';
-        countCell.textContent = String(entry.count);
+
+        const pct = Math.round((entry.count / maxCount) * 100);
+        const bar = document.createElement('div');
+        bar.className = 'log-count-bar';
+        bar.style.width = `${pct}%`;
+        bar.appendChild(document.createTextNode(`${entry.count} `));
+        const pctSpan = document.createElement('span');
+        pctSpan.className = 'log-count-bar-pct';
+        pctSpan.textContent = `(${Math.round((entry.count / totalCount) * 1000) / 10}%)`;
+        bar.appendChild(pctSpan);
+        countCell.className = 'log-count-bar-cell';
+        countCell.appendChild(bar);
 
         row.append(sourceCell, keyCell, countCell);
         bodyEl.appendChild(row);
@@ -634,6 +685,10 @@ function doesEntryMatchSelection(entry, selected) {
         return String(entry.userAgent || '') === selectedKey;
     }
 
+    if (source === 'errors') {
+        return String(entry.status ?? '') === selectedKey;
+    }
+
     if (source === 'tools') {
         return extractToolName(entry.url) === selectedKey;
     }
@@ -685,6 +740,7 @@ function formatLocalTime(value) {
 
 function formatLogSource(source) {
     if (source === 'statusCodes') return 'Status Codes';
+    if (source === 'errors') return 'Errors';
     if (source === 'userAgents') return 'User Agents';
     if (source === 'peakHours') return 'Peak Hours';
     if (source === 'wcaIds') return 'WCA IDs';

@@ -180,9 +180,6 @@ function isDNF(value) {
     return value === 'DNF' || value === null || value === undefined;
 }
 
-let competitor1Times = {};
-let competitor2Times = {};
-
 async function addEventInputs() {
     const competitor1Events = document.getElementById('c1-times');
     const competitor2Events = document.getElementById('c2-times');
@@ -501,44 +498,21 @@ function optimizeGuildford() {
 }
 
 // Function to fetch average times and all solves from the API for a given WCA ID and event
-async function getCurrentAverage(wcaId, event, competitorId) {
+async function getCurrentAverage(wcaId, event) {
     // Validate and sanitize inputs
     const sanitizedWcaId = wcaId.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
     const sanitizedEvent = event.replace(/[^a-zA-Z0-9]/g, '');
     const solvecount = parseInt(document.getElementById('solvecount').value) || 25;
 
-    // Construct the API URLs
+    // Construct the API URL
     const avgUrl = `/api/wca/${encodeURIComponent(sanitizedWcaId)}/${encodeURIComponent(
         sanitizedEvent,
     )}?num=${solvecount}`;
-    const allSolvesUrl = `/api/wca/${encodeURIComponent(sanitizedWcaId)}/${encodeURIComponent(
-        sanitizedEvent,
-    )}?getsolves=true`;
 
     try {
-        const [avgData, allSolvesData] = await Promise.all([
-            window.fetchJsonOrThrow(avgUrl, {
-                errorContext: 'Could not load competitor average',
-            }),
-            window.fetchJsonOrThrow(allSolvesUrl, {
-                errorContext: 'Could not load competitor solves',
-            }),
-        ]);
-
-        // Use only the first N solves from allResults (convert -1 and <0 to NaN, remove <0 before trimming)
-        let allResults = Array.isArray(allSolvesData.allResults)
-            ? allSolvesData.allResults
-                  .filter((x) => x > 0) // remove all <0 numbers
-                  .slice(0, solvecount)
-                  .map((x) => (x === -1 ? NaN : x / 100))
-            : [];
-
-        // Store all solves in the correct competitor object
-        if (competitorId === 'c1') {
-            competitor1Times[event] = allResults;
-        } else if (competitorId === 'c2') {
-            competitor2Times[event] = allResults;
-        }
+        const avgData = await window.fetchJsonOrThrow(avgUrl, {
+            errorContext: 'Could not load competitor average',
+        });
 
         // Validate the response structure
         if (!avgData || typeof avgData.average !== 'number') {
@@ -607,7 +581,7 @@ async function getWCAData(competitorId) {
         await Promise.all(
             events.map(async (eventName) => {
                 const eventId = eventNameToWcaId(eventName);
-                const avg = await getCurrentAverage(wcaId, eventId, competitorId);
+                const avg = await getCurrentAverage(wcaId, eventId);
                 const input = document.getElementById(`${competitorId}-${eventName}`);
                 if (!input) return;
                 if (avg === null || avg === undefined) {

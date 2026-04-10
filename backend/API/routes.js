@@ -86,6 +86,10 @@ router.get('/.well-known/*', (req, res) => {
     res.status(204).end();
 });
 
+router.get('/favicon.ico', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', '../public/assets', 'favicon.ico'));
+});
+
 // Serve specific tool pages
 router.get('/tools/:toolName', (req, res) => {
     const toolName = req.params.toolName;

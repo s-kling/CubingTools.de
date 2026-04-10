@@ -76,7 +76,7 @@ button:not(#accept-cookies):not(#decline-cookies) {
 }
 
 .selected {
-    color: var(--button-background);
+    color: var(--hover-text);
 }
 
 .info {
@@ -117,6 +117,7 @@ button:not(#accept-cookies):not(#decline-cookies) {
     line-height: 1.6;
     margin-bottom: var(--space-sm);
 }
+
 #combination-history {
     margin-top: var(--space-lg);
     padding: var(--space-md);

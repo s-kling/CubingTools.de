@@ -104,6 +104,8 @@ function createDashboardSkeleton() {
 
             <section class="messages-stats" id="messages-stats"></section>
 
+            <div id="messages-alert" class="admin-page-alert" style="display:none" role="alert"></div>
+
             <section class="messages-table-wrap card">
                 <table class="messages-table">
                     <thead>
@@ -116,6 +118,7 @@ function createDashboardSkeleton() {
                             <th>Tool</th>
                             <th>Score</th>
                             <th>Created</th>
+                            <th>Visits</th>
                             <th>Email</th> 
                             <th>IP hash</th>
                             <th>Actions</th>
@@ -478,6 +481,28 @@ function renderStats() {
         <article class="stat card"><h3>Appeals pending</h3><p>${appealPendingCount}</p></article>
         <article class="stat card"><h3>Selected</h3><p>${state.selectedIds.size}</p></article>
     `;
+
+    const alertEl = document.getElementById('messages-alert');
+    if (alertEl) {
+        const issues = [];
+        if (unconfirmedCount > 0) {
+            issues.push(
+                `<strong>${unconfirmedCount} unconfirmed</strong> message${unconfirmedCount !== 1 ? 's' : ''} — senders have not yet clicked the confirmation link.`,
+            );
+        }
+        if (appealPendingCount > 0) {
+            issues.push(
+                `<strong>${appealPendingCount} appeal${appealPendingCount !== 1 ? 's' : ''} pending</strong> — review and resolve them in the ban manager below.`,
+            );
+        }
+        if (issues.length > 0) {
+            alertEl.className = 'admin-page-alert admin-page-alert--warning';
+            alertEl.innerHTML = issues.join('<br>');
+            alertEl.style.display = 'block';
+        } else {
+            alertEl.style.display = 'none';
+        }
+    }
 }
 
 function renderTable() {
@@ -490,7 +515,7 @@ function renderTable() {
     if (visible.length === 0) {
         const row = document.createElement('tr');
         const cell = document.createElement('td');
-        cell.colSpan = 11;
+        cell.colSpan = 12;
         cell.className = 'messages-empty';
         cell.textContent = 'No messages match the current filters.';
         row.appendChild(cell);
@@ -544,13 +569,21 @@ function renderTable() {
         row.appendChild(createCell(message.tool || 'Other'));
         row.appendChild(scoreCell);
         row.appendChild(createCell(formatDate(message.timestamp)));
-        row.appendChild(createCell(message.email || 'N/A'));
+        row.appendChild(createCell(message.visits != null ? message.visits : 'N/A'));
+        row.appendChild(createCopyCell(message.email || 'N/A'));
         row.appendChild(createIpCell(message.secured_ip));
         if (message.status !== 'done') {
             row.appendChild(isAppeal ? createAppealActionCell(message) : createActionCell(message));
-        } else {
+        } else if (
+            state.role === 'admin' ||
+            (message.assignedTo === state.username && message.rowType !== 'appeal')
+        ) {
             // If the message is marked as done, only display the undone button
             row.appendChild(createUndoneActionCell(message));
+        } else {
+            const emptyCell = document.createElement('td');
+            emptyCell.textContent = '\u2014';
+            row.appendChild(emptyCell);
         }
         tbody.appendChild(row);
     });
@@ -589,10 +622,26 @@ function createCell(value) {
     return cell;
 }
 
+function createCopyCell(value) {
+    const cell = document.createElement('td');
+    cell.textContent = value;
+    cell.style.cursor = 'pointer';
+
+    cell.onclick = () => {
+        navigator.clipboard.writeText(value).then(() => {
+            cell.classList.add('copied');
+            setTimeout(() => cell.classList.remove('copied'), 1000);
+        });
+    };
+
+    return cell;
+}
+
 function createIpCell(value) {
     const rawValue = String(value || '').trim();
     const cell = document.createElement('td');
     cell.className = 'ip-cell';
+    cell.style.cursor = 'pointer';
 
     if (!rawValue) {
         cell.textContent = 'N/A';
@@ -603,6 +652,14 @@ function createIpCell(value) {
 
     cell.textContent = displayValue;
     cell.title = rawValue;
+
+    cell.onclick = () => {
+        navigator.clipboard.writeText(value).then(() => {
+            cell.classList.add('copied');
+            setTimeout(() => cell.classList.remove('copied'), 1000);
+        });
+    };
+
     return cell;
 }
 
