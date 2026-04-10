@@ -11,6 +11,7 @@ const state = {
         sort: 'count-desc',
         detailsSort: 'time-desc',
         limit: '5',
+        ignoreAdmin: false,
     },
 };
 
@@ -84,6 +85,10 @@ function createDashboardSkeleton() {
                 <p id="status-state" class="status-state" aria-live="polite"></p>
                 <div class="actions-row">
                     <button id="status-refresh" type="button">Refresh</button>
+                    <label class="toggle-label" id="ignore-admin-label">
+                        <input id="ignore-admin-toggle" type="checkbox" />
+                        Ignore admin
+                    </label>
                 </div>
             </section>
 
@@ -219,6 +224,10 @@ function bindDashboardEvents() {
         await loadStatus(state.token);
     });
 
+    document.getElementById('ignore-admin-toggle')?.addEventListener('change', (event) => {
+        updateSharedFilters({ ignoreAdmin: event.target.checked });
+    });
+
     document.getElementById('status-search')?.addEventListener('input', (event) => {
         updateSharedFilters({
             query: String(event.target.value || '')
@@ -304,7 +313,7 @@ function syncSharedFilterInputs() {
     });
 }
 
-function renderStatus() {
+async function renderStatus() {
     if (!state.data) return;
 
     state.selectedExplorerEntry = null;
@@ -328,11 +337,22 @@ function renderStatus() {
 
     const alertEl = document.getElementById('status-alert');
     if (alertEl) {
+        let threshold = 1;
+        try {
+            const threshRes = await fetch('/api/admin/config/error-rate-threshold', {
+                headers: { Authorization: `Bearer ${state.token}` },
+            });
+            if (threshRes.ok) {
+                const td = await threshRes.json();
+                threshold = td.threshold ?? 1;
+            }
+        } catch {}
+
         const errorRate = parseFloat(logs.errorRate) || 0;
         const issues = [];
-        if (errorRate > 1) {
+        if (errorRate > threshold) {
             issues.push(
-                `<strong>High error rate:</strong> ${logs.errorRate} — exceeds the 1% alert threshold.`,
+                `<strong>High error rate:</strong> ${logs.errorRate} — exceeds the ${threshold}% alert threshold.`,
             );
         }
         const memMb = parseFloat(data.memoryUsage) || 0;
@@ -437,10 +457,12 @@ function getLogExplorerEntries() {
     const query = state.filters.query;
     const selectedSource = state.filters.source;
     const minCount = Number.parseInt(state.filters.minCount, 10) || 0;
+    const ignoreAdmin = state.filters.ignoreAdmin;
 
     const filtered = allEntries.filter((entry) => {
         if (selectedSource !== 'all' && entry.source !== selectedSource) return false;
         if (entry.count < minCount) return false;
+        if (ignoreAdmin && entry.key.toLowerCase().includes('admin')) return false;
 
         if (!query) return true;
 
@@ -598,7 +620,17 @@ function createDetailsCell(text, className = '') {
 
 function getMatchingLogEntries(selected) {
     const entries = Array.isArray(state.data?.logEntries) ? state.data.logEntries : [];
-    return entries.filter((entry) => doesEntryMatchSelection(entry, selected));
+    const ignoreAdmin = state.filters.ignoreAdmin;
+    return entries.filter((entry) => {
+        if (
+            ignoreAdmin &&
+            String(entry.url || '')
+                .toLowerCase()
+                .includes('admin')
+        )
+            return false;
+        return doesEntryMatchSelection(entry, selected);
+    });
 }
 
 function getFilteredMatchingLogEntries(selected) {

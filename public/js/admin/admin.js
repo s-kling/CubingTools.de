@@ -149,10 +149,18 @@ function showDashboard(role, username, color) {
     dashboard.style.display = 'block';
 
     const usersCard =
-        role === 'admin'
+        role === 'admin' || role === 'operator'
             ? `<a href="/admin/users" class="admin-card">
                 <h3>Users</h3>
-                <p>Manage admin and operator accounts.</p>
+                <p>${role === 'admin' ? 'Manage admin and operator accounts.' : 'View admin and operator accounts.'}</p>
+            </a>`
+            : '';
+
+    const messagesCard =
+        role !== 'tester'
+            ? `<a href="/admin/messages" class="admin-card">
+                <h3>Messages</h3>
+                <p>View and manage user messages.</p>
             </a>`
             : '';
 
@@ -163,10 +171,7 @@ function showDashboard(role, username, color) {
                 <h3>Server Status</h3>
                 <p>Uptime, memory usage, and log statistics.</p>
             </a>
-            <a href="/admin/messages" class="admin-card">
-                <h3>Messages</h3>
-                <p>View and manage user messages.</p>
-            </a>
+            ${messagesCard}
             <a href="/admin/dev-todo" class="admin-card">
                 <h3>Developer Todo</h3>
                 <p>Track development tasks and project progress.</p>
@@ -183,6 +188,8 @@ function showDashboard(role, username, color) {
         appendColorPicker(role, username, color);
         loadAssignedNotifications(username);
     }
+
+    if (role === 'admin') appendErrorThresholdSlider();
 
     if (role) loadPeriodicTasks(role, username);
     const _dashToken = sessionStorage.getItem(SESSION_KEY);
@@ -243,6 +250,96 @@ function appendColorPicker(role, username, currentColor) {
     });
 
     label.append(colorBadge, colorInput, statusEl);
+    section.appendChild(label);
+    dashboard.appendChild(section);
+}
+
+async function appendErrorThresholdSlider() {
+    const token = sessionStorage.getItem(SESSION_KEY);
+    if (!token) return;
+
+    let currentThreshold = 1;
+    try {
+        const res = await fetch('/api/admin/config/error-rate-threshold', {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+            const data = await res.json();
+            currentThreshold = data.threshold ?? 1;
+        }
+    } catch {}
+
+    const section = document.createElement('section');
+    section.className = 'admin-color-section card';
+
+    const label = document.createElement('label');
+    label.className = 'admin-color-label';
+    label.textContent = 'Error rate threshold';
+
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.min = '0';
+    slider.max = '25';
+    slider.step = '0.5';
+    slider.value = String(currentThreshold);
+    slider.className = 'admin-threshold-slider';
+    slider.title = 'Error rate alert threshold (%)';
+
+    const numberInput = document.createElement('input');
+    numberInput.type = 'number';
+    numberInput.min = '0';
+    numberInput.max = '25';
+    numberInput.step = '0.5';
+    numberInput.value = String(currentThreshold);
+    numberInput.className = 'admin-threshold-number';
+    numberInput.title = 'Error rate alert threshold (%)';
+
+    const percentLabel = document.createElement('span');
+    percentLabel.className = 'admin-threshold-value';
+    percentLabel.textContent = '%';
+
+    const statusEl = document.createElement('span');
+    statusEl.className = 'admin-color-status';
+
+    function syncAndSave(value) {
+        const clamped = Math.min(25, Math.max(0, parseFloat(value) || 0));
+        slider.value = String(clamped);
+        numberInput.value = String(clamped);
+
+        clearTimeout(syncAndSave._timeout);
+        syncAndSave._timeout = setTimeout(async () => {
+            statusEl.textContent = 'Saving…';
+            try {
+                const res = await fetch('/api/admin/config/error-rate-threshold', {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ threshold: clamped }),
+                });
+                if (!res.ok) throw new Error();
+                statusEl.textContent = 'Saved.';
+                setTimeout(() => {
+                    statusEl.textContent = '';
+                }, 2000);
+            } catch {
+                statusEl.textContent = 'Failed to save.';
+            }
+        }, 300);
+    }
+
+    slider.addEventListener('input', () => {
+        numberInput.value = slider.value;
+    });
+    slider.addEventListener('change', () => syncAndSave(slider.value));
+
+    numberInput.addEventListener('input', () => {
+        slider.value = numberInput.value;
+    });
+    numberInput.addEventListener('change', () => syncAndSave(numberInput.value));
+
+    label.append(slider, numberInput, percentLabel, statusEl);
     section.appendChild(label);
     dashboard.appendChild(section);
 }
@@ -470,15 +567,25 @@ async function loadDashboardBadges(token) {
 
     // Status card: flag elevated error rate
     try {
-        const res = await fetch('/api/admin/status', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({}),
-        });
-        if (res.ok) {
-            const data = await res.json();
+        const [statusRes, threshRes] = await Promise.all([
+            fetch('/api/admin/status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({}),
+            }),
+            fetch('/api/admin/config/error-rate-threshold', {
+                headers: { Authorization: `Bearer ${token}` },
+            }),
+        ]);
+        let threshold = 1;
+        if (threshRes.ok) {
+            const td = await threshRes.json();
+            threshold = td.threshold ?? 1;
+        }
+        if (statusRes.ok) {
+            const data = await statusRes.json();
             const errorRate = parseFloat(data.logs?.errorRate) || 0;
-            if (errorRate > 1) setCardBadge('status', '!');
+            if (errorRate > threshold) setCardBadge('status', '!');
         }
     } catch {}
 }

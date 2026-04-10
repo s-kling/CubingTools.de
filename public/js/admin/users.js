@@ -2,6 +2,7 @@ const SESSION_KEY = 'admin-token';
 
 const state = {
     token: null,
+    role: null,
     users: [],
     currentUsername: null,
     currentColor: null,
@@ -26,15 +27,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const data = await verify.json();
 
-        if (data.role !== 'admin') {
+        if (data.role !== 'admin' && data.role !== 'operator') {
             document.getElementById('users-loading').textContent =
-                'Access denied. Admin role required.';
+                'Access denied. Operator or admin role required.';
             return;
         }
 
         state.token = token;
         state.currentUsername = data.username;
         state.currentColor = data.color || null;
+        state.role = data.role;
         initAdminNav(data.role, 'users', data.username, data.color);
         buildDashboard();
         await loadUsers();
@@ -49,9 +51,12 @@ function redirectToLogin() {
 
 function buildDashboard() {
     const dashboard = document.getElementById('users-dashboard');
+    const isAdmin = state.role === 'admin';
     dashboard.innerHTML = `
         <div class="users-dashboard">
-            <section class="users-controls card">
+            ${
+                isAdmin
+                    ? `<section class="users-controls card">
                 <p id="users-status" class="users-status" aria-live="polite"></p>
                 <form id="users-add-form" class="users-add-form">
                     <label>
@@ -62,12 +67,17 @@ function buildDashboard() {
                         Role
                         <select id="users-new-role">
                             <option value="operator">Operator</option>
+                            <option value="tester">Tester</option>
                             <option value="admin">Admin</option>
                         </select>
                     </label>
                     <button type="submit">Add User</button>
                 </form>
-            </section>
+            </section>`
+                    : `<section class="users-controls card">
+                <p id="users-status" class="users-status" aria-live="polite"></p>
+            </section>`
+            }
 
             <section class="users-table-wrap card">
                 <table class="users-table">
@@ -78,7 +88,7 @@ function buildDashboard() {
                             <th>Role</th>
                             <th>First Login</th>
                             <th>Last Login</th>
-                            <th>Actions</th>
+                            ${isAdmin ? '<th>Actions</th>' : ''}
                         </tr>
                     </thead>
                     <tbody id="users-tbody"></tbody>
@@ -87,14 +97,16 @@ function buildDashboard() {
         </div>
     `;
 
-    document.getElementById('users-add-form').addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const username = document.getElementById('users-new-username').value.trim();
-        const role = document.getElementById('users-new-role').value;
-        if (!username) return;
-        await addUser(username, role);
-        document.getElementById('users-new-username').value = '';
-    });
+    if (isAdmin) {
+        document.getElementById('users-add-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const username = document.getElementById('users-new-username').value.trim();
+            const role = document.getElementById('users-new-role').value;
+            if (!username) return;
+            await addUser(username, role);
+            document.getElementById('users-new-username').value = '';
+        });
+    }
 
     document.getElementById('users-loading').style.display = 'none';
     document.getElementById('users-dashboard').style.display = 'block';
@@ -117,7 +129,7 @@ async function loadUsers() {
         state.users = Array.isArray(data.users) ? data.users : [];
         renderTable();
         setStatus(`Loaded ${state.users.length} user(s).`, 'is-success');
-        loadTaskPanel();
+        if (state.role === 'admin') loadTaskPanel();
     } catch {
         setStatus('Failed to load users.', 'is-error');
     }
@@ -127,11 +139,12 @@ function renderTable() {
     const tbody = document.getElementById('users-tbody');
     if (!tbody) return;
     tbody.textContent = '';
+    const isAdmin = state.role === 'admin';
 
     if (state.users.length === 0) {
         const row = document.createElement('tr');
         const cell = document.createElement('td');
-        cell.colSpan = 6;
+        cell.colSpan = isAdmin ? 6 : 5;
         cell.className = 'users-empty';
         cell.textContent = 'No users found.';
         row.appendChild(cell);
@@ -159,34 +172,40 @@ function renderTable() {
         applyUserColorStyles(colorBadge, user.color || '#888888');
         colorCell.appendChild(colorBadge);
 
-        const colorInput = document.createElement('input');
-        colorInput.type = 'color';
-        colorInput.value = user.color || '#888888';
-        colorInput.className = 'users-color-input';
-        colorInput.title = 'Change color';
-        colorInput.addEventListener('input', () => {
-            applyUserColorStyles(colorBadge, colorInput.value);
-        });
-        colorInput.addEventListener('change', async () => {
-            await updateColor(user.username, colorInput.value);
-        });
-        colorCell.appendChild(colorInput);
+        if (isAdmin) {
+            const colorInput = document.createElement('input');
+            colorInput.type = 'color';
+            colorInput.value = user.color || '#888888';
+            colorInput.className = 'users-color-input';
+            colorInput.title = 'Change color';
+            colorInput.addEventListener('input', () => {
+                applyUserColorStyles(colorBadge, colorInput.value);
+            });
+            colorInput.addEventListener('change', async () => {
+                await updateColor(user.username, colorInput.value);
+            });
+            colorCell.appendChild(colorInput);
+        }
 
         const roleCell = document.createElement('td');
-        const roleSelect = document.createElement('select');
-        roleSelect.disabled = isSelf;
-        roleSelect.title = isSelf ? 'Cannot change your own role' : '';
-        ['admin', 'operator'].forEach((r) => {
-            const opt = document.createElement('option');
-            opt.value = r;
-            opt.textContent = r.charAt(0).toUpperCase() + r.slice(1);
-            opt.selected = user.role === r;
-            roleSelect.appendChild(opt);
-        });
-        roleSelect.addEventListener('change', async () => {
-            await updateRole(user.username, roleSelect.value);
-        });
-        roleCell.appendChild(roleSelect);
+        if (isAdmin) {
+            const roleSelect = document.createElement('select');
+            roleSelect.disabled = isSelf;
+            roleSelect.title = isSelf ? 'Cannot change your own role' : '';
+            ['admin', 'operator', 'tester'].forEach((r) => {
+                const opt = document.createElement('option');
+                opt.value = r;
+                opt.textContent = r.charAt(0).toUpperCase() + r.slice(1);
+                opt.selected = user.role === r;
+                roleSelect.appendChild(opt);
+            });
+            roleSelect.addEventListener('change', async () => {
+                await updateRole(user.username, roleSelect.value);
+            });
+            roleCell.appendChild(roleSelect);
+        } else {
+            roleCell.textContent = user.role.charAt(0).toUpperCase() + user.role.slice(1);
+        }
 
         const firstLoginCell = document.createElement('td');
         firstLoginCell.textContent = user.firstLogin ? 'Yes' : 'No';
@@ -206,27 +225,31 @@ function renderTable() {
         const actionsCell = document.createElement('td');
         actionsCell.className = 'users-actions';
 
-        const resetBtn = document.createElement('button');
-        resetBtn.type = 'button';
-        resetBtn.textContent = 'Reset Password';
-        resetBtn.addEventListener('click', async () => {
-            if (!confirm(`Reset password for "${user.username}" to the default?`)) return;
-            await resetPassword(user.username);
-        });
+        if (isAdmin) {
+            const resetBtn = document.createElement('button');
+            resetBtn.type = 'button';
+            resetBtn.textContent = 'Reset Password';
+            resetBtn.addEventListener('click', async () => {
+                if (!confirm(`Reset password for "${user.username}" to the default?`)) return;
+                await resetPassword(user.username);
+            });
 
-        const deleteBtn = document.createElement('button');
-        deleteBtn.type = 'button';
-        deleteBtn.textContent = 'Delete';
-        deleteBtn.className = 'users-delete-btn';
-        deleteBtn.disabled = isSelf;
-        deleteBtn.title = isSelf ? 'Cannot delete your own account' : '';
-        deleteBtn.addEventListener('click', async () => {
-            if (!confirm(`Delete user "${user.username}" permanently?`)) return;
-            await deleteUser(user.username);
-        });
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.className = 'users-delete-btn';
+            deleteBtn.disabled = isSelf;
+            deleteBtn.title = isSelf ? 'Cannot delete your own account' : '';
+            deleteBtn.addEventListener('click', async () => {
+                if (!confirm(`Delete user "${user.username}" permanently?`)) return;
+                await deleteUser(user.username);
+            });
 
-        actionsCell.append(resetBtn, deleteBtn);
-        row.append(usernameCell, colorCell, roleCell, firstLoginCell, lastLoginCell, actionsCell);
+            actionsCell.append(resetBtn, deleteBtn);
+        }
+
+        row.append(usernameCell, colorCell, roleCell, firstLoginCell, lastLoginCell);
+        if (isAdmin) row.appendChild(actionsCell);
         tbody.appendChild(row);
     });
 }
@@ -353,7 +376,7 @@ async function updateColor(username, color) {
         if (isSelf) {
             // Refresh nav to reflect new color
             document.querySelector('.admin-subnav')?.remove();
-            initAdminNav('admin', 'users', state.currentUsername, color);
+            initAdminNav(state.role, 'users', state.currentUsername, color);
         }
     } catch {
         setStatus('Failed to update color.', 'is-error');

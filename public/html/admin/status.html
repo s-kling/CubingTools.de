@@ -46,6 +46,48 @@
 
                 <p id="status-loading">Verifying session…</p>
                 <div id="status-report" style="display: none;"></div>
+
+                <!-- List of http status codes with their corresponding meanings and context -->
+                <div id="status-codes">
+                    <h2>HTTP Status Codes</h2>
+
+                    <details class="status-group">
+                        <summary><strong>2xx — Success</strong></summary>
+                        <ul>
+                            <li><strong>200 OK:</strong> Request successful. The server processed it correctly and returned the requested data.</li>
+                            <li><strong>201 Created:</strong> Resource created successfully (e.g., new user added). Returned on successful POST requests that create resources.</li>
+                            <li><strong>204 No Content:</strong> Request successful but no content to return. Typical for successful DELETE, OPTIONS, or acknowledged requests.</li>
+                        </ul>
+                    </details>
+
+                    <details class="status-group">
+                        <summary><strong>3xx — Redirection</strong></summary>
+                        <ul>
+                            <li><strong>302 Found:</strong> Temporary redirect to another URL. Used after email confirmation or when a resource has moved temporarily.</li>
+                        </ul>
+                    </details>
+
+                    <details class="status-group">
+                        <summary><strong>4xx — Client Error</strong></summary>
+                        <ul>
+                            <li><strong>400 Bad Request:</strong> Invalid request format, missing required fields, or validation failed. Check JSON syntax, field lengths, and email format.</li>
+                            <li><strong>401 Unauthorized:</strong> Authentication failed, token missing, expired, or invalid. Re-login or refresh your session token.</li>
+                            <li><strong>403 Forbidden:</strong> Authenticated but insufficient permissions for this resource. Your role (tester/operator/admin) lacks access.</li>
+                            <li><strong>404 Not Found:</strong> Endpoint or resource doesn't exist. Verify the API path and resource ID.</li>
+                            <li><strong>409 Conflict:</strong> Action conflicts with existing state. For example, a username already exists or an appeal is already pending.</li>
+                            <li><strong>418 I'm a teapot:</strong> The server refuses to brew coffee because it is, permanently, a teapot.</li>
+                            <li><strong>429 Too Many Requests:</strong> Rate limit exceeded. Too many requests in a short time window. Wait before retrying.</li>
+                        </ul>
+                    </details>
+
+                    <details class="status-group">
+                        <summary><strong>5xx — Server Error</strong></summary>
+                        <ul>
+                            <li><strong>500 Internal Server Error:</strong> Backend error during processing. Check server logs and contact administrators if it persists.</li>
+                        </ul>
+                    </details>
+                </div>
+
             </section>
         </main>
         <footer id="footer"></footer>

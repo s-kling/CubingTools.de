@@ -2,6 +2,7 @@ const SESSION_KEY = 'admin-token';
 
 const state = {
     token: null,
+    role: null,
     lines: [],
     sections: [],
 };
@@ -23,6 +24,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         const data = await verify.json();
         state.token = token;
+        state.role = data.role;
         initAdminNav(data.role, 'dev-todo', data.username, data.color);
         await loadTodos(token);
     } catch {
@@ -136,9 +138,13 @@ function renderTodos() {
             checkbox.type = 'checkbox';
             checkbox.checked = item.checked;
             checkbox.setAttribute('aria-label', `Toggle todo: ${item.text}`);
-            checkbox.addEventListener('change', () =>
-                onToggleTodo(item.lineIndex, checkbox.checked),
-            );
+            if (state.role === 'tester') {
+                checkbox.disabled = true;
+            } else {
+                checkbox.addEventListener('change', () =>
+                    onToggleTodo(item.lineIndex, checkbox.checked),
+                );
+            }
 
             const textEl = document.createElement('span');
             textEl.className = 'todo-item-label';

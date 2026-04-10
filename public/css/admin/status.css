@@ -64,6 +64,23 @@
     transform: translateY(-1px);
 }
 
+.actions-row .toggle-label {
+    display: inline-flex;
+    align-items: center;
+    width: auto;
+    gap: 6px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 0.95em;
+    color: var(--secondary-text);
+    user-select: none;
+}
+
+.actions-row .toggle-label input[type="checkbox"] {
+    accent-color: var(--main-lighter);
+    cursor: pointer;
+}
+
 .status-state {
     min-height: 26px;
     margin: 0;
@@ -238,6 +255,60 @@
     border-bottom: none;
     padding-bottom: 0;
     color: var(--secondary-text);
+}
+
+/* Collapsible status-code groups */
+.status-group {
+    border: 1px solid var(--card-border);
+    border-radius: var(--main-radius);
+    margin-bottom: var(--space-xs);
+    overflow: hidden;
+}
+
+.status-group summary {
+    padding: var(--space-sm) var(--space-md);
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    transition: background 0.15s ease;
+}
+
+.status-group summary:hover {
+    background: var(--subtle-hover);
+}
+
+.status-group summary::before {
+    content: '▸';
+    display: inline-block;
+    transition: transform 0.2s ease;
+    font-size: 0.85em;
+}
+
+.status-group[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+.status-group summary::-webkit-details-marker {
+    display: none;
+}
+
+.status-group ul {
+    margin: 0;
+    padding: var(--space-xs) var(--space-md) var(--space-sm);
+    padding-left: calc(var(--space-md) + 1.2em);
+    border-top: 1px solid var(--card-border);
+}
+
+.status-group li {
+    margin-bottom: 6px;
+    line-height: 1.45;
+}
+
+.status-group li:last-child {
+    margin-bottom: 0;
 }
 
 @media (max-width: 1080px) {

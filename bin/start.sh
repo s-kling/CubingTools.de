@@ -95,15 +95,6 @@ start_server() {
     SERVER_PID=$!
 
     echo -e "${GREEN}$TYPE server started (PID: $SERVER_PID, port: $PORT).${NC}"
-
-    URL="http://localhost:$PORT"
-    if command -v open > /dev/null; then
-        open "$URL"
-    elif command -v xdg-open > /dev/null; then
-        xdg-open "$URL"
-    else
-        echo -e "${YELLOW}Open $URL in your browser.${NC}"
-    fi
 }
 
 stop_server() {
@@ -117,6 +108,15 @@ stop_server() {
 # ─── Start ──────────────────────────────────────────────────────
 
 start_server
+
+URL="http://localhost:$PORT"
+if command -v open > /dev/null; then
+    open "$URL"
+elif command -v xdg-open > /dev/null; then
+    xdg-open "$URL"
+else
+    echo -e "${YELLOW}Open $URL in your browser.${NC}"
+fi
 
 # ─── Control Loop ───────────────────────────────────────────────
 

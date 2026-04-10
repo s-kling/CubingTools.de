@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const fs = require('fs');
 const nodemailer = require('nodemailer');
+const { db } = require('../firebase');
 
 const BCRYPT_ROUNDS = 12;
 
@@ -452,26 +453,27 @@ function isValidEmail(email) {
 // Session-backed admin auth + message moderation endpoints.
 class AdminSessionApi {
     constructor() {
-        this.usersPath = path.join(__dirname, '..', 'secret', 'users.json');
-        this.taskCompletionsPath = path.join(__dirname, '..', 'secret', 'task-completions.json');
-        this.tasksPath = path.join(__dirname, '..', 'secret', 'tasks.json');
         // In-memory token -> { expiry, username, role } map.
         this.sessions = new Map();
         this.SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
     }
 
-    // Load users from the JSON file.
-    _loadUsers() {
-        try {
-            return JSON.parse(fs.readFileSync(this.usersPath, 'utf8'));
-        } catch {
-            return [];
-        }
+    // Load all users from the Firestore 'users' collection.
+    async _loadUsers() {
+        const snapshot = await db.collection('users').get();
+        return snapshot.docs.map((doc) => doc.data());
     }
 
-    // Persist users to the JSON file.
-    _saveUsers(users) {
-        fs.writeFileSync(this.usersPath, JSON.stringify(users, null, 4), 'utf8');
+    // Update (or create) a single user document in Firestore.
+    async _saveUser(username, data) {
+        const docId = username.toLowerCase();
+        await db.collection('users').doc(docId).set(data, { merge: true });
+    }
+
+    // Delete a single user document from Firestore.
+    async _deleteUserDoc(username) {
+        const docId = username.toLowerCase();
+        await db.collection('users').doc(docId).delete();
     }
 
     // Remove stale sessions before issuing/validating tokens.
@@ -522,7 +524,7 @@ class AdminSessionApi {
         }
 
         const normalizedUsername = username.trim().toLowerCase();
-        const users = this._loadUsers();
+        const users = await this._loadUsers();
         const user = users.find((u) => u.username.toLowerCase() === normalizedUsername);
         if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -535,9 +537,8 @@ class AdminSessionApi {
 
         if (!isValid) return res.status(401).json({ error: 'Unauthorized' });
 
-        const idx = users.findIndex((u) => u.username === user.username);
-        users[idx].lastLogin = new Date().toISOString();
-        this._saveUsers(users);
+        user.lastLogin = new Date().toISOString();
+        await this._saveUser(user.username, user);
 
         const token = this.createSession(user.username, user.role);
         return res.json({
@@ -548,13 +549,13 @@ class AdminSessionApi {
     }
 
     // Stateless endpoint to verify token validity.
-    handleVerify(req, res) {
+    async handleVerify(req, res) {
         const token = this.extractToken(req);
         const session = this.verifyToken(token);
         if (!session) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
-        const users = this._loadUsers();
+        const users = await this._loadUsers();
         const user = users.find((u) => u.username === session.username);
         return res.json({
             valid: true,
@@ -566,7 +567,7 @@ class AdminSessionApi {
     }
 
     // Update the current user's display color.
-    updateUserColor(req, res) {
+    async updateUserColor(req, res) {
         const token = this.extractToken(req);
         const session = this.verifyToken(token);
         if (!session) return res.status(401).json({ error: 'Unauthorized' });
@@ -576,17 +577,17 @@ class AdminSessionApi {
             return res.status(400).json({ error: 'Invalid color. Must be a 6-digit hex color.' });
         }
 
-        const users = this._loadUsers();
-        const idx = users.findIndex((u) => u.username === session.username);
-        if (idx === -1) return res.status(404).json({ error: 'User not found' });
+        const users = await this._loadUsers();
+        const user = users.find((u) => u.username === session.username);
+        if (!user) return res.status(404).json({ error: 'User not found' });
 
-        users[idx].color = color;
-        this._saveUsers(users);
+        user.color = color;
+        await this._saveUser(user.username, user);
         return res.json({ success: true, color });
     }
 
     // Update any user's display color (admin only).
-    updateAnyUserColor(req, res) {
+    async updateAnyUserColor(req, res) {
         const { username } = req.params;
         if (!username || typeof username !== 'string') {
             return res.status(400).json({ error: 'Username is required' });
@@ -597,14 +598,12 @@ class AdminSessionApi {
             return res.status(400).json({ error: 'Invalid color. Must be a 6-digit hex color.' });
         }
 
-        const users = this._loadUsers();
-        const idx = users.findIndex(
-            (u) => u.username.toLowerCase() === username.trim().toLowerCase(),
-        );
-        if (idx === -1) return res.status(404).json({ error: 'User not found' });
+        const users = await this._loadUsers();
+        const user = users.find((u) => u.username.toLowerCase() === username.trim().toLowerCase());
+        if (!user) return res.status(404).json({ error: 'User not found' });
 
-        users[idx].color = color;
-        this._saveUsers(users);
+        user.color = color;
+        await this._saveUser(user.username, user);
         return res.json({ success: true, color });
     }
 
@@ -633,6 +632,20 @@ class AdminSessionApi {
         next();
     }
 
+    // Express middleware guard restricted to admin or operator roles (excludes tester).
+    requireOperatorOrAdmin(req, res, next) {
+        const token = this.extractToken(req);
+        const session = this.verifyToken(token);
+        if (!session) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        if (session.role !== 'admin' && session.role !== 'operator') {
+            return res.status(403).json({ error: 'Forbidden: operator or admin access required' });
+        }
+        req.adminUser = { username: session.username, role: session.role };
+        next();
+    }
+
     // Update the current user's password and clear the first-login flag.
     async handleChangePassword(req, res) {
         const token = this.extractToken(req);
@@ -644,27 +657,27 @@ class AdminSessionApi {
             return res.status(400).json({ error: 'New password must be at least 8 characters' });
         }
 
-        const users = this._loadUsers();
-        const idx = users.findIndex((u) => u.username === session.username);
-        if (idx === -1) return res.status(404).json({ error: 'User not found' });
+        const users = await this._loadUsers();
+        const user = users.find((u) => u.username === session.username);
+        if (!user) return res.status(404).json({ error: 'User not found' });
 
-        users[idx].password = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
-        users[idx].firstLogin = false;
-        this._saveUsers(users);
+        user.password = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+        user.firstLogin = false;
+        await this._saveUser(user.username, user);
 
         return res.json({ success: true });
     }
 
     // Return list of users (passwords omitted) for admin UI.
-    listUsers(req, res) {
-        const users = this._loadUsers();
+    async listUsers(req, res) {
+        const users = await this._loadUsers();
         const safe = users.map(({ password: _pw, ...rest }) => rest);
         return res.json({ users: safe });
     }
 
     // Return usernames and colors (any authenticated user, for assignment dropdowns).
-    listUsernames(req, res) {
-        const users = this._loadUsers();
+    async listUsernames(req, res) {
+        const users = await this._loadUsers();
         return res.json({
             users: users.map((u) => ({ username: u.username, color: u.color || '#888888' })),
         });
@@ -677,11 +690,11 @@ class AdminSessionApi {
             return res.status(400).json({ error: 'Username is required' });
         }
         const normalizedRole = String(role || 'operator').trim();
-        if (!['admin', 'operator'].includes(normalizedRole)) {
-            return res.status(400).json({ error: 'Role must be "admin" or "operator"' });
+        if (!['admin', 'operator', 'tester'].includes(normalizedRole)) {
+            return res.status(400).json({ error: 'Role must be "admin", "operator", or "tester"' });
         }
 
-        const users = this._loadUsers();
+        const users = await this._loadUsers();
         const exists = users.some(
             (u) => u.username.toLowerCase() === username.trim().toLowerCase(),
         );
@@ -693,19 +706,19 @@ class AdminSessionApi {
         const randomColor = `#${crypto.randomBytes(3).toString('hex')}`;
 
         const defaultPasswordHash = await bcrypt.hash('cubingtools', BCRYPT_ROUNDS);
-        users.push({
+        const newUser = {
             username: username.trim(),
             password: defaultPasswordHash,
             role: normalizedRole,
             color: randomColor,
             firstLogin: true,
-        });
-        this._saveUsers(users);
+        };
+        await this._saveUser(newUser.username, newUser);
         return res.status(201).json({ success: true });
     }
 
     // Delete a user by username (admin only, cannot delete self).
-    deleteUser(req, res) {
+    async deleteUser(req, res) {
         const { username } = req.params;
         const session = this.verifyToken(this.extractToken(req));
         if (!username || typeof username !== 'string') {
@@ -715,16 +728,13 @@ class AdminSessionApi {
             return res.status(400).json({ error: 'Cannot delete your own account' });
         }
 
-        const users = this._loadUsers();
-        const idx = users.findIndex(
-            (u) => u.username.toLowerCase() === username.trim().toLowerCase(),
-        );
-        if (idx === -1) {
+        const users = await this._loadUsers();
+        const user = users.find((u) => u.username.toLowerCase() === username.trim().toLowerCase());
+        if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        users.splice(idx, 1);
-        this._saveUsers(users);
+        await this._deleteUserDoc(user.username);
         // Invalidate any active sessions for the deleted user.
         for (const [token, s] of this.sessions) {
             if (s.username.toLowerCase() === username.trim().toLowerCase()) {
@@ -735,7 +745,7 @@ class AdminSessionApi {
     }
 
     // Update a user's role (admin only, cannot demote self).
-    updateUserRole(req, res) {
+    async updateUserRole(req, res) {
         const { username } = req.params;
         const { role } = req.body || {};
         const session = this.verifyToken(this.extractToken(req));
@@ -743,23 +753,21 @@ class AdminSessionApi {
         if (!username || typeof username !== 'string') {
             return res.status(400).json({ error: 'Username is required' });
         }
-        if (!['admin', 'operator'].includes(role)) {
-            return res.status(400).json({ error: 'Role must be "admin" or "operator"' });
+        if (!['admin', 'operator', 'tester'].includes(role)) {
+            return res.status(400).json({ error: 'Role must be "admin", "operator", or "tester"' });
         }
         if (session && session.username.toLowerCase() === username.trim().toLowerCase()) {
             return res.status(400).json({ error: 'Cannot change your own role' });
         }
 
-        const users = this._loadUsers();
-        const idx = users.findIndex(
-            (u) => u.username.toLowerCase() === username.trim().toLowerCase(),
-        );
-        if (idx === -1) {
+        const users = await this._loadUsers();
+        const user = users.find((u) => u.username.toLowerCase() === username.trim().toLowerCase());
+        if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        users[idx].role = role;
-        this._saveUsers(users);
+        user.role = role;
+        await this._saveUser(user.username, user);
         return res.json({ success: true });
     }
 
@@ -770,22 +778,20 @@ class AdminSessionApi {
             return res.status(400).json({ error: 'Username is required' });
         }
 
-        const users = this._loadUsers();
-        const idx = users.findIndex(
-            (u) => u.username.toLowerCase() === username.trim().toLowerCase(),
-        );
-        if (idx === -1) {
+        const users = await this._loadUsers();
+        const user = users.find((u) => u.username.toLowerCase() === username.trim().toLowerCase());
+        if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        users[idx].password = await bcrypt.hash('cubingtools', BCRYPT_ROUNDS);
-        users[idx].firstLogin = true;
-        this._saveUsers(users);
+        user.password = await bcrypt.hash('cubingtools', BCRYPT_ROUNDS);
+        user.firstLogin = true;
+        await this._saveUser(user.username, user);
         return res.json({ success: true });
     }
 
     // Assign or unassign a message to a specific admin user.
-    handleAssignMessage(req, res) {
+    async handleAssignMessage(req, res) {
         const id = String(req?.params?.id || '').trim();
         if (!id) {
             return res.status(400).json({ error: 'Message id required' });
@@ -795,7 +801,7 @@ class AdminSessionApi {
         const normalizedAssignee = String(assignedTo || '').trim() || null;
 
         if (normalizedAssignee) {
-            const users = this._loadUsers();
+            const users = await this._loadUsers();
             const exists = users.some(
                 (u) => u.username.toLowerCase() === normalizedAssignee.toLowerCase(),
             );
@@ -804,7 +810,7 @@ class AdminSessionApi {
             }
         }
 
-        const updated = contactApi.assignMessage(id, normalizedAssignee);
+        const updated = await contactApi.assignMessage(id, normalizedAssignee);
         if (!updated) {
             return res.status(404).json({ error: 'Message not found' });
         }
@@ -813,7 +819,7 @@ class AdminSessionApi {
     }
 
     // Mark or unmark a message as done (admin or assigned user only).
-    handleMarkMessageDone(req, res) {
+    async handleMarkMessageDone(req, res) {
         const id = String(req?.params?.id || '').trim();
         if (!id) {
             return res.status(400).json({ error: 'Message id required' });
@@ -823,7 +829,7 @@ class AdminSessionApi {
         const isDone = Boolean(done);
         const { username, role } = req.adminUser;
 
-        const messages = contactApi.getMessages();
+        const messages = await contactApi.getMessages();
         const message = messages.find((m) => m.id === id);
         if (!message) {
             return res.status(404).json({ error: 'Message not found' });
@@ -833,7 +839,7 @@ class AdminSessionApi {
             return res.status(403).json({ error: 'Not authorized to mark this message done' });
         }
 
-        const updated = contactApi.markMessageDone(id, isDone);
+        const updated = await contactApi.markMessageDone(id, isDone);
         if (!updated) {
             return res.status(404).json({ error: 'Message not found' });
         }
@@ -842,20 +848,20 @@ class AdminSessionApi {
     }
 
     // Return moderation data for admin UI.
-    getAdminMessages(req, res) {
-        const messages = contactApi.getMessages();
+    async getAdminMessages(req, res) {
+        const messages = await contactApi.getMessages();
         const bans = contactApi.getBans();
         return res.json({ messages, bans });
     }
 
     // Delete one queued/confirmed message by ID.
-    deleteAdminMessage(req, res) {
+    async deleteAdminMessage(req, res) {
         const id = String(req?.params?.id || '').trim();
         if (!id) {
             return res.status(400).json({ error: 'Message id required' });
         }
 
-        const removed = contactApi.removeMessage(id);
+        const removed = await contactApi.removeMessage(id);
         if (!removed) {
             return res.status(404).json({ error: 'Message not found' });
         }
@@ -926,24 +932,25 @@ class AdminSessionApi {
         return res.json({ success: true, bans: contactApi.getBans() });
     }
 
-    // Read per-task completion history from disk.
-    _loadTaskCompletions() {
-        try {
-            return JSON.parse(fs.readFileSync(this.taskCompletionsPath, 'utf8'));
-        } catch {
-            return {};
+    // Read per-task completion history from Firestore.
+    async _loadTaskCompletions() {
+        const snapshot = await db.collection('taskCompletions').get();
+        const completions = {};
+        for (const doc of snapshot.docs) {
+            completions[doc.id] = doc.data().entries || [];
         }
+        return completions;
     }
 
-    // Persist task completions to disk.
-    _saveTaskCompletions(completions) {
-        fs.writeFileSync(this.taskCompletionsPath, JSON.stringify(completions, null, 4), 'utf8');
+    // Persist a single task's completion entries to Firestore.
+    async _saveTaskCompletion(taskId, entries) {
+        await db.collection('taskCompletions').doc(taskId).set({ entries });
     }
 
     // Evaluate whether a task's data condition is currently satisfied.
-    _evaluateCondition(condition) {
+    async _evaluateCondition(condition) {
         if (!condition) return true;
-        const messages = contactApi.getMessages();
+        const messages = await contactApi.getMessages();
         const confirmedMessages = messages.filter((m) => m.confirmed);
         switch (condition) {
             case 'hasPendingMessages':
@@ -959,14 +966,17 @@ class AdminSessionApi {
         }
     }
 
-    // Return task definitions from the tasks JSON file, enriched with live applicability.
-    handleGetTasks(req, res) {
+    // Return task definitions from Firestore, enriched with live applicability.
+    async handleGetTasks(req, res) {
         try {
-            const tasks = JSON.parse(fs.readFileSync(this.tasksPath, 'utf8'));
-            const enriched = tasks.map((task) => ({
-                ...task,
-                applicable: this._evaluateCondition(task.condition),
-            }));
+            const snapshot = await db.collection('tasks').get();
+            const tasks = snapshot.docs.map((doc) => doc.data());
+            const enriched = await Promise.all(
+                tasks.map(async (task) => ({
+                    ...task,
+                    applicable: await this._evaluateCondition(task.condition),
+                })),
+            );
             return res.json({ tasks: enriched });
         } catch {
             return res.status(500).json({ error: 'Failed to load tasks.' });
@@ -974,24 +984,24 @@ class AdminSessionApi {
     }
 
     // Return all completion history for all tasks.
-    handleGetTaskCompletions(req, res) {
-        const completions = this._loadTaskCompletions();
+    async handleGetTaskCompletions(req, res) {
+        const completions = await this._loadTaskCompletions();
         return res.json({ completions });
     }
 
     // Record a task completion for the authenticated user.
-    handleMarkTaskDone(req, res) {
+    async handleMarkTaskDone(req, res) {
         const taskId = String(req?.params?.taskId || '').trim();
         if (!taskId) return res.status(400).json({ error: 'Missing task ID.' });
 
         const { username } = req.adminUser;
-        const completions = this._loadTaskCompletions();
+        const completions = await this._loadTaskCompletions();
         if (!Array.isArray(completions[taskId])) completions[taskId] = [];
         completions[taskId].unshift({ username, completedAt: new Date().toISOString() });
         // Keep at most 100 entries per task to prevent unbounded growth.
         if (completions[taskId].length > 100)
             completions[taskId] = completions[taskId].slice(0, 100);
-        this._saveTaskCompletions(completions);
+        await this._saveTaskCompletion(taskId, completions[taskId]);
         return res.json({ success: true });
     }
 }
@@ -1003,7 +1013,6 @@ class ContactApi {
         this.projectID = process.env.RECAPTCHA_PROJECT_ID || '';
         this.recaptchaKey = process.env.RECAPTCHA_SITE_KEY || '';
         this.recaptchaAction = process.env.RECAPTCHA_ACTION || '';
-        this.mailsPath = path.join(__dirname, 'mail', 'mails.json');
         this.bansPath = path.join(__dirname, 'mail', 'bans.json');
         // Pending confirmation messages auto-expire to keep storage clean.
         this.unconfirmedTtlMs = 60 * 60 * 1000;
@@ -1202,7 +1211,7 @@ class ContactApi {
     }
 
     // Entry point for contact and confirmation endpoints.
-    handleRequest(req, res) {
+    async handleRequest(req, res) {
         const {
             name,
             email,
@@ -1219,7 +1228,7 @@ class ContactApi {
         const { id } = req.query;
 
         if (id) {
-            const valid = this.validateConfirmationLink(id);
+            const valid = await this.validateConfirmationLink(id);
             if (valid) {
                 return res.redirect(302, '/contact?status=confirmed');
             } else {
@@ -1464,14 +1473,12 @@ class ContactApi {
         }
     }
 
-    // Save pending confirmation payload until user clicks confirmation link.
-    saveMessage({ id, sec_ip, name, email, tool, message, visits, recaptcha_score }) {
-        let mails = this.readMailsFile();
-        const pruneResult = this.pruneExpiredUnconfirmedMails(mails);
-        mails = pruneResult.mails;
+    // Save pending confirmation payload to Firestore.
+    async saveMessage({ id, sec_ip, name, email, tool, message, visits, recaptcha_score }) {
+        await this.pruneExpiredUnconfirmedMails();
 
-        mails.push({
-            id: id,
+        const doc = {
+            id,
             secured_ip: sec_ip,
             name,
             email,
@@ -1481,50 +1488,39 @@ class ContactApi {
             timestamp: new Date().toISOString(),
             recaptcha_score: recaptcha_score,
             confirmed: false,
-        });
+        };
 
-        fs.writeFileSync(this.mailsPath, JSON.stringify(mails, null, 2), 'utf8');
+        await db.collection('messages').doc(id).set(doc);
     }
 
-    // Read queued messages with fault-tolerant parsing.
-    readMailsFile() {
-        if (!fs.existsSync(this.mailsPath)) {
-            return [];
-        }
-
-        try {
-            const parsed = JSON.parse(fs.readFileSync(this.mailsPath, 'utf8'));
-            return Array.isArray(parsed) ? parsed : [];
-        } catch {
-            return [];
-        }
+    // Read all messages from Firestore.
+    async readMessages() {
+        const snapshot = await db.collection('messages').get();
+        return snapshot.docs.map((doc) => doc.data());
     }
 
-    // Drop unconfirmed messages older than TTL.
-    pruneExpiredUnconfirmedMails(mails) {
+    // Drop unconfirmed messages older than TTL from Firestore.
+    async pruneExpiredUnconfirmedMails() {
         const cutoff = Date.now() - this.unconfirmedTtlMs;
+        const snapshot = await db.collection('messages').where('confirmed', '==', false).get();
+
+        const batch = db.batch();
         let changed = false;
 
-        const filtered = mails.filter((mail) => {
-            if (mail?.confirmed) {
-                return true;
-            }
-
-            const timestampMs = Date.parse(mail?.timestamp || '');
-            if (Number.isNaN(timestampMs)) {
-                return true;
-            }
-
-            const isExpired = timestampMs < cutoff;
-            if (isExpired) {
+        for (const doc of snapshot.docs) {
+            const data = doc.data();
+            const timestampMs = Date.parse(data?.timestamp || '');
+            if (!Number.isNaN(timestampMs) && timestampMs < cutoff) {
+                batch.delete(doc.ref);
                 changed = true;
-                return false;
             }
+        }
 
-            return true;
-        });
+        if (changed) {
+            await batch.commit();
+        }
 
-        return { mails: filtered, changed };
+        return { changed };
     }
 
     // Attach appeal metadata to matching ban entries.
@@ -1811,128 +1807,83 @@ class ContactApi {
     }
 
     // Confirm queued message by id and forward to final inbox.
-    validateConfirmationLink(id) {
+    async validateConfirmationLink(id) {
         // Confirmation IDs are 32-character lowercase hex strings.
         if (!id || !/^[0-9a-f]{32}$/.test(String(id))) {
             return false;
         }
 
-        if (!fs.existsSync(this.mailsPath)) {
+        await this.pruneExpiredUnconfirmedMails();
+
+        const docRef = db.collection('messages').doc(id);
+        const doc = await docRef.get();
+        if (!doc.exists) {
             return false;
         }
 
-        let mails = this.readMailsFile();
-        if (!mails.length) {
-            return false;
-        }
-
-        const pruneResult = this.pruneExpiredUnconfirmedMails(mails);
-        mails = pruneResult.mails;
-
-        const mailIndex = mails.findIndex((mail) => mail.id === id);
-        if (mailIndex === -1) {
-            if (pruneResult.changed) {
-                fs.writeFileSync(this.mailsPath, JSON.stringify(mails, null, 2), 'utf8');
-            }
-            return false;
-        }
-
-        const mail = mails[mailIndex];
+        const mail = doc.data();
         if (mail.confirmed) {
             return false;
         }
 
         mail.confirmed = true;
-        mails[mailIndex] = mail;
-        fs.writeFileSync(this.mailsPath, JSON.stringify(mails, null, 2), 'utf8');
+        await docRef.set(mail);
 
         this.sendMail(mail);
 
         return true;
     }
 
-    // Delete message by id from local storage.
-    removeMessage(id) {
-        if (!fs.existsSync(this.mailsPath)) {
+    // Delete message by id from Firestore.
+    async removeMessage(id) {
+        const docRef = db.collection('messages').doc(String(id));
+        const doc = await docRef.get();
+        if (!doc.exists) {
             return false;
         }
 
-        let mails = this.readMailsFile();
-        if (!mails.length) {
-            return false;
-        }
-
-        const pruneResult = this.pruneExpiredUnconfirmedMails(mails);
-        mails = pruneResult.mails;
-
-        const mailIndex = mails.findIndex((mail) => mail.id === id);
-        if (mailIndex === -1) {
-            if (pruneResult.changed) {
-                fs.writeFileSync(this.mailsPath, JSON.stringify(mails, null, 2), 'utf8');
-            }
-            return false;
-        }
-
-        // Remove the mail from the pending list
-        mails.splice(mailIndex, 1);
-        fs.writeFileSync(this.mailsPath, JSON.stringify(mails, null, 2), 'utf8');
-
+        await docRef.delete();
         return true;
     }
 
     // Set or clear the assignedTo field on a message.
-    assignMessage(id, assignedTo) {
+    async assignMessage(id, assignedTo) {
         if (!id || !/^[0-9a-f]{32}$/.test(String(id))) {
             return false;
         }
 
-        const mails = this.readMailsFile();
-        const idx = mails.findIndex((mail) => mail.id === id);
-        if (idx === -1) {
+        const docRef = db.collection('messages').doc(id);
+        const doc = await docRef.get();
+        if (!doc.exists) {
             return false;
         }
 
-        mails[idx] = { ...mails[idx], assignedTo: String(assignedTo || '').trim() || null };
-        fs.writeFileSync(this.mailsPath, JSON.stringify(mails, null, 2), 'utf8');
+        await docRef.update({ assignedTo: String(assignedTo || '').trim() || null });
         return true;
     }
 
-    // Set or clear the done status on a message; returns { success, assignedTo } or false.
-    markMessageDone(id, done) {
+    // Set or clear the done status on a message; returns { assignedTo } or false.
+    async markMessageDone(id, done) {
         if (!id || !/^[0-9a-f]{32}$/.test(String(id))) {
             return false;
         }
 
-        const mails = this.readMailsFile();
-        const idx = mails.findIndex((mail) => mail.id === id);
-        if (idx === -1) {
+        const docRef = db.collection('messages').doc(id);
+        const doc = await docRef.get();
+        if (!doc.exists) {
             return false;
         }
 
-        mails[idx] = { ...mails[idx], status: done ? 'done' : null };
-        fs.writeFileSync(this.mailsPath, JSON.stringify(mails, null, 2), 'utf8');
-        return { assignedTo: mails[idx].assignedTo || null };
+        await docRef.update({ status: done ? 'done' : null });
+        const data = doc.data();
+        return { assignedTo: data.assignedTo || null };
     }
 
     // Return all messages after pruning expired unconfirmed entries.
-    getMessages() {
-        if (!fs.existsSync(this.mailsPath)) {
-            return [];
-        }
-
-        let mails = this.readMailsFile();
-        if (!mails.length) {
-            return [];
-        }
-
-        const pruneResult = this.pruneExpiredUnconfirmedMails(mails);
-        mails = pruneResult.mails;
-
-        if (pruneResult.changed) {
-            fs.writeFileSync(this.mailsPath, JSON.stringify(mails, null, 2), 'utf8');
-        }
-
-        return mails;
+    async getMessages() {
+        await this.pruneExpiredUnconfirmedMails();
+        const snapshot = await db.collection('messages').get();
+        return snapshot.docs.map((doc) => doc.data());
     }
 }
 
@@ -1960,11 +1911,11 @@ router.post('/api/admin/change-password', adminChangePasswordLimiter, (req, res)
     adminSessionApi.handleChangePassword(req, res),
 );
 
-// User management endpoints (admin only).
+// User management endpoints (read: admin + operator, write: admin only).
 router.get(
     '/api/admin/users',
     adminUsersReadLimiter,
-    adminSessionApi.requireAdmin.bind(adminSessionApi),
+    adminSessionApi.requireOperatorOrAdmin.bind(adminSessionApi),
     (req, res) => adminSessionApi.listUsers(req, res),
 );
 
@@ -2018,6 +1969,43 @@ router.post(
     (req, res) => statusApi.handleRequest(req, res),
 );
 
+// Error rate threshold config endpoints.
+const configPath = path.join(__dirname, '..', 'config.json');
+
+router.get(
+    '/api/admin/config/error-rate-threshold',
+    adminStatusLimiter,
+    adminSessionApi.requireAuth.bind(adminSessionApi),
+    (req, res) => {
+        try {
+            const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+            return res.json({ threshold: config.error_rate_threshold ?? 1 });
+        } catch {
+            return res.json({ threshold: 1 });
+        }
+    },
+);
+
+router.patch(
+    '/api/admin/config/error-rate-threshold',
+    adminStatusLimiter,
+    adminSessionApi.requireAdmin.bind(adminSessionApi),
+    (req, res) => {
+        const { threshold } = req.body || {};
+        if (typeof threshold !== 'number' || threshold < 0 || threshold > 25) {
+            return res.status(400).json({ error: 'Threshold must be a number between 0 and 25.' });
+        }
+        try {
+            const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+            config.error_rate_threshold = threshold;
+            fs.writeFileSync(configPath, JSON.stringify(config, null, 4), 'utf8');
+            return res.json({ success: true, threshold });
+        } catch {
+            return res.status(500).json({ error: 'Failed to update config.' });
+        }
+    },
+);
+
 // Protected TODO read endpoint.
 router.get(
     '/api/admin/todos',
@@ -2054,11 +2042,11 @@ router.post(
     },
 );
 
-// Protected moderation and ban-management endpoints.
+// Protected moderation and ban-management endpoints (operator or admin only).
 router.get(
     '/api/admin/messages',
     adminMessagesReadLimiter,
-    adminSessionApi.requireAuth.bind(adminSessionApi),
+    adminSessionApi.requireOperatorOrAdmin.bind(adminSessionApi),
     (req, res) => adminSessionApi.getAdminMessages(req, res),
 );
 
@@ -2072,42 +2060,42 @@ router.delete(
 router.get(
     '/api/admin/messages/bans',
     adminMessagesReadLimiter,
-    adminSessionApi.requireAuth.bind(adminSessionApi),
+    adminSessionApi.requireOperatorOrAdmin.bind(adminSessionApi),
     (req, res) => adminSessionApi.getAdminBans(req, res),
 );
 
 router.post(
     '/api/admin/messages/ban',
     adminMessagesBanLimiter,
-    adminSessionApi.requireAuth.bind(adminSessionApi),
+    adminSessionApi.requireOperatorOrAdmin.bind(adminSessionApi),
     (req, res) => adminSessionApi.addAdminBan(req, res),
 );
 
 router.post(
     '/api/admin/messages/unban',
     adminMessagesBanLimiter,
-    adminSessionApi.requireAuth.bind(adminSessionApi),
+    adminSessionApi.requireOperatorOrAdmin.bind(adminSessionApi),
     (req, res) => adminSessionApi.removeAdminBan(req, res),
 );
 
 router.post(
     '/api/admin/messages/appeal/resolve',
     adminMessagesBanLimiter,
-    adminSessionApi.requireAuth.bind(adminSessionApi),
+    adminSessionApi.requireOperatorOrAdmin.bind(adminSessionApi),
     (req, res) => adminSessionApi.resolveAdminAppeal(req, res),
 );
 
 router.patch(
     '/api/admin/messages/:id/assign',
     adminMessagesWriteLimiter,
-    adminSessionApi.requireAuth.bind(adminSessionApi),
+    adminSessionApi.requireOperatorOrAdmin.bind(adminSessionApi),
     (req, res) => adminSessionApi.handleAssignMessage(req, res),
 );
 
 router.patch(
     '/api/admin/messages/:id/done',
     adminMessagesWriteLimiter,
-    adminSessionApi.requireAuth.bind(adminSessionApi),
+    adminSessionApi.requireOperatorOrAdmin.bind(adminSessionApi),
     (req, res) => adminSessionApi.handleMarkMessageDone(req, res),
 );
 

@@ -353,6 +353,33 @@
     min-width: 40px;
 }
 
+.admin-threshold-slider {
+    width: 160px;
+    cursor: pointer;
+    accent-color: var(--accent);
+}
+
+.admin-threshold-number {
+    width: 4.5ch;
+    padding: 2px 4px;
+    border: 1px solid var(--border);
+    border-radius: var(--main-radius);
+    background: var(--card-bg);
+    color: var(--primary-text);
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.admin-threshold-number::-webkit-inner-spin-button {
+    display: none;
+}
+
+.admin-threshold-value {
+    font-size: 0.875rem;
+    color: var(--secondary-text);
+}
+
 /* ---------- Page-level alert banners ---------- */
 
 .admin-page-alert {

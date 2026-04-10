@@ -29,9 +29,9 @@ function initAdminNav(role, currentPage, username, color) {
 
     const pages = [
         { id: 'status', label: 'Status', href: '/admin/status' },
-        { id: 'messages', label: 'Messages', href: '/admin/messages' },
+        { id: 'messages', label: 'Messages', href: '/admin/messages', minRole: 'operator' },
         { id: 'dev-todo', label: 'Dev Todo', href: '/admin/dev-todo' },
-        { id: 'users', label: 'Users', href: '/admin/users', adminOnly: true },
+        { id: 'users', label: 'Users', href: '/admin/users', minRole: 'operator' },
     ];
 
     const nav = document.createElement('nav');
@@ -56,8 +56,10 @@ function initAdminNav(role, currentPage, username, color) {
     sep.setAttribute('aria-hidden', 'true');
     linksWrap.appendChild(sep);
 
+    const roleLevel = { admin: 2, operator: 1, tester: 0 };
+
     pages.forEach((page) => {
-        if (page.adminOnly && role !== 'admin') return;
+        if (page.minRole && roleLevel[role] < roleLevel[page.minRole]) return;
 
         const a = document.createElement('a');
         a.href = page.href;
@@ -85,7 +87,8 @@ function initAdminNav(role, currentPage, username, color) {
 
     const badge = document.createElement('span');
     badge.className = 'admin-subnav__role';
-    badge.textContent = role === 'admin' ? 'Admin' : 'Operator';
+    const roleLabels = { admin: 'Admin', operator: 'Operator', tester: 'Tester' };
+    badge.textContent = roleLabels[role] || role;
     actions.appendChild(badge);
 
     const logoutBtn = document.createElement('button');
@@ -151,19 +154,29 @@ async function loadNavBadges() {
 
     // Status badge: elevated error rate
     try {
-        const res = await fetch('/api/admin/status', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: '{}',
-        });
-        if (res.ok) {
-            const data = await res.json();
+        const [statusRes, threshRes] = await Promise.all([
+            fetch('/api/admin/status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: '{}',
+            }),
+            fetch('/api/admin/config/error-rate-threshold', {
+                headers: { Authorization: `Bearer ${token}` },
+            }),
+        ]);
+        let threshold = 1;
+        if (threshRes.ok) {
+            const td = await threshRes.json();
+            threshold = td.threshold ?? 1;
+        }
+        if (statusRes.ok) {
+            const data = await statusRes.json();
             const errorRate = parseFloat(data.logs?.errorRate) || 0;
-            if (errorRate > 1) {
+            if (errorRate > threshold) {
                 setSubnavBadge(
                     'status',
                     '!',
-                    `Error rate ${data.logs?.errorRate} exceeds 1% threshold`,
+                    `Error rate ${data.logs?.errorRate} exceeds ${threshold}% threshold`,
                 );
             }
         }
