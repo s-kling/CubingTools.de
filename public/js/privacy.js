@@ -1,5 +1,12 @@
 const policyFolder = '../html/privacy-policies/'; // Path to the folder containing policies
-const policies = ['2026-03-31', '2026-02-14', '2025-02-27', '2024-12-24', '2024-12-01']; // List of policy versions (filenames without .md)
+const policies = [
+    '2026-04-10',
+    '2026-03-31',
+    '2026-02-14',
+    '2025-02-27',
+    '2024-12-24',
+    '2024-12-01',
+]; // List of policy versions (filenames without .md)
 const termsFolder = '../html/terms/'; // Path to the folder containing terms
 const terms = ['2026-04-02'];
 
@@ -42,7 +49,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Select the correct option in the dropdown
             dropdown.value = `${fileType}:${latestVersion}`;
         } else {
-            const optionToSelect = dropdown.querySelector(`option[value="${fileType}:${versionParam}"]`);
+            const optionToSelect = dropdown.querySelector(
+                `option[value="${fileType}:${versionParam}"]`,
+            );
             if (optionToSelect) {
                 optionToSelect.selected = true;
                 const [file, version] = optionToSelect.value.split(':');
@@ -54,11 +63,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 content.innerHTML = `<p>Invalid version specified in URL. Please select a valid version from the dropdown.</p>`;
                 window.showUserErrorPopup({
                     title: 'Invalid policy version',
-                    message: 'The version specified in the URL is not valid. Please select a valid version from the dropdown.',
-                    reportTitle: 'Privacy policy page failed to load due to invalid version parameter',
+                    message:
+                        'The version specified in the URL is not valid. Please select a valid version from the dropdown.',
+                    reportTitle:
+                        'Privacy policy page failed to load due to invalid version parameter',
                     reportContext: `An invalid version parameter (${versionParam}) was provided in the URL.`,
                     dedupeKey: `privacy-policy-invalid-version:${versionParam}`,
-                    });
+                });
             }
         }
     }
@@ -67,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Function to fetch and render markdown content
 function loadMarkdown(file, version) {
     let folder = file === 'policy' ? policyFolder : termsFolder;
-    
+
     const filePath = `${folder}${version}.md`;
     fetch(filePath)
         .then((response) => {

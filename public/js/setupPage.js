@@ -1,4 +1,4 @@
-let currentPrivacyPolicyVersion = '2026-03-31';
+let currentPrivacyPolicyVersion = '2026-04-10';
 const GITHUB_BUG_REPORT_URL = 'https://github.com/s-kling/cubingtools.de/issues/new';
 const USER_ERROR_POPUP_COOLDOWN_MS = 20000;
 const recentUserFeedbackPopups = new Map();

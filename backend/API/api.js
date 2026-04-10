@@ -107,11 +107,10 @@ const wcaLimiter = createRateLimiter(
 );
 
 // Encapsulates WCA profile fetch + result aggregation helpers used by the public API.
+// Uses the official WCA API v0 (https://www.worldcubeassociation.org/api/v0/).
 class WcaApi {
     constructor() {
-        // Raw GitHub-hosted JSON snapshots for WCA persons.
-        this.baseUrl =
-            'https://raw.githubusercontent.com/robiningelbrecht/wca-rest-api/master/api/persons';
+        this.baseUrl = 'https://www.worldcubeassociation.org/api/v0/persons';
         // Keep fetched responses for a short period to reduce upstream requests.
         this.cacheTtlMs = 5 * 60 * 1000;
         this.responseCache = new Map();
@@ -140,7 +139,13 @@ class WcaApi {
         }
     }
 
+    // Strip padding zeros from an attempts array (unused slots in bo3/bo1 formats).
+    filterAttempts(attempts) {
+        return attempts.filter((a) => a !== 0);
+    }
+
     // Fetch competitor data with de-duplication for in-flight requests.
+    // Combines person info and results from two official WCA API endpoints.
     async fetchCompetitorData(wcaId) {
         const cacheKey = this.normalizeWcaId(wcaId);
         const now = Date.now();
@@ -160,14 +165,21 @@ class WcaApi {
             this.responseCache.delete(cacheKey);
         }
 
-        const requestPromise = axios
-            .get(`${this.baseUrl}/${cacheKey}.json`)
-            .then((response) => {
+        const requestPromise = Promise.all([
+            axios.get(`${this.baseUrl}/${cacheKey}`),
+            axios.get(`${this.baseUrl}/${cacheKey}/results`),
+        ])
+            .then(([personResponse, resultsResponse]) => {
+                const data = {
+                    name: personResponse.data.person.name,
+                    personalRecords: personResponse.data.personal_records || {},
+                    results: Array.isArray(resultsResponse.data) ? resultsResponse.data : [],
+                };
                 this.responseCache.set(cacheKey, {
-                    data: response.data,
+                    data,
                     expiresAt: Date.now() + this.cacheTtlMs,
                 });
-                return response.data;
+                return data;
             })
             .catch((error) => {
                 this.responseCache.delete(cacheKey);
@@ -192,20 +204,18 @@ class WcaApi {
         return { name: data.name };
     }
 
-    // Flatten all rounds for one event across all competitions.
+    // Filter results for a specific event from the flat results array.
     getAllResultsForEvent(data, event) {
-        let allResults = [];
-        for (const competition of Object.values(data.results)) {
-            if (competition[event]) {
-                allResults = allResults.concat(competition[event]);
-            }
-        }
-        return allResults;
+        return data.results.filter((r) => r.event_id === event);
     }
 
     // Build a latest-solves list, keeping only valid solves.
+    // Results arrive oldest-first from the API, so reverse to get newest first.
     getSolves(allResults, solvecount) {
-        let solves = allResults.flatMap((result) => result.solves.reverse());
+        const reversed = [...allResults].reverse();
+        let solves = reversed.flatMap((result) =>
+            this.filterAttempts([...result.attempts].reverse()),
+        );
         solves = solves.filter((result) => result > 0).slice(0, solvecount);
         return solves;
     }
@@ -218,7 +228,7 @@ class WcaApi {
         solves.sort((a, b) => a - b);
         solves = solves.slice(1, -1); // drop fastest and slowest
         const sum = solves.reduce((a, b) => a + b, 0);
-        return sum / solves.length / 100; // convert ms → seconds
+        return sum / solves.length / 100; // convert centiseconds → seconds
     }
 
     // Return all average values for an event timeline.
@@ -226,11 +236,12 @@ class WcaApi {
         return allResults.flatMap((result) => result.average);
     }
 
-    // Pull current PRs from rank sections.
+    // Pull current PRs from the personal_records section.
     getPersonalRecords(data, event) {
+        const eventRecords = data.personalRecords[event];
         return {
-            single: data.rank.singles.find((e) => e.eventId === event)?.best || null,
-            average: data.rank.averages.find((e) => e.eventId === event)?.best || null,
+            single: eventRecords?.single?.best || null,
+            average: eventRecords?.average?.best || null,
         };
     }
 
@@ -256,8 +267,11 @@ class WcaApi {
             const solvecount = Number.isFinite(rawNum) && rawNum > 0 ? Math.min(rawNum, 200) : 12;
 
             if (getsolves) {
+                const reversed = [...allResults].reverse();
                 return res.json({
-                    allResults: allResults.flatMap((result) => result.solves.reverse()),
+                    allResults: reversed.flatMap((result) =>
+                        this.filterAttempts([...result.attempts].reverse()),
+                    ),
                 });
             } else if (getaverages) {
                 return res.json({ allAverages: this.getAverages(allResults) });
