@@ -139,6 +139,11 @@ async function fetchWCAData() {
         return;
     }
 
+    const btn = document.querySelector('#wcaIdFetch button');
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner"></span>';
+    btn.disabled = true;
+
     const apiUrl = `/api/wca/${wcaId}/${event}?getsolves=true`;
     try {
         const data = await window.fetchJsonOrThrow(apiUrl, {
@@ -171,6 +176,9 @@ async function fetchWCAData() {
             reportContext: `Fetching solve data failed for ${wcaId} in event ${event}.`,
             dedupeKey: `global-calc-wca:${wcaId}:${event}`,
         });
+    } finally {
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
     }
 }
 

@@ -3,6 +3,8 @@ const path = require('path');
 const router = express.Router();
 const events = require('../events');
 
+// Import logging from ../server.js
+
 // Allowlist: tool/asset names may only contain alphanumeric chars, hyphens, and underscores.
 const SAFE_NAME_RE = /^[a-zA-Z0-9_-]+$/;
 
@@ -98,8 +100,22 @@ router.get('/tools/:toolName', (req, res) => {
         return res.status(400).send('Bad Request');
     }
 
+    const pseudoNames = {
+        guildford: ['relay', 'optimizer', 'relay-optimizer'],
+        grouping: ['groupifier'],
+    };
+
+    // If the toolName provided is a pseudo-name, find the real tool name that matches it.
+    let realToolName = toolName;
+    for (const [realName, aliases] of Object.entries(pseudoNames)) {
+        if (aliases.includes(toolName)) {
+            realToolName = realName;
+            break;
+        }
+    }
+
     const toolsBase = path.resolve(__dirname, '../../public/tools');
-    const filePath = resolvePathSafe(toolsBase, toolName, `${toolName}.html`);
+    const filePath = resolvePathSafe(toolsBase, realToolName, `${realToolName}.html`);
 
     if (!filePath) {
         return res.status(400).send('Bad Request');

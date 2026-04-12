@@ -101,6 +101,10 @@ function logRequest(req, res, startTime) {
         userAgent: req.headers['user-agent'] || null,
     };
 
+    if (req.query.utm_source) {
+        entry.utmSource = req.query.utm_source;
+    }
+
     const line = JSON.stringify(entry) + '\n';
 
     logStream.write(line);

@@ -50,6 +50,7 @@
 
     <!-- JS Files -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P" defer></script>
+    <script src="https://cdn.cubing.net/v0/js/cubing/twisty" type="module"></script>
     <script src="../../js/setupPage.js" defer></script>
     <script src="/js/average" defer></script>
 </head>
@@ -65,14 +66,21 @@
         <div id="version"></div>
 
         <main>
-            <!-- Top controls -->
-            <div class="controls">
-                <input type="text" id="wca" placeholder="WCA ID (e.g. 2023KLIN02)" />
-                <label>
-                <input type="checkbox" id="usePrTarget" />
-                    Use PR Average as Target
-                </label>
-                <input type="text" id="target" placeholder="Target (0.00)" />
+            <!-- Sub-navbar (CubeTime style) -->
+            <div class="sub-navbar">
+                <div class="sub-navbar-track">
+                    <div class="sub-navbar-indicator" id="subNavIndicator"></div>
+                    <button class="sub-navbar-tab active" data-tab="timer">Timer</button>
+                    <button class="sub-navbar-tab" data-tab="stats">Stats</button>
+                    <button class="sub-navbar-tab" data-tab="settings">Settings</button>
+                </div>
+            </div>
+
+            <!-- Timer Page -->
+            <div class="page-view active" id="page-timer">
+
+            <!-- Hidden controls (synced from settings) -->
+            <div style="display:none">
                 <select id="event-type">
                     <option value="333">3x3x3</option>
                     <option value="222">2x2x2</option>
@@ -90,31 +98,289 @@
                     <option value="444bf">4x4 BLD</option>
                     <option value="555bf">5x5 BLD</option>
                 </select>
+                <input type="text" id="wca" />
+                <input type="text" id="target" />
+                <input type="checkbox" id="usePrTarget" />
+                <button id="modeInput"></button>
+                <button id="modeTimer"></button>
             </div>
 
-            <!-- Layout grid: sidebar + main area -->
+            <!-- Layout grid: main area -->
             <div class="layout">
-                <!-- Left sidebar: averages -->
-                <aside id="averages-list">
-                    <h3>Averages</h3>
-                    <ul id="tagContainer"></ul>
-                </aside>
-
                 <!-- Main area -->
                 <section class="timer-area">
-                    <!-- Big input -->
-                    <input type="number" id="timeInput" placeholder="0.00" autofocus />
+                    <!-- Event picker + target -->
+                    <div class="timer-toolbar">
+                        <select class="timer-event-select" id="timerEventSelect">
+                            <option value="333">3x3x3</option>
+                            <option value="222">2x2x2</option>
+                            <option value="444">4x4x4</option>
+                            <option value="555">5x5x5</option>
+                            <option value="666">6x6x6</option>
+                            <option value="777">7x7x7</option>
+                            <option value="333bf">3x3 BLD</option>
+                            <option value="333oh">3x3 OH</option>
+                            <option value="clock">Clock</option>
+                            <option value="minx">Megaminx</option>
+                            <option value="pyram">Pyraminx</option>
+                            <option value="skewb">Skewb</option>
+                            <option value="sq1">Square-1</option>
+                            <option value="444bf">4x4 BLD</option>
+                            <option value="555bf">5x5 BLD</option>
+                        </select>
+                        <span class="timer-target" id="timerTarget" title="Target time"></span>
+                    </div>
+                    <!-- Scramble display -->
+                    <div class="scramble-container">
+                        <p class="scramble-text" id="scrambleText">Loading scramble...</p>
+                        <button class="icon-btn" id="newScrambleBtn" title="New scramble">↻</button>
+                    </div>
 
-                    <div id="currentTimes" class="time-list"></div>
+                    <!-- Progress indicator -->
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="progress-label" id="progressLabel">0 / 5 solves</div>
 
-                    <!-- Stats -->
-                    <div class="stats">
-                        <div><strong>Mean:</strong> <span id="mean">0.00</span></div>
-                        <div id="bpa-div"><strong>BPA:</strong> <span id="bpa">-</span></div>
-                        <div id="wpa-div"><strong>WPA:</strong> <span id="wpa">-</span></div>
-                        <div title="Time For Target"><strong>TFT:</strong> <span id="tft">–</span></div>
+                    <!-- Manual input (default) -->
+                    <div id="inputMode">
+                        <input type="text" id="timeInput" placeholder="0.00" autofocus />
+                    </div>
+
+                    <!-- Timer mode (hidden by default) -->
+                    <div id="timerMode" hidden>
+                        <div class="timer-display" id="timerDisplay">0.00</div>
                     </div>
                 </section>
+            </div>
+
+            <!-- Bottom row: scramble drawing + solves + stats -->
+            <div class="bottom-row">
+                <div class="scramble-box" id="scrambleDrawing">
+                    <twisty-player
+                        id="scrambleViewer"
+                        visualization="2D"
+                        control-panel="none"
+                        background="none"
+                        hint-facelets="none"
+                        puzzle="3x3x3"
+                    ></twisty-player>
+                </div>
+                <aside id="solves-list" class="bottom-solves">
+                    <div class="solves-header">
+                        <h3>Solves</h3>
+                        <button class="icon-btn" id="undoBtn" title="Undo last solve" disabled>↩</button>
+                    </div>
+                    <div id="currentTimes" class="time-list"></div>
+                </aside>
+                <div class="stats-box">
+                    <div class="stats">
+                        <div class="stat-card">
+                            <span class="stat-label">Mean</span>
+                            <span class="stat-value" id="mean">0.00</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label" title="Best Possible Average">BPA</span>
+                            <span class="stat-value" id="bpa">-</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label" title="Worst Possible Average">WPA</span>
+                            <span class="stat-value" id="wpa">-</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label" title="Time For Target">For Target</span>
+                            <span class="stat-value" id="tft">–</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            </div><!-- /page-timer -->
+
+            <!-- Mobile penalty sheet (swipe down to reveal) -->
+            <div class="mobile-penalty-sheet" id="mobilePenaltySheet" hidden>
+                <div class="penalty-sheet-handle"></div>
+                <div class="penalty-sheet-time" id="penaltySheetTime">0.00</div>
+                <div class="penalty-sheet-buttons" id="penaltySheetButtons">
+                    <button class="penalty-btn confirm" id="penaltyOk" title="No penalty"><i class="fas fa-check"></i></button>
+                    <button class="penalty-btn plus2" id="penaltyPlus2" title="+2">+</button>
+                    <button class="penalty-btn dnf" id="penaltyDnf" title="DNF">x</button>
+                    <button class="penalty-btn edit" id="penaltyEdit" title="Edit"><i class="fas fa-pen"></i></button>
+                    <button class="penalty-btn delete" id="penaltyDelete" title="Delete"><i class="fas fa-times-circle"></i></button>
+                </div>
+            </div>
+
+            <!-- Stats Page -->
+            <div class="page-view" id="page-stats">
+                <div class="stats-page-content">
+                    <div class="session-overview">
+                        <div class="stat-card">
+                            <span class="stat-label">Session Best</span>
+                            <span class="stat-value" id="sessionBest">-</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Session Avg</span>
+                            <span class="stat-value" id="sessionAvg">-</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Averages</span>
+                            <span class="stat-value" id="sessionCount">0</span>
+                        </div>
+                    </div>
+                    <div class="averages-section">
+                        <div class="averages-header">
+                            <h3>Averages</h3>
+                            <div class="averages-actions">
+                                <button class="icon-btn" id="clearAllBtn" title="Clear all averages"><i class="fas fa-trash-alt"></i></button>
+                            </div>
+                        </div>
+                        <div class="averages-empty" id="averagesEmpty">
+                            <p>No averages yet.</p>
+                            <p class="hint">Complete <span id="solveCountHint">5</span> solves to record an average.</p>
+                        </div>
+                        <ul id="tagContainer"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Page -->
+            <div class="page-view" id="page-settings">
+                <div class="settings-page">
+                    <div class="settings-section">
+                        <h3 class="settings-section-title">Timer</h3>
+                        <div class="settings-row">
+                            <div class="settings-row-label">
+                                <span class="settings-label">Input Mode</span>
+                                <span class="settings-desc">Choose between typing times or using the stopwatch</span>
+                            </div>
+                            <div class="mode-toggle settings-mode-toggle">
+                                <button class="mode-btn active" id="settingsModeInput" title="Manual input">⌨ Type</button>
+                                <button class="mode-btn" id="settingsModeTimer" title="Stopwatch timer">⏱ Timer</button>
+                            </div>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-label">
+                                <span class="settings-label">Hold Duration</span>
+                                <span class="settings-desc">Time to hold Space before the timer is ready (ms)</span>
+                            </div>
+                            <input type="number" class="settings-input" id="settingsHoldDuration" value="300" min="0" max="2000" step="50" />
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3 class="settings-section-title">Event &amp; Target</h3>
+                        <div class="settings-row">
+                            <div class="settings-row-label">
+                                <span class="settings-label">Event</span>
+                                <span class="settings-desc">Puzzle type for scrambles and averages</span>
+                            </div>
+                            <select class="settings-input" id="settingsEvent">
+                                <option value="333">3x3x3</option>
+                                <option value="222">2x2x2</option>
+                                <option value="444">4x4x4</option>
+                                <option value="555">5x5x5</option>
+                                <option value="666">6x6x6</option>
+                                <option value="777">7x7x7</option>
+                                <option value="333bf">3x3 BLD</option>
+                                <option value="333oh">3x3 OH</option>
+                                <option value="clock">Clock</option>
+                                <option value="minx">Megaminx</option>
+                                <option value="pyram">Pyraminx</option>
+                                <option value="skewb">Skewb</option>
+                                <option value="sq1">Square-1</option>
+                                <option value="444bf">4x4 BLD</option>
+                                <option value="555bf">5x5 BLD</option>
+                            </select>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-label">
+                                <span class="settings-label">WCA ID</span>
+                                <span class="settings-desc">Link your WCA profile for PR comparisons</span>
+                            </div>
+                            <input type="text" class="settings-input" id="settingsWca" placeholder="e.g. 2023KLIN02" />
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-label">
+                                <span class="settings-label">Target Time</span>
+                                <span class="settings-desc">Goal time for TFT calculation</span>
+                            </div>
+                            <input type="text" class="settings-input" id="settingsTarget" placeholder="0.00" />
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-label">
+                                <span class="settings-label">Use PR as Target</span>
+                                <span class="settings-desc">Automatically set your PR as the target</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="settingsUsePr" />
+                                <span class="settings-toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3 class="settings-section-title">Session</h3>
+                        <div class="settings-row">
+                            <div class="settings-row-label">
+                                <span class="settings-label">Clear All Averages</span>
+                                <span class="settings-desc">Remove all saved averages for the current event</span>
+                            </div>
+                            <button class="settings-btn danger" id="settingsClearAll">Clear</button>
+                        </div>
+                    </div>
+                </div>
+            </div><!-- /page-settings -->
+
+            <!-- Confirm popup -->
+            <div class="edit-modal-backdrop" id="confirmPopup" hidden>
+                <div class="edit-modal">
+                    <h3 id="confirmPopupTitle">Are you sure?</h3>
+                    <p id="confirmPopupMessage" style="margin:0 0 16px;color:#A1A1AA;font-size:14px;"></p>
+                    <div class="edit-modal-actions">
+                        <button class="modal-btn cancel" id="confirmPopupCancel">Cancel</button>
+                        <button class="modal-btn confirm" id="confirmPopupConfirm">Delete</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Edit modal -->
+            <div class="edit-modal-backdrop" id="editModal" hidden>
+                <div class="edit-modal">
+                    <h3>Edit Time</h3>
+                    <input type="text" id="editTimeInput" placeholder="0.00" />
+                    <div class="edit-modal-actions">
+                        <button class="modal-btn cancel" id="editCancel">Cancel</button>
+                        <button class="modal-btn confirm" id="editConfirm">Save</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress popup -->
+            <div class="progress-popup-backdrop" id="progressPopup" hidden>
+                <div class="progress-popup">
+                    <h3 id="progressPopupTitle">Current Solves</h3>
+                    <div id="progressPopupContent" class="progress-popup-solves"></div>
+                    <button class="modal-btn cancel" id="progressPopupClose">Close</button>
+                </div>
+            </div>
+
+            <!-- Average detail popup -->
+            <div class="avg-detail-backdrop" id="avgDetailPopup" hidden>
+                <div class="avg-detail-popup">
+                    <div class="avg-detail-header">
+                        <h3 id="avgDetailTitle">Average</h3>
+                        <button class="avg-detail-close" id="avgDetailClose"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="avg-detail-summary">
+                        <div class="avg-detail-time" id="avgDetailTime">-</div>
+                        <div class="avg-detail-rank" id="avgDetailRank"></div>
+                    </div>
+                    <div class="avg-detail-solves" id="avgDetailSolves"></div>
+                    <div class="avg-detail-actions">
+                        <button class="modal-btn cancel" id="avgDetailShareBtn"><i class="fas fa-share-alt"></i> Share</button>
+                        <button class="modal-btn cancel" id="avgDetailDeleteBtn"><i class="fas fa-trash-alt"></i> Delete</button>
+                    </div>
+                </div>
             </div>
         </main>
         

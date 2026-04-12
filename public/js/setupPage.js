@@ -347,6 +347,33 @@ document.addEventListener('DOMContentLoaded', async () => {
                 dedupeKey: 'fifteenth-visit-feedback',
             });
         }
+
+        // One-Time popup as advertisement for the beta version
+        localStorage.setItem(
+            'beta_popup_shown',
+            localStorage.getItem('beta_popup_shown') || 'false',
+        );
+        // If on prod version, and at least 3 visits, and haven't shown the popup yet, show the popup
+        if (
+            (location.hostname === 'cubingtools.de' || location.port === '8001') &&
+            parseInt(localStorage.getItem('visits') || '0', 10) >= 3 &&
+            localStorage.getItem('beta_popup_shown') === 'false'
+        ) {
+            showUserFeedbackPopup({
+                title: 'Try our beta version!',
+                message:
+                    'Experience the latest features and improvements by trying out our beta version. Click the button below to switch to the beta release.',
+                variant: 'info',
+                eyebrow: 'New features',
+                primaryActionLabel: 'Try Beta',
+                primaryActionHref: location.href.replace('cubingtools.de', 'beta.cubingtools.de'),
+                primaryActionTarget: '_self',
+                primaryActionRel: '',
+                dismissLabel: 'No thanks',
+                dedupeKey: 'beta-version-promo',
+            });
+            localStorage.setItem('beta_popup_shown', 'true');
+        }
     }
 
     if (cookiesAccepted === currentPrivacyPolicyVersion) {

@@ -1,14 +1,15 @@
-const express = require('express');
 const axios = require('axios');
-const rateLimit = require('express-rate-limit');
-const router = express.Router();
-const path = require('path');
-const packageJson = require('../../package.json');
-const crypto = require('crypto');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
+const express = require('express');
 const fs = require('fs');
 const nodemailer = require('nodemailer');
+const path = require('path');
+const rateLimit = require('express-rate-limit');
+const router = express.Router();
+
 const { db } = require('../firebase');
+const packageJson = require('../../package.json');
 
 const BCRYPT_ROUNDS = 12;
 
@@ -105,6 +106,12 @@ const wcaLimiter = createRateLimiter(
     15 * 60 * 1000,
     180,
     'Too many WCA API requests, please try again later.',
+);
+
+const scrambleLimiter = createRateLimiter(
+    15 * 60 * 1000,
+    300,
+    'Too many scramble requests, please try again later.',
 );
 
 // Encapsulates WCA profile fetch + result aggregation helpers used by the public API.
@@ -337,6 +344,7 @@ class StatusApi {
             statusCodes: {},
             statusCodeUrls: {},
             userAgents: {},
+            utmSources: {},
             avgResponseTimeMs: {},
             errorRate: 0,
             peakHours: {},
@@ -362,6 +370,7 @@ class StatusApi {
                 status: entry.status ?? null,
                 durationMs: entry.durationMs ?? null,
                 userAgent: entry.userAgent || null,
+                utmSource: entry.utmSource || null,
             });
 
             stats.totalRequests++;
@@ -389,6 +398,11 @@ class StatusApi {
             // User agents
             if (entry.userAgent) {
                 stats.userAgents[entry.userAgent] = (stats.userAgents[entry.userAgent] || 0) + 1;
+            }
+
+            // UTM sources
+            if (entry.utmSource) {
+                stats.utmSources[entry.utmSource] = (stats.utmSources[entry.utmSource] || 0) + 1;
             }
 
             // Avg response time per endpoint
@@ -2136,6 +2150,93 @@ router.get('/api/wca/:wcaId/:event', wcaLimiter, (req, res) => wcaApi.handleRequ
 // Public version endpoint for frontend/client diagnostics.
 router.get('/api/version', (req, res) => {
     res.json({ version: packageJson.version });
+});
+
+// Mapping from WCA event IDs to TNoodle puzzle keys.
+const EVENT_TO_TNOODLE_PUZZLE = {
+    '222': '222',
+    '333': '333',
+    '444': '444',
+    '555': '555',
+    '666': '666',
+    '777': '777',
+    '333bf': '333ni',
+    '333oh': '333',
+    'clock': 'clock',
+    'minx': 'minx',
+    'pyram': 'pyram',
+    'skewb': 'skewb',
+    'sq1': 'sq1',
+    '444bf': '444ni',
+    '555bf': '555ni',
+};
+
+const TNOODLE_BASE_URL = process.env.TNOODLE_URL || 'http://localhost:2014';
+
+// Prefetch cache: stores one scramble ahead per puzzle key so the next request is instant.
+const scrambleCache = new Map();
+
+function fetchScramblesFromTnoodle(puzzleKey, count) {
+    return axios
+        .get(`${TNOODLE_BASE_URL}/api/v0/scramble/${puzzleKey}`, {
+            params: { numScrambles: count },
+        })
+        .then((response) => (Array.isArray(response.data) ? response.data : []));
+}
+
+function prefetchScramble(puzzleKey) {
+    const pending = fetchScramblesFromTnoodle(puzzleKey, 1)
+        .then((scrambles) => {
+            scrambleCache.set(puzzleKey, { scrambles, pending: false });
+        })
+        .catch(() => {
+            scrambleCache.delete(puzzleKey);
+        });
+    scrambleCache.set(puzzleKey, { scrambles: null, pending: true, promise: pending });
+}
+
+// Public scramble generation endpoint (uses TNoodle server with one-ahead prefetch).
+router.get('/api/scramble/:event', scrambleLimiter, async (req, res) => {
+    const event = req.params.event;
+    const puzzleKey = EVENT_TO_TNOODLE_PUZZLE[event];
+
+    if (!puzzleKey) {
+        return res.status(400).json({ error: 'Invalid event type.' });
+    }
+
+    const count = Math.min(Math.max(parseInt(req.query.count, 10) || 1, 1), 50);
+
+    try {
+        // For single-scramble requests, use the prefetch cache.
+        if (count === 1) {
+            const cached = scrambleCache.get(puzzleKey);
+
+            if (cached?.pending && cached.promise) {
+                await cached.promise;
+            }
+
+            const ready = scrambleCache.get(puzzleKey);
+
+            if (ready?.scrambles?.length > 0) {
+                const scrambles = ready.scrambles;
+                scrambleCache.delete(puzzleKey);
+                prefetchScramble(puzzleKey);
+                return res.json({ event, scrambles });
+            }
+
+            // No cached scramble available — fetch directly, then prefetch next.
+            const scrambles = await fetchScramblesFromTnoodle(puzzleKey, 1);
+            prefetchScramble(puzzleKey);
+            return res.json({ event, scrambles });
+        }
+
+        // Multi-scramble requests bypass the cache.
+        const scrambles = await fetchScramblesFromTnoodle(puzzleKey, count);
+        res.json({ event, scrambles });
+    } catch (err) {
+        console.error('Scramble generation error:', err.message);
+        res.status(500).json({ error: 'Failed to generate scramble.' });
+    }
 });
 
 module.exports = router;

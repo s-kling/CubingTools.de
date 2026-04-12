@@ -90,8 +90,8 @@ document.getElementById('contact-form')?.addEventListener('submit', async (event
 
     if (submitButton) {
         submitButton.disabled = true;
-        submitButton.dataset.originalLabel = submitButton.textContent || 'Submit';
-        submitButton.textContent = 'Sending...';
+        submitButton.dataset.originalHTML = submitButton.innerHTML;
+        submitButton.innerHTML = '<span class="spinner"></span>';
     }
 
     try {
@@ -168,7 +168,7 @@ document.getElementById('contact-form')?.addEventListener('submit', async (event
     } finally {
         if (submitButton) {
             submitButton.disabled = false;
-            submitButton.textContent = submitButton.dataset.originalLabel || 'Submit';
+            submitButton.innerHTML = submitButton.dataset.originalHTML || 'Submit';
         }
     }
 });

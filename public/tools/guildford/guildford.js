@@ -453,8 +453,19 @@ let competitor1Name = 'Competitor 1';
 let competitor2Name = 'Competitor 2';
 
 async function handleButtons(competitor) {
-    await getWCAData(competitor);
-    updateURLWithFormData();
+    const btn = document.querySelector(
+        `#timeForm .competitor:has(#${competitor}-wca) .globals-btn`,
+    );
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner"></span>';
+    btn.disabled = true;
+    try {
+        await getWCAData(competitor);
+        updateURLWithFormData();
+    } finally {
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
+    }
 }
 
 // Get the pickup time

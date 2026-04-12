@@ -13,6 +13,7 @@ LOG_FOLDER="$ROOT_DIR/backend/log"
 CONFIG_FILE="$ROOT_DIR/backend/config.json"
 SECRET_DIR="$ROOT_DIR/backend/secret"
 NODE_MODULES="$ROOT_DIR/node_modules"
+TNOODLE_PORT=2014
 
 # ─── Setup Check ────────────────────────────────────────────────
 
@@ -83,6 +84,60 @@ esac
 # ─── Helpers ────────────────────────────────────────────────────
 
 SERVER_PID=""
+TNOODLE_PID=""
+
+start_tnoodle() {
+    TNOODLE_JAR="$ROOT_DIR/bin/tnoodle.jar"
+
+    if [ ! -f "$TNOODLE_JAR" ]; then
+        echo -e "${YELLOW}No tnoodle.jar found in project root. Scramble generation will not work.${NC}"
+        return
+    fi
+
+    if ! command -v java > /dev/null 2>&1; then
+        echo -e "${YELLOW}Java not found. TNoodle requires Java to run.${NC}"
+        return
+    fi
+
+    if lsof -i:"$TNOODLE_PORT" > /dev/null 2>&1; then
+        echo -e "${YELLOW}TNoodle port $TNOODLE_PORT is already in use. Skipping TNoodle start.${NC}"
+        return
+    fi
+
+    echo -e "${CYAN}Starting TNoodle server on port $TNOODLE_PORT...${NC}"
+    java -jar "$TNOODLE_JAR" &>/dev/null &
+    TNOODLE_PID=$!
+
+    # Wait for TNoodle to become ready
+    echo -ne "${CYAN}Waiting for TNoodle to be ready"
+    for i in $(seq 1 30); do
+        if curl -s -o /dev/null -w '' "http://localhost:$TNOODLE_PORT" 2>/dev/null; then
+            echo -e "${NC}"
+            echo -e "${GREEN}TNoodle started (PID: $TNOODLE_PID, port: $TNOODLE_PORT).${NC}"
+            return
+        fi
+        if ! kill -0 "$TNOODLE_PID" 2>/dev/null; then
+            echo -e "${NC}"
+            echo -e "${RED}TNoodle process exited unexpectedly.${NC}"
+            TNOODLE_PID=""
+            return
+        fi
+        echo -n "."
+        sleep 1
+    done
+    echo -e "${NC}"
+    echo -e "${YELLOW}TNoodle started (PID: $TNOODLE_PID) but may not be ready yet.${NC}"
+}
+
+stop_tnoodle() {
+    if [ -n "$TNOODLE_PID" ]; then
+        echo -e "${CYAN}Stopping TNoodle (PID: $TNOODLE_PID)...${NC}"
+        kill "$TNOODLE_PID" 2>/dev/null
+        wait "$TNOODLE_PID" 2>/dev/null
+        echo -e "${GREEN}TNoodle stopped.${NC}"
+        TNOODLE_PID=""
+    fi
+}
 
 start_server() {
     if lsof -i:"$PORT" > /dev/null 2>&1; then
@@ -91,6 +146,7 @@ start_server() {
         sleep 0.3
     fi
 
+    echo -e "${CYAN}Starting $TYPE server on port $PORT...${NC}"
     node "$ROOT_DIR/backend/server.js" $BETA_FLAG &
     SERVER_PID=$!
 
@@ -99,14 +155,17 @@ start_server() {
 
 stop_server() {
     if [ -n "$SERVER_PID" ]; then
+        echo -e "${CYAN}Stopping $TYPE server (PID: $SERVER_PID)...${NC}"
         kill "$SERVER_PID" 2>/dev/null
         wait "$SERVER_PID" 2>/dev/null
+        echo -e "${GREEN}$TYPE server stopped.${NC}"
         SERVER_PID=""
     fi
 }
 
 # ─── Start ──────────────────────────────────────────────────────
 
+start_tnoodle
 start_server
 
 URL="http://localhost:$PORT"
@@ -120,20 +179,45 @@ fi
 
 # ─── Control Loop ───────────────────────────────────────────────
 
-echo -e "${CYAN}Commands: [r] restart   [s] stop${NC}"
+echo -e "${CYAN}Commands: [r] restart all   [rn] restart node   [rt] restart tnoodle   [s] stop all   [sn] stop node   [st] stop tnoodle${NC}"
 while true; do
     read -r CMD
     case "$CMD" in
         r)
+            echo -e "${YELLOW}Restarting all servers...${NC}"
+            stop_server
+            stop_tnoodle
+            start_tnoodle
+            start_server
+            echo -e "${CYAN}Commands: [r] restart all   [rn] restart node   [rt] restart tnoodle   [s] stop all   [sn] stop node   [st] stop tnoodle${NC}"
+            ;;
+        rn)
             echo -e "${YELLOW}Restarting $TYPE server...${NC}"
             stop_server
             start_server
-            echo -e "${CYAN}Commands: [r] restart   [s] stop${NC}"
+            echo -e "${CYAN}Commands: [r] restart all   [rn] restart node   [rt] restart tnoodle   [s] stop all   [sn] stop node   [st] stop tnoodle${NC}"
             ;;
-        s|q)
+        rt)
+            echo -e "${YELLOW}Restarting TNoodle server...${NC}"
+            stop_tnoodle
+            start_tnoodle
+            echo -e "${CYAN}Commands: [r] restart all   [rn] restart node   [rt] restart tnoodle   [s] stop all   [sn] stop node   [st] stop tnoodle${NC}"
+            ;;
+        sn)
             echo -e "${YELLOW}Stopping $TYPE server...${NC}"
             stop_server
-            echo -e "${GREEN}Server stopped.${NC}"
+            echo -e "${CYAN}Commands: [r] restart all   [rn] restart node   [rt] restart tnoodle   [s] stop all   [sn] stop node   [st] stop tnoodle${NC}"
+            ;;
+        st)
+            echo -e "${YELLOW}Stopping TNoodle server...${NC}"
+            stop_tnoodle
+            echo -e "${CYAN}Commands: [r] restart all   [rn] restart node   [rt] restart tnoodle   [s] stop all   [sn] stop node   [st] stop tnoodle${NC}"
+            ;;
+        s|q)
+            echo -e "${YELLOW}Stopping all servers...${NC}"
+            stop_server
+            stop_tnoodle
+            echo -e "${GREEN}All servers stopped.${NC}"
             break
             ;;
     esac

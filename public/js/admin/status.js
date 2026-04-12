@@ -116,6 +116,7 @@ function createDashboardSkeleton() {
                             <option value="tools">Tools</option>
                             <option value="wcaIds">WCA IDs</option>
                             <option value="peakHours">Peak hours</option>
+                            <option value="utmSources">UTM Sources</option>
                         </select>
                     </label>
 
@@ -209,6 +210,7 @@ function createDashboardSkeleton() {
                                 <th>Status</th>
                                 <th>Duration (ms)</th>
                                 <th>User Agent</th>
+                                <th>UTM Source</th>
                             </tr>
                         </thead>
                         <tbody id="status-log-details-results"></tbody>
@@ -443,6 +445,12 @@ function getLogExplorerEntries() {
         count,
     }));
 
+    const utmSources = Object.entries(logs.utmSources || {}).map(([key, count]) => ({
+        source: 'utmSources',
+        key,
+        count,
+    }));
+
     const allEntries = [
         ...endpoints,
         ...statusCodes,
@@ -451,6 +459,7 @@ function getLogExplorerEntries() {
         ...userAgents,
         ...toolEntries,
         ...wcaEntries,
+        ...utmSources,
         ...peakHours,
     ];
 
@@ -589,7 +598,7 @@ function renderSelectedLogEntries() {
     if (entries.length === 0) {
         const row = document.createElement('tr');
         const cell = document.createElement('td');
-        cell.colSpan = 6;
+        cell.colSpan = 7;
         cell.className = 'status-empty-cell';
         cell.textContent = 'No detailed log entries found for this selection.';
         row.appendChild(cell);
@@ -606,6 +615,7 @@ function renderSelectedLogEntries() {
         row.appendChild(createDetailsCell(String(entry.status ?? 'N/A')));
         row.appendChild(createDetailsCell(String(entry.durationMs ?? 'N/A')));
         row.appendChild(createDetailsCell(entry.userAgent || 'N/A', 'status-log-key'));
+        row.appendChild(createDetailsCell(entry.utmSource || '—'));
 
         bodyEl.appendChild(row);
     });
@@ -662,6 +672,7 @@ function getFilteredMatchingLogEntries(selected) {
             entry.status,
             entry.durationMs,
             entry.userAgent,
+            entry.utmSource,
         ]
             .map((value) => String(value || '').toLowerCase())
             .join(' ');
@@ -735,6 +746,10 @@ function doesEntryMatchSelection(entry, selected) {
         return `${String(date.getUTCHours()).padStart(2, '0')}:00 UTC` === selectedKey;
     }
 
+    if (source === 'utmSources') {
+        return String(entry.utmSource || '') === selectedKey;
+    }
+
     return false;
 }
 
@@ -779,6 +794,7 @@ function formatLogSource(source) {
     if (source === 'methods') return 'HTTP Methods';
     if (source === 'tools') return 'Tools';
     if (source === 'endpoints') return 'Endpoints';
+    if (source === 'utmSources') return 'UTM Sources';
     return source;
 }
 
