@@ -307,6 +307,7 @@ ul li::before {
     font-size: var(--font-size-base);
     font-family: var(--font-main);
     cursor: pointer;
+    user-select: none;
     transition: border-color 0.2s ease;
 }
 
@@ -336,18 +337,21 @@ ul li::before {
     align-items: center;
     gap: var(--space-sm);
     width: 100%;
-    max-width: 500px;
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
     padding: var(--space-sm) var(--space-md);
     background: var(--card-bg);
     border: 1px solid var(--card-border);
     border-radius: var(--main-radius);
     margin-bottom: var(--space-sm);
+    box-sizing: border-box;
 }
 
 .scramble-text {
     flex: 1;
     font-size: var(--font-size-base);
-    font-family: monospace;
+    font-family: monospace !important;
     color: var(--main-text);
     line-height: 1.5;
     word-spacing: 0.15em;
@@ -355,6 +359,16 @@ ul li::before {
     text-align: center;
     min-height: 1.5em;
     margin: 0;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    line-clamp: 4;
+    max-height: calc(1.5em * 4 + 2px);
+    text-overflow: ellipsis;
+    white-space: normal;
+    cursor: pointer;
+    width: 50ch;
 }
 
 .scramble-container .icon-btn:hover {
@@ -398,6 +412,7 @@ ul li::before {
 
 /* Timer display */
 .timer-display {
+    font-family: monospace !important;
     font-size: 4rem;
     font-weight: 600;
     text-align: center;
@@ -589,6 +604,23 @@ ul li::before {
     opacity: 1 !important;
     color: var(--link-color);
     border-color: var(--link-color);
+}
+
+/* === ANALYZE ROW (Stats page) === */
+
+.analyze-row {
+    display: flex;
+    justify-content: center;
+    margin-bottom: var(--space-sm);
+}
+
+.analyze-row a {
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    width: 100%;
+    justify-content: center;
 }
 
 /* === AVERAGES SECTION (Stats page) === */
@@ -889,6 +921,10 @@ main.timer-running .timer-area {
 
 main.timer-running .timer-display {
     font-size: 6rem;
+}
+
+main.timer-running ~ footer {
+    display: none !important;
 }
 
 /* === PROGRESS POPUP === */
@@ -1373,6 +1409,49 @@ main.timer-running .timer-display {
     background: var(--button-hover);
 }
 
+/* === SCRAMBLE FULLSCREEN POPUP === */
+
+.scramble-fullscreen-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 9500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+}
+
+.scramble-fullscreen-backdrop[hidden] {
+    display: none;
+}
+
+.scramble-fullscreen-popup {
+    background: linear-gradient(180deg, var(--popup-bg-from), var(--popup-bg-to));
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: var(--space-lg);
+    box-shadow: var(--shadow-md);
+    max-width: 600px;
+    width: 90vw;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-md);
+}
+
+.scramble-fullscreen-text {
+    font-family: monospace;
+    font-size: var(--font-size-lg);
+    color: var(--main-text);
+    line-height: 1.6;
+    word-spacing: 0.15em;
+    letter-spacing: 0.02em;
+    text-align: center;
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 /* === MOBILE PENALTY SHEET === */
 
 .mobile-penalty-sheet {
@@ -1395,6 +1474,20 @@ main.timer-running .timer-display {
         padding: var(--space-xs) var(--space-md);
         min-width: 80px;
         font-size: 0.9rem;
+    }
+
+    /* Scramble text: wrap on mobile */
+    .scramble-text {
+        white-space: normal;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        word-break: break-word;
+        max-width: 100%;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        line-clamp: 3;
+        max-height: calc(1.5em * 3 + 2px);
     }
 
     /* Settings */
@@ -1436,13 +1529,22 @@ main.timer-running .timer-display {
         user-select: none;
     }
 
-    /* Scramble: minimal top text */
+    /* ── Timer toolbar: allow wrapping ── */
+    .timer-toolbar {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    /* Scramble: minimal top text, constrained height */
     .scramble-container {
         max-width: 100%;
         background: transparent;
         border: none;
         padding: var(--space-xs) var(--space-md);
         margin-bottom: 0;
+        max-height: 4.5em;
+        overflow-y: auto;
+        flex-shrink: 0;
     }
 
     .scramble-container .icon-btn {
@@ -1485,6 +1587,7 @@ main.timer-running .timer-display {
     /* ── Bottom row: stack on mobile ── */
     .bottom-row {
         flex-direction: row;
+        flex-wrap: wrap;
         gap: var(--space-xs);
         margin-top: 0;
         padding: var(--space-xs) var(--space-sm);
@@ -1507,6 +1610,7 @@ main.timer-running .timer-display {
 
     .stats-box {
         flex: 1;
+        min-width: 0;
         padding: var(--space-xs);
         background: transparent;
         border: none;
@@ -1592,6 +1696,13 @@ main.timer-running .timer-display {
 }
 
 @media (max-width: 480px) {
+    /* Sub-navbar: shrink tabs to fit */
+    .sub-navbar-tab {
+        padding: var(--space-xs) var(--space-sm);
+        min-width: 64px;
+        font-size: 0.82rem;
+    }
+
     #timeInput {
         font-size: 3.2rem;
     }
@@ -1600,8 +1711,28 @@ main.timer-running .timer-display {
         font-size: 4rem;
     }
 
+    /* Scramble: tighter cap for long scrambles */
+    .scramble-container {
+        max-height: 3.5em;
+    }
+
     .scramble-text {
         font-size: 0.75rem;
+    }
+
+    /* Bottom row: stack vertically when too narrow */
+    .bottom-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .scramble-box {
+        width: 100%;
+    }
+
+    .scramble-box twisty-player {
+        width: 120px;
+        height: 100px;
     }
 
     .penalty-sheet-buttons .penalty-btn {
@@ -1614,12 +1745,23 @@ main.timer-running .timer-display {
 }
 
 @media (max-width: 360px) {
+    .sub-navbar-tab {
+        padding: var(--space-xxs) var(--space-xs);
+        min-width: 56px;
+        font-size: 0.78rem;
+    }
+
     #timeInput {
         font-size: 2.5rem;
     }
 
     .timer-display {
         font-size: 3.2rem;
+    }
+
+    .scramble-container {
+        max-height: 3em;
+        padding: var(--space-xxs) var(--space-xs);
     }
 
     .stats {

@@ -77,6 +77,31 @@
                         <div id="sourceToggle" class="source-toggle" role="tablist" aria-label="Choose data source">
                             <button id="sourceCsTimer" class="source-toggle-btn active" type="button" onclick="setDataSourceMode('cstimer')">csTimer File</button>
                             <button id="sourceWca" class="source-toggle-btn" type="button" onclick="setDataSourceMode('wca')">WCA Data</button>
+                            <button id="sourceAverage" class="source-toggle-btn" type="button" onclick="setDataSourceMode('average')">Average Tool</button>
+                        </div>
+
+                        <div id="averageToolFetch" class="input-group" style="display: none;">
+                            <label for="averageEventType">Load solves from Average Calculator</label>
+                            <div class="control-row">
+                                <select id="averageEventType">
+                                    <option value="333">3x3x3</option>
+                                    <option value="222">2x2x2</option>
+                                    <option value="444">4x4x4</option>
+                                    <option value="555">5x5x5</option>
+                                    <option value="666">6x6x6</option>
+                                    <option value="777">7x7x7</option>
+                                    <option value="333bf">3x3x3 Blindfolded</option>
+                                    <option value="333oh">3x3x3 One-Handed</option>
+                                    <option value="clock">Clock</option>
+                                    <option value="minx">Megaminx</option>
+                                    <option value="pyram">Pyraminx</option>
+                                    <option value="skewb">Skewb</option>
+                                    <option value="sq1">Square-1</option>
+                                    <option value="444bf">4x4x4 Blindfolded</option>
+                                    <option value="555bf">5x5x5 Blindfolded</option>
+                                </select>
+                                <button type="button" onclick="loadAverageToolData()">Load Solves</button>
+                            </div>
                         </div>
 
                         <div id="fileUpload" class="input-group">

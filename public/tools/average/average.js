@@ -14,8 +14,8 @@ const state = {
     currentScramble: null,
     undoData: null,
     previousAverage: null,
-    sessionPrSingle: null,
-    sessionPrAverage: null,
+    sessionPrSingle: {},
+    sessionPrAverage: {},
 };
 
 const meanEvents = ['666', '777', '444bf', '555bf', '333bf'];
@@ -234,9 +234,13 @@ function addTime() {
     if (
         time !== -1 &&
         time !== Infinity &&
-        (!state.sessionPrSingle || time < state.sessionPrSingle.value)
+        (!state.sessionPrSingle[event] || time < state.sessionPrSingle[event].value)
     ) {
-        state.sessionPrSingle = { value: time, scramble: state.currentScramble, event: event };
+        state.sessionPrSingle[event] = {
+            value: time,
+            scramble: state.currentScramble,
+            event: event,
+        };
     }
 
     input.value = '';
@@ -336,9 +340,10 @@ function calculateStats() {
         if (
             !isNaN(moVal) &&
             isFinite(moVal) &&
-            (!state.sessionPrAverage || moVal < parseFloat(state.sessionPrAverage.average))
+            (!state.sessionPrAverage[event] ||
+                moVal < parseFloat(state.sessionPrAverage[event].average))
         ) {
-            state.sessionPrAverage = { ...newTag };
+            state.sessionPrAverage[event] = { ...newTag };
         }
 
         saveAverages();
@@ -349,6 +354,7 @@ function calculateStats() {
         displayTags();
         updateProgress();
         updateSessionStats();
+        updatePrTarget();
     }
     if (ao5 && n === 5) {
         const avgId = state.times[state.times.length - 1].averageId;
@@ -367,9 +373,10 @@ function calculateStats() {
         if (
             !isNaN(aoVal) &&
             isFinite(aoVal) &&
-            (!state.sessionPrAverage || aoVal < parseFloat(state.sessionPrAverage.average))
+            (!state.sessionPrAverage[event] ||
+                aoVal < parseFloat(state.sessionPrAverage[event].average))
         ) {
-            state.sessionPrAverage = { ...newTag };
+            state.sessionPrAverage[event] = { ...newTag };
         }
 
         saveAverages();
@@ -380,6 +387,7 @@ function calculateStats() {
         displayTags();
         updateProgress();
         updateSessionStats();
+        updatePrTarget();
     }
 }
 
@@ -804,6 +812,7 @@ document.getElementById('wca').addEventListener('input', async () => {
     try {
         await fetchUserData(wcaId);
         calculateStats();
+        updatePrTarget();
 
         // Set the target placeholder to user's PR average if available
         const prAverage = getUserPRAverage();
@@ -858,12 +867,29 @@ function getAverageRank(time) {
 }
 
 // === Handle PR target checkbox ===
-// Helper to get user's PR average (best non-DNF average)
+// Helper to get user's PR average (best non-DNF average from WCA or session)
 function getUserPRAverage() {
-    if (!state.userAverages.length) return null;
-    const validAverages = state.userAverages.filter((a) => a !== Infinity && isFinite(a));
+    const validAverages = state.userAverages.filter(
+        (a) => a !== Infinity && isFinite(a) && !isNaN(a),
+    );
     if (!validAverages.length) return null;
     return Math.min(...validAverages).toFixed(2);
+}
+
+// Update target field to current PR when "Use PR" is checked
+function updatePrTarget() {
+    if (!usePrCheckbox.checked) return;
+    const pr = getUserPRAverage();
+    if (pr) {
+        targetInput.value = pr;
+        targetInput.disabled = true;
+    } else {
+        targetInput.value = '';
+        targetInput.disabled = true;
+    }
+    setStorage('setting_target', targetInput.value);
+    calculateStats();
+    updateTargetDisplay();
 }
 
 const usePrCheckbox = document.getElementById('usePrTarget');
@@ -871,11 +897,7 @@ const targetInput = document.getElementById('target');
 
 usePrCheckbox.addEventListener('change', () => {
     if (usePrCheckbox.checked) {
-        const pr = getUserPRAverage();
-        if (pr) {
-            targetInput.value = pr;
-            targetInput.disabled = true;
-        }
+        updatePrTarget();
     } else {
         targetInput.disabled = false;
         targetInput.value = '';
@@ -1155,11 +1177,16 @@ eventSelector.addEventListener('change', async (e) => {
     loadAverages();
     calculateStats();
     updateProgress();
+    updatePrTarget();
     updateTargetDisplay();
     fetchScramble();
 
     // Keep timer event select in sync
     if (timerEventSelect) timerEventSelect.value = newEvent;
+
+    // Update analyze button link
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    if (analyzeBtn) analyzeBtn.href = `/tools/globalCalc?source=average&event=${newEvent}`;
 });
 
 // Timer page event selector → sync to hidden event-type
@@ -1206,6 +1233,11 @@ window.addEventListener('DOMContentLoaded', () => {
 
     state.eventType = document.getElementById('event-type').value;
     if (timerEventSelect) timerEventSelect.value = state.eventType;
+
+    // Set initial analyze button link
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    if (analyzeBtn) analyzeBtn.href = `/tools/globalCalc?source=average&event=${state.eventType}`;
+
     loadAverages();
     loadIncomplete();
     calculateStats();
@@ -1247,15 +1279,15 @@ const PUZZLE_MAP = {
     '555': '5x5x5',
     '666': '6x6x6',
     '777': '7x7x7',
-    '333bf': '3x3x3',
-    '333oh': '3x3x3',
-    'clock': 'clock',
-    'minx': 'megaminx',
-    'pyram': 'pyraminx',
-    'skewb': 'skewb',
-    'sq1': 'square1',
-    '444bf': '4x4x4',
-    '555bf': '5x5x5',
+    '333bf': '3x3 Blindfolded',
+    '333oh': '3x3 One-Handed',
+    'clock': 'Clock',
+    'minx': 'Megaminx',
+    'pyram': 'Pyraminx',
+    'skewb': 'Skewb',
+    'sq1': 'Square-1',
+    '444bf': '4x4 Blindfolded',
+    '555bf': '5x5 Blindfolded',
 };
 
 function updateScrambleDrawing(scramble) {
@@ -1300,6 +1332,25 @@ async function fetchScramble() {
 }
 
 document.getElementById('newScrambleBtn').addEventListener('click', fetchScramble);
+
+// === SCRAMBLE FULLSCREEN POPUP ===
+
+document.getElementById('scrambleText').addEventListener('click', () => {
+    if (!state.currentScramble) return;
+    const popup = document.getElementById('scrambleFullscreen');
+    document.getElementById('scrambleFullscreenText').textContent = state.currentScramble;
+    popup.hidden = false;
+});
+
+document.getElementById('scrambleFullscreenClose').addEventListener('click', () => {
+    document.getElementById('scrambleFullscreen').hidden = true;
+});
+
+document.getElementById('scrambleFullscreen').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) {
+        e.currentTarget.hidden = true;
+    }
+});
 
 // === MODE TOGGLE ===
 
@@ -1539,8 +1590,12 @@ function addTimerTime(time) {
     state.userSolves.push(time);
 
     // Track session PR single
-    if (!state.sessionPrSingle || time < state.sessionPrSingle.value) {
-        state.sessionPrSingle = { value: time, scramble: state.currentScramble, event: event };
+    if (!state.sessionPrSingle[event] || time < state.sessionPrSingle[event].value) {
+        state.sessionPrSingle[event] = {
+            value: time,
+            scramble: state.currentScramble,
+            event: event,
+        };
     }
 
     calculateStats();
@@ -1559,13 +1614,15 @@ document.addEventListener('keydown', (e) => {
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
-    if (e.code !== 'Space') return;
-    e.preventDefault();
-
+    // If timer is running, allow ANY key to stop
     if (state.timerRunning) {
         stopTimer();
         return;
     }
+
+    // Only allow spacebar to start the timer
+    if (e.code !== 'Space') return;
+    e.preventDefault();
 
     if (state.timerHolding) return; // already holding
 
@@ -1581,7 +1638,9 @@ document.addEventListener('keydown', (e) => {
 
 document.addEventListener('keyup', (e) => {
     if (state.mode !== 'timer') return;
-    if (e.code !== 'Space') return;
+
+    // Only care about spacebar for starting, but ignore key for stopping
+    if (!state.timerRunning && e.code !== 'Space') return;
     e.preventDefault();
 
     if (holdTimeout) {
@@ -1589,11 +1648,13 @@ document.addEventListener('keyup', (e) => {
         holdTimeout = null;
     }
 
-    if (state.timerReady && !state.timerRunning) {
+    if (state.timerReady && !state.timerRunning && e.code === 'Space') {
         state.timerHolding = false;
         startTimer();
         return;
     }
+
+    // If timer is running, any key stops it (handled in keydown)
 
     // Released too early — not ready
     state.timerHolding = false;
@@ -1601,12 +1662,12 @@ document.addEventListener('keyup', (e) => {
     timerDisplay.classList.remove('ready');
 });
 
-// === MOBILE TOUCH TIMER ===
+// === TOUCH TIMER ===
 
 const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
 
-// Touch-based timer for mobile (tap to start/stop)
-(function initMobileTouchTimer() {
+// Touch-based timer (tap and hold to start/stop)
+(function initTouchTimer() {
     const timerArea = document.querySelector('.timer-area');
     if (!timerArea) return;
 
@@ -1615,7 +1676,6 @@ const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
     timerArea.addEventListener(
         'touchstart',
         (e) => {
-            if (!isMobile()) return;
             if (state.mode !== 'timer') return;
 
             // Don't intercept buttons or inputs
@@ -1646,7 +1706,6 @@ const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
     );
 
     timerArea.addEventListener('touchend', (e) => {
-        if (!isMobile()) return;
         if (state.mode !== 'timer') return;
 
         const tag = e.target.tagName;

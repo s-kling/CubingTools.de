@@ -7,23 +7,33 @@ let currentDataSourceMode = 'cstimer';
 const meanEvents = new Set(['666', '777', '444bf', '555bf', '333bf']);
 
 function setDataSourceMode(mode) {
-    currentDataSourceMode = mode === 'wca' ? 'wca' : 'cstimer';
+    currentDataSourceMode = mode === 'wca' ? 'wca' : mode === 'average' ? 'average' : 'cstimer';
 
     const fileUpload = document.getElementById('fileUpload');
     const wcaIdFetch = document.getElementById('wcaIdFetch');
+    const averageToolFetch = document.getElementById('averageToolFetch');
     const sourceCsTimer = document.getElementById('sourceCsTimer');
     const sourceWca = document.getElementById('sourceWca');
+    const sourceAverage = document.getElementById('sourceAverage');
 
-    if (!fileUpload || !wcaIdFetch || !sourceCsTimer || !sourceWca) {
+    if (
+        !fileUpload ||
+        !wcaIdFetch ||
+        !averageToolFetch ||
+        !sourceCsTimer ||
+        !sourceWca ||
+        !sourceAverage
+    ) {
         return;
     }
 
-    const showCsTimer = currentDataSourceMode === 'cstimer';
-    fileUpload.style.display = showCsTimer ? 'flex' : 'none';
-    wcaIdFetch.style.display = showCsTimer ? 'none' : 'flex';
+    fileUpload.style.display = currentDataSourceMode === 'cstimer' ? 'flex' : 'none';
+    wcaIdFetch.style.display = currentDataSourceMode === 'wca' ? 'flex' : 'none';
+    averageToolFetch.style.display = currentDataSourceMode === 'average' ? 'flex' : 'none';
 
-    sourceCsTimer.classList.toggle('active', showCsTimer);
-    sourceWca.classList.toggle('active', !showCsTimer);
+    sourceCsTimer.classList.toggle('active', currentDataSourceMode === 'cstimer');
+    sourceWca.classList.toggle('active', currentDataSourceMode === 'wca');
+    sourceAverage.classList.toggle('active', currentDataSourceMode === 'average');
 }
 
 function loadCSTimerFile(event) {
@@ -600,5 +610,75 @@ function updateChart() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    setDataSourceMode('cstimer');
+    const params = new URLSearchParams(window.location.search);
+    const source = params.get('source');
+    const event = params.get('event');
+
+    if (source === 'average') {
+        setDataSourceMode('average');
+        if (event) {
+            const eventSelect = document.getElementById('averageEventType');
+            if (eventSelect) {
+                eventSelect.value = event;
+            }
+        }
+        loadAverageToolData();
+    } else {
+        setDataSourceMode('cstimer');
+    }
 });
+
+function loadAverageToolData() {
+    setDataSourceMode('average');
+
+    const event = document.getElementById('averageEventType').value;
+    if (!event) {
+        alert('Please select an event.');
+        return;
+    }
+
+    const eventType = document.getElementById('event-type');
+    if (eventType) {
+        eventType.value = event;
+    }
+
+    const stored = localStorage.getItem(`averages_${event}`);
+    if (!stored) {
+        setEmptyState('No averages found for this event in the Average Calculator.');
+        return;
+    }
+
+    let averages;
+    try {
+        averages = JSON.parse(stored);
+    } catch {
+        setEmptyState('Could not parse stored average data.');
+        return;
+    }
+
+    if (!Array.isArray(averages) || averages.length === 0) {
+        setEmptyState('No averages found for this event in the Average Calculator.');
+        return;
+    }
+
+    const allTimes = [];
+    for (const avg of averages) {
+        if (!Array.isArray(avg.times)) continue;
+        for (const solve of avg.times) {
+            const value = Number(solve.value);
+            if (Number.isFinite(value) && value > 0) {
+                allTimes.push(Math.round(value * 100));
+            }
+        }
+    }
+
+    if (allTimes.length === 0) {
+        setEmptyState('No valid solve times found in stored averages.');
+        return;
+    }
+
+    originalArray = allTimes;
+    inputArray = [...originalArray];
+    initializeSlider();
+    updateChart();
+}

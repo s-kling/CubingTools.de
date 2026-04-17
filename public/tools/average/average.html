@@ -227,6 +227,9 @@
                             <span class="stat-value" id="sessionCount">0</span>
                         </div>
                     </div>
+                    <div class="analyze-row">
+                        <a id="analyzeBtn" class="modal-btn confirm" href="/tools/globalCalc?source=average&event=333">Analyze in Global Calculator</a>
+                    </div>
                     <div class="averages-section">
                         <div class="averages-header">
                             <h3>Averages</h3>
@@ -380,6 +383,13 @@
                         <button class="modal-btn cancel" id="avgDetailShareBtn"><i class="fas fa-share-alt"></i> Share</button>
                         <button class="modal-btn cancel" id="avgDetailDeleteBtn"><i class="fas fa-trash-alt"></i> Delete</button>
                     </div>
+                </div>
+            </div>
+            <!-- Scramble fullscreen popup -->
+            <div class="scramble-fullscreen-backdrop" id="scrambleFullscreen" hidden>
+                <div class="scramble-fullscreen-popup">
+                    <p class="scramble-fullscreen-text" id="scrambleFullscreenText"></p>
+                    <button class="modal-btn cancel" id="scrambleFullscreenClose">Close</button>
                 </div>
             </div>
         </main>

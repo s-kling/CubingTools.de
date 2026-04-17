@@ -768,3 +768,64 @@ function optimizeAndDisplayLive(competitor1, competitor2) {
     const pickupTime = parseFloat(document.getElementById('pickup').value) || 0;
     processCombinations(competitor1, competitor2, pickupTime);
 }
+
+function setCompetitorSource(competitorId, mode) {
+    const wcaSection = document.getElementById(`${competitorId}-source-wca`);
+    const globalsBtn = document.getElementById(`${competitorId}-globals-btn`);
+    const toggle = wcaSection.closest('.competitor').querySelector('.source-toggle');
+    const buttons = toggle.querySelectorAll('.source-toggle-btn');
+
+    if (mode === 'average') {
+        wcaSection.style.display = 'none';
+        globalsBtn.style.display = 'none';
+        buttons[0].classList.remove('active');
+        buttons[1].classList.add('active');
+        loadAverageToolTimes(competitorId);
+    } else {
+        wcaSection.style.display = '';
+        globalsBtn.style.display = '';
+        buttons[0].classList.add('active');
+        buttons[1].classList.remove('active');
+    }
+}
+
+function loadAverageToolTimes(competitorId) {
+    const allEventTimes =
+        competitorId === 'c1' ? competitor1AllEventTimes : competitor2AllEventTimes;
+    let loadedAny = false;
+
+    events.forEach((eventName) => {
+        const wcaId = eventNameToWcaId(eventName);
+        if (!wcaId) return;
+
+        const stored = localStorage.getItem(`averages_${wcaId}`);
+        if (!stored) return;
+
+        let averages;
+        try {
+            averages = JSON.parse(stored);
+        } catch {
+            return;
+        }
+
+        if (!Array.isArray(averages) || averages.length === 0) return;
+
+        // Use the most recent average's value
+        const lastAvg = averages[averages.length - 1];
+        const avgValue = parseFloat(lastAvg.average);
+        if (!isFinite(avgValue) || avgValue <= 0) return;
+
+        const formatted = formatTime(avgValue);
+        const input = document.getElementById(`${competitorId}-${eventName}`);
+        if (input) {
+            input.value = formatted;
+            formatInputField(input);
+            allEventTimes[eventName] = input.value;
+            loadedAny = true;
+        }
+    });
+
+    if (loadedAny) {
+        optimizeGuildford();
+    }
+}

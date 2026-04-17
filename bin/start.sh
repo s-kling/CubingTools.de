@@ -20,20 +20,24 @@ TNOODLE_PORT=2014
 MISSING=()
 SETUP_NEEDED=()
 
-[ ! -f "$CONFIG_FILE" ]                           && MISSING+=("backend/config.json")
+[ ! -f "$CONFIG_FILE" ]                           && MISSING+=("backend/config.json — server port configuration (copy from config.example.json or create with {\"prod_port\":8000,\"beta_port\":8001})")
 [ ! -d "$SECRET_DIR" ] || [ -z "$(ls -A "$SECRET_DIR" 2>/dev/null)" ] \
-                                                  && MISSING+=("backend/secret/")
-[ ! -f "$SECRET_DIR/service-account.json" ]       && MISSING+=("backend/secret/service-account.json")
-[ ! -f "$SECRET_DIR/users.json" ]                 && MISSING+=("backend/secret/users.json")
+                                                  && MISSING+=("backend/secret/ — directory for credentials (create it and add the files below)")
+[ ! -f "$SECRET_DIR/service-account.json" ]       && MISSING+=("backend/secret/service-account.json — Firebase/GCP service account key (download from Firebase Console > Project Settings > Service accounts)")
+[ ! -f "$SECRET_DIR/users.json" ]                 && MISSING+=("backend/secret/users.json — initial admin user seed data (see README for format)")
 
 [ ! -d "$NODE_MODULES" ]                          && SETUP_NEEDED+=("node_modules (run npm install)")
 [ ! -d "$LOG_FOLDER" ]                            && SETUP_NEEDED+=("backend/log/ folder")
 
 if [ ${#MISSING[@]} -gt 0 ]; then
-    echo -e "${RED}The following required files are missing and must be created manually:${NC}"
+    echo -e "${RED}Cannot start: the following required files are missing:${NC}"
+    echo ""
     for item in "${MISSING[@]}"; do
-        echo -e "  ${RED}✗ $item${NC}"
+        echo -e "  ${RED}✗${NC} $item"
     done
+    echo ""
+    echo -e "${YELLOW}These files contain secrets and are not checked into version control."
+    echo -e "Ask a project maintainer or check the README for setup instructions.${NC}"
     exit 1
 fi
 
@@ -48,7 +52,8 @@ if [ ${#SETUP_NEEDED[@]} -gt 0 ]; then
             echo -e "${CYAN}Running npm install...${NC}"
             cd "$ROOT_DIR" && npm install
             if [ $? -ne 0 ]; then
-                echo -e "${RED}npm install failed.${NC}"
+                echo -e "${RED}npm install failed. Check the output above for errors.${NC}"
+                echo -e "${YELLOW}Common fixes: clear npm cache (npm cache clean --force), delete node_modules and retry, or check your Node.js version (requires >= 18).${NC}"
                 exit 1
             fi
             echo -e "${GREEN}npm install completed.${NC}"
@@ -78,7 +83,7 @@ read -r -p "$(echo -e "${CYAN}Enter your choice [1/2]: ${NC}")" CHOICE
 case "$CHOICE" in
     1) PORT=$PROD_PORT; TYPE="production"; BETA_FLAG="" ;;
     2) PORT=$BETA_PORT; TYPE="beta";       BETA_FLAG="--beta" ;;
-    *) echo -e "${RED}Invalid choice.${NC}"; exit 1 ;;
+    *) echo -e "${RED}Invalid choice '$CHOICE'. Please enter 1 for production or 2 for beta.${NC}"; exit 1 ;;
 esac
 
 # ─── Helpers ────────────────────────────────────────────────────
@@ -90,22 +95,26 @@ start_tnoodle() {
     TNOODLE_JAR="$ROOT_DIR/bin/tnoodle.jar"
 
     if [ ! -f "$TNOODLE_JAR" ]; then
-        echo -e "${YELLOW}No tnoodle.jar found in project root. Scramble generation will not work.${NC}"
+        echo -e "${YELLOW}TNoodle JAR not found at bin/tnoodle.jar — scramble API will be unavailable.${NC}"
+        echo -e "${YELLOW}To fix: download TNoodle from https://www.worldcubeassociation.org/regulations/scrambles/ and place the JAR at bin/tnoodle.jar${NC}"
         return
     fi
 
     if ! command -v java > /dev/null 2>&1; then
-        echo -e "${YELLOW}Java not found. TNoodle requires Java to run.${NC}"
+        echo -e "${YELLOW}Java runtime not found — TNoodle requires Java (JRE 8+) to run.${NC}"
+        echo -e "${YELLOW}To fix: install Java via 'brew install openjdk' (macOS) or 'apt install default-jre' (Linux).${NC}"
         return
     fi
 
     if lsof -i:"$TNOODLE_PORT" > /dev/null 2>&1; then
-        echo -e "${YELLOW}TNoodle port $TNOODLE_PORT is already in use. Skipping TNoodle start.${NC}"
+        EXISTING_PID=$(lsof -ti:"$TNOODLE_PORT" 2>/dev/null | head -1)
+        echo -e "${YELLOW}Port $TNOODLE_PORT is already in use (PID: ${EXISTING_PID:-unknown}). Skipping TNoodle start.${NC}"
+        echo -e "${YELLOW}If this is a stale process, run: kill $EXISTING_PID${NC}"
         return
     fi
 
     echo -e "${CYAN}Starting TNoodle server on port $TNOODLE_PORT...${NC}"
-    java -jar "$TNOODLE_JAR" &>/dev/null &
+    java -jar "$TNOODLE_JAR" --nobrowser --noiconbar &>/dev/null &
     TNOODLE_PID=$!
 
     # Wait for TNoodle to become ready
@@ -118,7 +127,7 @@ start_tnoodle() {
         fi
         if ! kill -0 "$TNOODLE_PID" 2>/dev/null; then
             echo -e "${NC}"
-            echo -e "${RED}TNoodle process exited unexpectedly.${NC}"
+            echo -e "${RED}TNoodle process exited unexpectedly. Check that bin/tnoodle.jar is a valid JAR and your Java version is compatible (JRE 8+).${NC}"
             TNOODLE_PID=""
             return
         fi
@@ -126,7 +135,7 @@ start_tnoodle() {
         sleep 1
     done
     echo -e "${NC}"
-    echo -e "${YELLOW}TNoodle started (PID: $TNOODLE_PID) but may not be ready yet.${NC}"
+    echo -e "${YELLOW}TNoodle started (PID: $TNOODLE_PID) but did not respond within 30s. It may still be loading — scramble requests will block until ready.${NC}"
 }
 
 stop_tnoodle() {
@@ -141,7 +150,8 @@ stop_tnoodle() {
 
 start_server() {
     if lsof -i:"$PORT" > /dev/null 2>&1; then
-        echo -e "${YELLOW}Port $PORT is in use. Killing existing process...${NC}"
+        EXISTING_PID=$(lsof -ti:"$PORT" 2>/dev/null | head -1)
+        echo -e "${YELLOW}Port $PORT is already in use (PID: ${EXISTING_PID:-unknown}). Killing existing process...${NC}"
         lsof -ti:"$PORT" | xargs kill -9 2>/dev/null
         sleep 0.3
     fi
