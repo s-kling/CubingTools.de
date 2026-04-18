@@ -368,7 +368,6 @@ ul li::before {
     text-overflow: ellipsis;
     white-space: normal;
     cursor: pointer;
-    width: 50ch;
 }
 
 .scramble-container .icon-btn:hover {
@@ -816,6 +815,7 @@ ul li::before {
     gap: var(--space-md);
     margin-top: var(--space-md);
     align-items: stretch;
+    height: fit-content;
 }
 
 .scramble-box {
@@ -838,7 +838,7 @@ ul li::before {
 /* Bottom-row solves sidebar */
 .bottom-solves {
     flex: 0 0 200px;
-    max-height: 280px;
+    max-height: 290px;
     overflow-y: auto;
     background: var(--main-lighter);
     padding: var(--space-sm);

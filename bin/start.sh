@@ -117,7 +117,7 @@ start_tnoodle() {
     java -jar "$TNOODLE_JAR" --nobrowser --noiconbar &>/dev/null &
     TNOODLE_PID=$!
 
-    # Wait for TNoodle to become ready
+    # Wait for TNoodle to be ready
     echo -ne "${CYAN}Waiting for TNoodle to be ready"
     for i in $(seq 1 30); do
         if curl -s -o /dev/null -w '' "http://localhost:$TNOODLE_PORT" 2>/dev/null; then
@@ -160,6 +160,8 @@ start_server() {
     node "$ROOT_DIR/backend/server.js" $BETA_FLAG &
     SERVER_PID=$!
 
+    pre_generate_scrambles
+
     echo -e "${GREEN}$TYPE server started (PID: $SERVER_PID, port: $PORT).${NC}"
 }
 
@@ -170,6 +172,43 @@ stop_server() {
         wait "$SERVER_PID" 2>/dev/null
         echo -e "${GREEN}$TYPE server stopped.${NC}"
         SERVER_PID=""
+    fi
+}
+
+pre_generate_scrambles() {
+    if [ -n "$TNOODLE_PID" ]; then
+        echo -e "${CYAN}Pre-generating scrambles to warm up TNoodle...${NC}"
+        echo -e "${GREEN}Generating 3x3...${NC}"
+        curl -s "http://localhost:$TNOODLE_PORT/scramble/333" > /dev/null
+        echo -e "${GREEN}Generating 2x2...${NC}"
+        curl -s "http://localhost:$TNOODLE_PORT/scramble/222" > /dev/null
+        echo -e "${GREEN}Generating 4x4...${NC}"
+        curl -s "http://localhost:$TNOODLE_PORT/scramble/444" > /dev/null
+        echo -e "${GREEN}Generating 5x5...${NC}"
+        curl -s "http://localhost:$TNOODLE_PORT/scramble/555" > /dev/null
+        echo -e "${GREEN}Generating 6x6...${NC}"
+        curl -s "http://localhost:$TNOODLE_PORT/scramble/666" > /dev/null
+        echo -e "${GREEN}Generating 7x7...${NC}"
+        curl -s "http://localhost:$TNOODLE_PORT/scramble/777" > /dev/null
+        echo -e "${GREEN}Generating 3x3 Blindfolded...${NC}"
+        curl -s "http://localhost:$TNOODLE_PORT/scramble/333bf" > /dev/null
+        echo -e "${GREEN}Generating 3x3 One-Handed...${NC}"
+        curl -s "http://localhost:$TNOODLE_PORT/scramble/333oh" > /dev/null
+        echo -e "${GREEN}Generating Clock...${NC}"
+        curl -s "http://localhost:$TNOODLE_PORT/scramble/clock" > /dev/null
+        echo -e "${GREEN}Generating Megaminx...${NC}"
+        curl -s "http://localhost:$TNOODLE_PORT/scramble/minx" > /dev/null
+        echo -e "${GREEN}Generating Pyraminx...${NC}"
+        curl -s "http://localhost:$TNOODLE_PORT/scramble/pyram" > /dev/null
+        echo -e "${GREEN}Generating Skewb...${NC}"
+        curl -s "http://localhost:$TNOODLE_PORT/scramble/skewb" > /dev/null
+        echo -e "${GREEN}Generating Square-1...${NC}"
+        curl -s "http://localhost:$TNOODLE_PORT/scramble/sq1" > /dev/null
+        echo -e "${GREEN}Generating 4x4 Blindfolded...${NC}"
+        curl -s "http://localhost:$TNOODLE_PORT/scramble/444bf" > /dev/null
+        echo -e "${GREEN}Generating 5x5 Blindfolded...${NC}"
+        curl -s "http://localhost:$TNOODLE_PORT/scramble/555bf" > /dev/null
+        echo -e "${GREEN}Scrambles pre-generated.${NC}"
     fi
 }
 

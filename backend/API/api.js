@@ -2174,9 +2174,9 @@ const EVENT_TO_TNOODLE_PUZZLE = {
 const TNOODLE_BASE_URL = process.env.TNOODLE_URL || 'http://localhost:2014';
 
 // Prefetch cache: stores one scramble ahead per puzzle key so the next request is instant.
-const scrambleCache = new Map();
+const scrambleCache = {};
 
-function fetchScramblesFromTnoodle(puzzleKey, count) {
+async function fetchScramblesFromTnoodle(puzzleKey, count) {
     return axios
         .get(`${TNOODLE_BASE_URL}/api/v0/scramble/${puzzleKey}`, {
             params: { numScrambles: count },
@@ -2185,14 +2185,14 @@ function fetchScramblesFromTnoodle(puzzleKey, count) {
 }
 
 function prefetchScramble(puzzleKey) {
-    const pending = fetchScramblesFromTnoodle(puzzleKey, 1)
+    const pending = fetchScramblesFromTnoodle(puzzleKey, 3)
         .then((scrambles) => {
-            scrambleCache.set(puzzleKey, { scrambles, pending: false });
+            scrambleCache[puzzleKey] = { scrambles, pending: false };
         })
         .catch(() => {
-            scrambleCache.delete(puzzleKey);
+            delete scrambleCache[puzzleKey];
         });
-    scrambleCache.set(puzzleKey, { scrambles: null, pending: true, promise: pending });
+    scrambleCache[puzzleKey] = { scrambles: null, pending: true, promise: pending };
 }
 
 // Public scramble generation endpoint (uses TNoodle server with one-ahead prefetch).
@@ -2209,17 +2209,17 @@ router.get('/api/scramble/:event', scrambleLimiter, async (req, res) => {
     try {
         // For single-scramble requests, use the prefetch cache.
         if (count === 1) {
-            const cached = scrambleCache.get(puzzleKey);
+            const cached = scrambleCache[puzzleKey];
 
             if (cached?.pending && cached.promise) {
                 await cached.promise;
             }
 
-            const ready = scrambleCache.get(puzzleKey);
+            const ready = scrambleCache[puzzleKey];
 
             if (ready?.scrambles?.length > 0) {
                 const scrambles = ready.scrambles;
-                scrambleCache.delete(puzzleKey);
+                delete scrambleCache[puzzleKey];
                 prefetchScramble(puzzleKey);
                 return res.json({ event, scrambles });
             }
