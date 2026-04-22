@@ -61,7 +61,7 @@
     padding: 0;
     border: 1px solid var(--input-border);
     background: var(--button-background);
-    color: var(--main-text);
+    color: #fff;
     font-weight: 600;
     width: 34px;
     height: 34px;

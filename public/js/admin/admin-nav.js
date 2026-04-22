@@ -79,8 +79,15 @@ function initAdminNav(role, currentPage, username, color) {
         const userBadge = document.createElement('span');
         userBadge.className = 'admin-subnav__user';
         userBadge.textContent = username;
+        userBadge.style.cursor = role !== 'tester' ? 'pointer' : 'default';
         if (color) {
             applyUserColorStyles(userBadge, color);
+        }
+        if (role !== 'tester') {
+            userBadge.onclick = () => {
+                const profileUrl = `/admin/users`;
+                window.open(profileUrl, '_blank');
+            };
         }
         actions.appendChild(userBadge);
     }

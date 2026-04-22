@@ -29,9 +29,18 @@ function createRateLimiter(windowMs, max, message, options = {}) {
     });
 }
 
+/*
+const limier = createRateLimiter(
+    time,
+    maxRequests,
+    'Too many requests, please try again later.',
+    { skipSuccessfulRequests: true } // Optional: only count failed attempts for certain endpoints like login
+)
+*/
+
 const contactLimiter = createRateLimiter(
     10 * 60 * 1000,
-    8,
+    3,
     'Too many contact requests, please try again later.',
 );
 
@@ -2021,37 +2030,41 @@ router.patch(
 );
 
 // Protected TODO read endpoint.
+// Firestore-backed TODO read endpoint.
 router.get(
     '/api/admin/todos',
     adminTodosReadLimiter,
     (req, res, next) => adminSessionApi.requireAuth(req, res, next),
-    (req, res) => {
-        const todoPath = path.join(__dirname, '../../md/TODO.md');
-        if (!fs.existsSync(todoPath)) {
-            return res.status(404).json({ error: 'TODO file not found' });
+    async (req, res) => {
+        try {
+            const doc = await db.collection('meta').doc('todo').get();
+            if (!doc.exists) {
+                return res.status(404).json({ error: 'TODO not found' });
+            }
+            const data = doc.data();
+            return res.json({ content: data.content || '' });
+        } catch (err) {
+            return res.status(500).json({ error: 'Failed to load TODO' });
         }
-        const content = fs.readFileSync(todoPath, 'utf8');
-        return res.json({ content });
     },
 );
 
 // Protected TODO write endpoint.
+// Firestore-backed TODO write endpoint.
 router.post(
     '/api/admin/todos',
     adminTodosWriteLimiter,
     (req, res, next) => adminSessionApi.requireAuth(req, res, next),
-    (req, res) => {
+    async (req, res) => {
         const { content } = req.body || {};
         if (typeof content !== 'string') {
             return res.status(400).json({ error: 'Invalid todo content' });
         }
-
-        const todoPath = path.join(__dirname, '../../md/TODO.md');
         try {
-            fs.writeFileSync(todoPath, content, 'utf8');
+            await db.collection('meta').doc('todo').set({ content });
             return res.json({ success: true });
         } catch {
-            return res.status(500).json({ error: 'Failed to update TODO file' });
+            return res.status(500).json({ error: 'Failed to update TODO' });
         }
     },
 );

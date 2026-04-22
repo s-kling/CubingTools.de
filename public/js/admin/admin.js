@@ -219,7 +219,7 @@ function appendColorPicker(role, username, currentColor) {
     const statusEl = document.createElement('span');
     statusEl.className = 'admin-color-status';
 
-    colorInput.addEventListener('input', () => {
+    colorInput.addEventListener('close', () => {
         applyUserColorStyles(colorBadge, colorInput.value);
     });
 

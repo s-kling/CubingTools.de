@@ -7,10 +7,10 @@
     <title>Average Calculator</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Enter your solve times and instantly see whether your current average is on track to beat your official Personal Record. Compare your practice performance to your WCA profile and analyze what you need to hit your next PR.">
+    <meta name="description" content="Track your solve times with a built-in timer or manual input, and instantly see whether your current average is on track to beat your official Personal Record. Use the timer, compare your practice performance to your WCA profile, and analyze what you need to hit your next PR.">
     <!-- Slogan used only in the carousel -->
     <meta name="slogan" content="Every solve counts. See how much.">
-    <meta name="keywords" content="WCA, world cube association, cubing, speedcubing, tool, tools, cubingtools, cubing tool, cubing tools, ao5, average of 5, mo3, mean of 3, average, mean, calculator, calculate, pr, personal record">
+    <meta name="keywords" content="WCA, world cube association, cubing, speedcubing, tool, tools, cubingtools, cubing tool, cubing tools, ao5, average of 5, mo3, mean of 3, average, mean, calculator, calculate, pr, personal record, timer, stopwatch, online timer, cubing timer, solve timer, manual input, practice, statistics, cstimer, cs timer, twisty timer, twisty">
     
     <!-- Other Fancy Things -->
     <link rel="icon" href="/assets/favicon.ico" type="image/x-icon">
@@ -18,7 +18,7 @@
 
     <!-- Open Graph Metadata (Facebook, LinkedIn, WhatsApp, Discord, etc.) -->
     <meta property="og:title" content="CubingTools.de Average Calculator" />
-    <meta property="og:description" content="Enter your solve times and instantly see whether your current average is on track to beat your official Personal Record. Compare your practice performance to your WCA profile and analyze what you need to hit your next PR." />
+    <meta property="og:description" content="Track your solve times with a built-in timer or manual input, and instantly see whether your current average is on track to beat your official Personal Record. Use the timer, compare your practice performance to your WCA profile, and analyze what you need to hit your next PR." />
     <meta property="og:image" content="/assets/average_logo.png" />
     <meta property="og:image:alt" content="CubingTools.de Logo" />
     <meta property="og:url" content="https://cubingtools.de/tools/average" />
@@ -38,7 +38,7 @@
         "@context": "https://schema.org",
         "@type": "WebSite",
         "name": "CubingTools.de Average Calculator",
-        "description": "Enter your solve times and instantly see whether your current average is on track to beat your official Personal Record. Compare your practice performance to your WCA profile and analyze what you need to hit your next PR.",
+        "description": "Track your solve times with a built-in timer or manual input, and instantly see whether your current average is on track to beat your official Personal Record. Use the timer, compare your practice performance to your WCA profile, and analyze what you need to hit your next PR.",
         "image": "https://cubingtools.de/assets/average_logo.png",
         "url": "https://cubingtools.de/tools/average"
         }
@@ -175,23 +175,23 @@
                 </aside>
                 <div class="stats-box">
                     <div class="stats">
-                        <div class="stat-card">
+                        <div class="stat-card during-average">
                             <span class="stat-label">Mean</span>
                             <span class="stat-value" id="mean">0.00</span>
                         </div>
-                        <div class="stat-card">
+                        <div class="stat-card during-average">
                             <span class="stat-label" title="Best Possible Average">BPA</span>
                             <span class="stat-value" id="bpa">-</span>
                         </div>
-                        <div class="stat-card">
+                        <div class="stat-card during-average">
                             <span class="stat-label" title="Worst Possible Average">WPA</span>
                             <span class="stat-value" id="wpa">-</span>
                         </div>
-                        <div class="stat-card">
+                        <div class="stat-card during-average">
                             <span class="stat-label" title="Time For Target">For Target</span>
                             <span class="stat-value" id="tft">–</span>
                         </div>
-                        <div class="stat-card">
+                        <div class="stat-card after-average">
                             <span class="stat-label" title="Average of N">Average</span>
                             <span class="stat-value" id="average">–</span>
                         </div>
@@ -308,7 +308,7 @@
                                 <span class="settings-label">WCA ID</span>
                                 <span class="settings-desc">Link your WCA profile for PR comparisons</span>
                             </div>
-                            <input type="text" class="settings-input" id="settingsWca" placeholder="e.g. 2023KLIN02" />
+                            <input type="text" class="settings-input" id="settingsWca" maxlength="10" placeholder="e.g. 2023KLIN02" />
                         </div>
                         <div class="settings-row">
                             <div class="settings-row-label">

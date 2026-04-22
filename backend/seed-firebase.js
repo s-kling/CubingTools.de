@@ -11,6 +11,20 @@ const fs = require('fs');
 const path = require('path');
 
 async function seed() {
+        // --- TODO.md (meta/todo in Firestore) ---
+        const todoPath = path.join(__dirname, '../md/TODO.md');
+        if (fs.existsSync(todoPath)) {
+            const todoContent = fs.readFileSync(todoPath, 'utf8');
+            const todoDoc = await db.collection('meta').doc('todo').get();
+            if (todoDoc.exists) {
+                console.log('meta/todo already exists in Firestore, skipping migration.');
+            } else {
+                await db.collection('meta').doc('todo').set({ content: todoContent });
+                console.log('Seeded meta/todo from TODO.md.');
+            }
+        } else {
+            console.log('No TODO.md found, skipping TODO migration.');
+        }
     // --- Users ---
     const usersPath = path.join(__dirname, 'secret', 'users.json');
     if (fs.existsSync(usersPath)) {

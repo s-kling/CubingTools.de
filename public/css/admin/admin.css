@@ -40,12 +40,13 @@
     text-decoration: none;
     font-size: 0.875rem;
     font-weight: 500;
-    transition: background 0.14s ease, color 0.14s ease;
+    transition: all 0.14s ease, color 0.14s ease;
 }
 
 .admin-subnav__link:hover {
     background: var(--hover-background);
     color: var(--hover-text);
+    border-radius: var(--main-radius) var(--main-radius) 0 0;
 }
 
 .admin-subnav__link.is-active {
@@ -253,6 +254,10 @@
     text-decoration: none;
     color: var(--main-text);
     transition: box-shadow 0.16s ease, transform 0.16s ease, border-color 0.16s ease;
+}
+
+.admin-card::before {
+    display: none;
 }
 
 .admin-card:hover {

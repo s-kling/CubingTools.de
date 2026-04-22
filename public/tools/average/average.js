@@ -279,24 +279,19 @@ function calculateStats() {
     const meanElem = document.getElementById('mean');
     const averageElem = document.getElementById('average');
 
-    if (n !== required) {
+    const duringAverageElem = document.querySelectorAll('.during-average');
+    const afterAverageElem = document.querySelectorAll('.after-average');
+
+    if (n !== required && n !== required - 1) {
         averageElem.style.display = 'none';
-        if (meanElem) {
-            meanElem.style.display = 'block';
-            meanElem.textContent = '0.00';
-        }
-        if (bpaElem) {
-            bpaElem.style.display = 'block';
-            bpaElem.textContent = '-';
-        }
-        if (wpaElem) {
-            wpaElem.style.display = 'block';
-            wpaElem.textContent = '-';
-        }
-        if (tftElem) {
-            tftElem.style.display = 'block';
-            tftElem.textContent = '–';
-        }
+        if (meanElem) meanElem.textContent = '0.00';
+        if (bpaElem) bpaElem.textContent = '-';
+        if (wpaElem) wpaElem.textContent = '-';
+        if (tftElem) tftElem.textContent = '–';
+
+        duringAverageElem.forEach((el) => (el.style.display = 'flex'));
+        afterAverageElem.forEach((el) => (el.style.display = 'none'));
+
         return;
     }
 
@@ -306,6 +301,9 @@ function calculateStats() {
         wpaElem.style.display = 'none';
         tftElem.style.display = 'none';
         averageElem.style.display = 'block';
+
+        duringAverageElem.forEach((el) => (el.style.display = 'none'));
+        afterAverageElem.forEach((el) => (el.style.display = 'flex'));
     }
 
     const mean = (state.times.reduce((a, b) => a + b.value, 0) / n).toFixed(2);
@@ -760,7 +758,7 @@ function deleteTime(index) {
             state.times.splice(index, 1);
 
             // Update the delete stat shame counter
-            state.deleteStatShameCounter = (state.deleteStatShameCounter || 0) + 1;
+            state.deleteStatShameCounter = (parseInt(state.deleteStatShameCounter, 10) || 0) + 1;
             localStorage.setItem('deleteStatShameCounter', state.deleteStatShameCounter);
 
             calculateStats();
@@ -1338,7 +1336,8 @@ window.addEventListener('DOMContentLoaded', () => {
         currentHoldDuration = savedHoldDuration;
     }
 
-    state.deleteStatShameCounter = localStorage.getItem('deleteStatShameCounter') || 0;
+    state.deleteStatShameCounter =
+        parseInt(localStorage.getItem('deleteStatShameCounter'), 10) || 0;
 
     state.eventType = document.getElementById('event-type').value;
     if (timerEventSelect) timerEventSelect.value = state.eventType;

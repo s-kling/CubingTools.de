@@ -211,12 +211,11 @@ debugLog(`mode=${betaTest ? 'beta' : 'prod'} logFile=${logFilePath}`);
 debugLog(`bodyParserLimit=${config.body_parser_limit}`);
 
 server.listen(port, () => {
-    console.log(`Listening on port ${port}`);
     debugLog(`server=http://localhost:${port}`);
 });
 
 process.on('SIGINT', () => {
-    console.log('\nReceived SIGINT. Shutting down gracefully...');
+    debugLog('Received SIGINT. Shutting down gracefully...');
     debugLog('closing HTTP server and log stream');
     server.close(() => {
         logStream.end();
@@ -225,9 +224,9 @@ process.on('SIGINT', () => {
 });
 
 process.on('uncaughtException', (error) => {
-    console.error(colorize('red', '[fatal] uncaughtException'), error);
+    debugLog(colorize('red', '[fatal] uncaughtException'), error);
 });
 
 process.on('unhandledRejection', (reason) => {
-    console.error(colorize('red', '[fatal] unhandledRejection'), reason);
+    debugLog(colorize('red', '[fatal] unhandledRejection'), reason);
 });

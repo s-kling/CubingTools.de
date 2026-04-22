@@ -129,7 +129,7 @@ async function loadUsers() {
         state.users = Array.isArray(data.users) ? data.users : [];
         renderTable();
         setStatus(`Loaded ${state.users.length} user(s).`, 'is-success');
-        if (state.role === 'admin') loadTaskPanel();
+        loadTaskPanel();
     } catch {
         setStatus('Failed to load users.', 'is-error');
     }
@@ -490,6 +490,7 @@ async function loadTaskPanel() {
     const tbody = document.createElement('tbody');
 
     sorted.forEach((task) => {
+        if (task.applicable === false) return;
         const due = isDue(task);
         const history = Array.isArray(completions[task.id]) ? completions[task.id] : [];
         const latest = history[0] || null;

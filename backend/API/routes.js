@@ -39,9 +39,10 @@ router.get('/events', (req, res) => {
     res.json({ events: events });
 });
 
-// Serve the main page
-router.get('/privacy-policy', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', '../public/html', 'privacy.html'));
+['/privacy-policy', '/privacy'].forEach(route => {
+    router.get(route, (req, res) => {
+        res.sendFile(path.join(__dirname, '..', '../public/html', 'privacy.html'));
+    });
 });
 
 // Serve the contact page
