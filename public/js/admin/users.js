@@ -463,11 +463,13 @@ async function loadTaskPanel() {
     title.textContent = 'Periodic Task Status';
     header.appendChild(title);
 
-    if (dueTasks.length > 0) {
+    const relevant = tasks.filter((t) => t.applicable !== false && isDue(t));
+
+    if (relevant.length > 0) {
         const badge = document.createElement('span');
         badge.className = 'admin-badge';
-        badge.textContent = String(dueTasks.length);
-        badge.title = `${dueTasks.length} task${dueTasks.length !== 1 ? 's' : ''} currently due`;
+        badge.textContent = String(relevant.length);
+        badge.title = `${relevant.length} task${relevant.length !== 1 ? 's' : ''} currently due`;
         header.appendChild(badge);
     }
 

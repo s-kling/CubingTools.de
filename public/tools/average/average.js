@@ -832,7 +832,7 @@ document.getElementById('wca').addEventListener('input', async () => {
     setStorage('setting_wca', wcaId);
     if (!wcaId) return;
 
-    if (!/\d{4}[a-zA-Z]{4}\d{2}/.test(wcaId)) return;
+    if (!/\d{4}[a-zA-Z]{4}\d{2}/.test(wcaId) || wcaId.length !== 10) return;
 
     try {
         await fetchUserData(wcaId);

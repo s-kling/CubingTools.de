@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <script>(function(){try{var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t);}catch(e){}})()</script>
     <!-- Basic Metadata -->
@@ -33,8 +34,6 @@
             <h2>Tools</h2>
         </div>
 
-        <div id="version"></div>
-
         <main>
             <section class="heading">
                 <h1>Admin Console</h1>
@@ -45,7 +44,7 @@
                 <div id="admin-auth">
                     <label>
                         Username:
-                        <input type="text" id="admin-username" placeholder="Username" autocomplete="username" />
+                        <input type="text" id="admin-username" placeholder="Username" autocomplete="off" />
                     </label>
                     <label>
                         Password:
@@ -72,6 +71,7 @@
                 <div id="dashboard" style="display: none;"></div>
             </section>
         </main>
+        
         <footer id="footer"></footer>
     </div>
 </body>

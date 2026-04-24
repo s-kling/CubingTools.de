@@ -813,7 +813,7 @@ ul li::before {
 .bottom-row {
     display: flex;
     gap: var(--space-md);
-    margin-top: var(--space-md);
+    margin: var(--space-md) 0;
     align-items: stretch;
     height: fit-content;
 }
@@ -921,10 +921,6 @@ main.timer-running .timer-area {
 
 main.timer-running .timer-display {
     font-size: 6rem;
-}
-
-main.timer-running ~ footer {
-    display: none !important;
 }
 
 /* === PROGRESS POPUP === */
@@ -1695,6 +1691,12 @@ main.timer-running ~ footer {
     }
 }
 
+@media (max-width: 650px) {
+    main.timer-running ~ footer {
+        display: none;
+    }
+}
+
 @media (max-width: 480px) {
     /* Sub-navbar: shrink tabs to fit */
     .sub-navbar-tab {
@@ -1770,5 +1772,59 @@ main.timer-running ~ footer {
 
     .stat-card {
         padding: var(--space-xxs);
+    }
+}
+
+@media (max-height: 600px) {
+    .sub-navbar {
+        padding: var(--space-xxs) 0;
+    }
+
+    .scramble-container {
+        padding: var(--space-xxs) var(--space-sm);
+        margin-bottom: 0;
+    }
+
+    .timer-toolbar {
+        margin-bottom: var(--space-xxs);
+    }
+
+    .progress-bar {
+        margin-top: var(--space-xs);
+    }
+
+    .progress-label {
+        margin-bottom: var(--space-xxs);
+    }
+
+    .timer-display,
+    #timeInput {
+        margin: var(--space-sm) 0;
+        font-size: 3rem;
+    }
+
+    .bottom-row {
+        display: none;
+    }
+}
+
+@media (max-height: 480px) {
+    .sub-navbar {
+        display: none;
+    }
+
+    .scramble-container {
+        display: none;
+    }
+
+    .progress-bar,
+    .progress-label {
+        display: none;
+    }
+
+    .timer-display,
+    #timeInput {
+        margin: var(--space-xs) 0;
+        font-size: 2.5rem;
     }
 }

@@ -20,7 +20,7 @@ function formatTimeAgo(date) {
 async function attemptLogin() {
     adminError.style.display = 'none';
 
-    const username = usernameInput.value.trim();
+    const username = usernameInput.value.trim().toLowerCase();
     const password = passwordInput.value.trim();
     if (!username || !password) return;
 
@@ -435,7 +435,7 @@ async function loadPeriodicTasks(role, username) {
     }
 
     const relevant = tasks.filter(
-        (t) => (t.role === 'both' || t.role === role) && t.applicable !== false,
+        (t) => (t.role === 'both' || t.role === role) && t.applicable !== false && isDue(t),
     );
     if (!relevant.length) return;
 
@@ -463,11 +463,11 @@ async function loadPeriodicTasks(role, username) {
     heading.textContent = 'Periodic Tasks';
     header.appendChild(heading);
 
-    if (dueTasks.length > 0) {
+    if (relevant.length > 0) {
         const badge = document.createElement('span');
         badge.className = 'admin-badge';
-        badge.textContent = String(dueTasks.length);
-        badge.setAttribute('aria-label', `${dueTasks.length} tasks due`);
+        badge.textContent = String(relevant.length);
+        badge.setAttribute('aria-label', `${relevant.length} tasks due`);
         header.appendChild(badge);
     }
 

@@ -348,21 +348,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        // One-Time popup as advertisement for the beta version
+        // One-Time popup as advertisement for the beta footer
         localStorage.setItem(
             'beta_popup_shown',
             localStorage.getItem('beta_popup_shown') || 'false',
         );
-        // If on prod version, and at least 3 visits, and haven't shown the popup yet, show the popup
+        // If on prod footer, and at least 3 visits, and haven't shown the popup yet, show the popup
         if (
             (location.hostname === 'cubingtools.de' || location.port === '8001') &&
             parseInt(localStorage.getItem('visits') || '0', 10) >= 3 &&
             localStorage.getItem('beta_popup_shown') === 'false'
         ) {
             showUserFeedbackPopup({
-                title: 'Try our beta version!',
+                title: 'Try our beta footer!',
                 message:
-                    'Experience the latest features and improvements by trying out our beta version. Click the button below to switch to the beta release.',
+                    'Experience the latest features and improvements by trying out our beta footer. Click the button below to switch to the beta release.',
                 variant: 'info',
                 eyebrow: 'New features',
                 primaryActionLabel: 'Try Beta',
@@ -370,7 +370,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 primaryActionTarget: '_self',
                 primaryActionRel: '',
                 dismissLabel: 'No thanks',
-                dedupeKey: 'beta-version-promo',
+                dedupeKey: 'beta-footer-promo',
             });
             localStorage.setItem('beta_popup_shown', 'true');
         }
@@ -388,19 +388,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     loadTools();
-    const packageVersion = await addVersionTag();
+    addFooterTag();
     setupNavbar();
-    setupFooter(packageVersion);
 });
 
 function addCookieConsentBanner() {
     const cookiesAccepted = localStorage.getItem('cookies_accepted');
     const message = !cookiesAccepted
-        ? 'We use cookies to improve your experience. By accepting these cookies, you agree to our privacy policy.'
+        ? 'We use cookies to improve your experience. By accepting these cookies, you agree to our privacy policy. By using the site even without accepting, you agree to the <a href="/privacy?terms=latest" style="color: #ffd700;">terms and conditions</a>.'
         : 'Our privacy policies have changed. Please review and accept again.';
 
     const messageHtml = !cookiesAccepted
-        ? 'We use cookies to improve your experience. By accepting these cookies, you agree to our <a href="/privacy-policy" style="color: #ffd700;">privacy policy</a>.'
+        ? 'We use cookies to improve your experience. By accepting these cookies, you agree to our <a href="/privacy" style="color: #ffd700;">privacy policy</a>. By using the site even without accepting, you agree to the <a href="/privacy?terms=latest" style="color: #ffd700;">terms and conditions</a>.'
         : 'Our <a href="/privacy-policy" style="color: #ffd700;">privacy policies</a> have changed. Please review and accept again.';
 
     showUserFeedbackPopup({
@@ -504,30 +503,56 @@ async function loadTools() {
     }
 }
 
-async function addVersionTag() {
-    const versionElement = document.createElement('a');
-    let version = '...';
-    versionElement.className = 'version-tag';
-    versionElement.innerText = 'Loading...';
-    versionElement.href = 'https://github.com/s-kling/cubingtools.de/releases/';
+async function addFooterTag() {
+    const bar = document.getElementById('footer');
+    bar.innerHTML = '';
 
+    let footer = 'unknown';
+
+    // ── Top row ──────────────────────────────────────────
+    const top = document.createElement('div');
+    top.className = 'footer-tag__top';
+
+    const versionLink = document.createElement('a');
+    versionLink.className = 'footer-tag__version';
+    versionLink.href = 'https://github.com/s-kling/cubingtools.de/releases/';
+    versionLink.target = '_blank';
+    versionLink.rel = 'noopener noreferrer';
+    versionLink.textContent = 'Loading…';
+
+    top.appendChild(versionLink);
+
+    // ── Bottom row ────────────────────────────────────────
+    const bottom = document.createElement('div');
+    bottom.className = 'footer-tag__links';
+
+    [
+        { label: 'Made by Sebastian Kling', href: '/contact' },
+        { label: 'GitHub', href: 'https://github.com/s-kling/cubingtools.de', external: true },
+    ].forEach(({ label, href, external }) => {
+        const a = document.createElement('a');
+        a.textContent = label;
+        a.href = href;
+        if (external) {
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+        }
+        bottom.appendChild(a);
+    });
+
+    bar.appendChild(top);
+    bar.appendChild(bottom);
+
+    // ── Fetch version ─────────────────────────────────────
     try {
         const response = await fetch('/api/version');
-        const versionData = await response.json();
-        version = versionData.version || 'unknown';
+        const data = await response.json();
+        version = data.version || 'unknown';
 
-        versionElement.innerText =
-            window.location.port == 8001 || window.location.hostname === 'beta.cubingtools.de'
-                ? `BETA ${version}`
-                : `v${version}`;
-    } catch (error) {
-        console.error('Error loading version:', error);
-        versionElement.innerText = 'Error loading version';
+        versionLink.innerHTML = `${window.location.hostname}&nbsp;<span class="footer-tag__num">v${version}</span>`;
+    } catch {
+        versionLink.textContent = window.location.hostname;
     }
-
-    document.getElementById('version').appendChild(versionElement);
-
-    return version;
 }
 
 function setupNavbar() {
@@ -651,45 +676,4 @@ function setupNavbar() {
             hamburger.checked = false;
         }
     });
-}
-
-function setupFooter(packageVersion) {
-    const footer = document.getElementById('footer');
-    footer.innerHTML = '';
-
-    const footerDiv = document.createElement('div');
-    footerDiv.className = 'footer-content';
-
-    // Copyright
-    const footerText = document.createElement('a');
-    footerText.innerHTML = `${window.location.hostname} v${packageVersion} by Sebastian Kling`;
-    footerText.href = '/contact';
-    footerText.className = 'small-screen';
-
-    // Credit
-    const creditText = document.createElement('p');
-    creditText.innerHTML = 'Developed by ';
-    creditText.className = 'big-screen';
-
-    const name = document.createElement('a');
-    name.href = '/contact';
-    name.innerText = 'Sebastian Kling';
-    creditText.appendChild(name);
-
-    // Privacy Policy
-    const privacyText = document.createElement('p');
-    privacyText.innerText = 'For more information on how we handle your data, please read our ';
-    privacyText.className = 'big-screen';
-
-    const privacyLink = document.createElement('a');
-    privacyLink.href = '/privacy-policy';
-    privacyLink.innerText = 'Privacy Policy';
-    privacyText.appendChild(privacyLink);
-
-    // Append elements to footer
-    footerDiv.appendChild(footerText);
-    footerDiv.appendChild(creditText);
-    footerDiv.appendChild(privacyText);
-
-    footer.appendChild(footerDiv);
 }
