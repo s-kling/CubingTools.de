@@ -1,3 +1,25 @@
+/* PR rank pill for stat cards (overlap style) */
+.pr-rank-pill {
+    display: inline-block;
+    background: var(--button-background, #4F46E5);
+    color: var(--button-color, #fff);
+    font-weight: 600;
+    font-size: 0.85em;
+    padding: 0 10px;
+    height: 22px;
+    line-height: 22px;
+    border-radius: 11px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+    border: 1px solid var(--card-border, #333);
+    pointer-events: none;
+    white-space: nowrap;
+    opacity: 1;
+    position: absolute;
+    left: 50%;
+    transform: translate(-50%, 50%);
+    bottom: 0;
+    z-index: 2;
+}
 main {
     display: flex;
     flex-direction: column;
@@ -57,6 +79,10 @@ ul li::before {
     white-space: nowrap;
     min-width: 100px;
     text-align: center;
+}
+
+.sub-navbar-tab:hover {
+    background: transparent !important;
 }
 
 .sub-navbar-tab.active {
@@ -1582,6 +1608,7 @@ main.timer-running .timer-display {
 
     /* ── Bottom row: stack on mobile ── */
     .bottom-row {
+        margin: 0;
         flex-direction: row;
         flex-wrap: wrap;
         gap: var(--space-xs);

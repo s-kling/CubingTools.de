@@ -873,15 +873,16 @@ main input[type="checkbox"] + label::before {
 @media only screen and (max-width: 650px) {
     .container { 
         grid-template-columns: 1fr;
-        grid-template-rows: 0.5fr 0.6fr 5.0fr 0.4fr;
+        grid-template-rows: 0.5fr 0.6fr 5.0fr;
         grid-template-areas:
             "nav"
             "sidebar"
             "main"
-            "footer";
+            /* "footer"; */
     }
 
     footer {
+        display: none;
         justify-content: center;
         gap: var(--space-sm);
         flex-wrap: wrap;

@@ -628,6 +628,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+document.getElementById('averageEventType').addEventListener('change', loadAverageToolData);
+document.getElementById('sourceAverage').addEventListener('click', loadAverageToolData);
+
 function loadAverageToolData() {
     setDataSourceMode('average');
 

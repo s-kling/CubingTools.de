@@ -283,8 +283,6 @@ function calculateStats() {
     const afterAverageElem = document.querySelectorAll('.after-average');
 
     if (n !== required && n !== required - 1) {
-        averageElem.style.display = 'none';
-        if (meanElem) meanElem.textContent = '0.00';
         if (bpaElem) bpaElem.textContent = '-';
         if (wpaElem) wpaElem.textContent = '-';
         if (tftElem) tftElem.textContent = '–';
@@ -296,17 +294,12 @@ function calculateStats() {
     }
 
     if (n >= required) {
-        meanElem.style.display = 'none';
-        bpaElem.style.display = 'none';
-        wpaElem.style.display = 'none';
-        tftElem.style.display = 'none';
-        averageElem.style.display = 'block';
-
         duringAverageElem.forEach((el) => (el.style.display = 'none'));
         afterAverageElem.forEach((el) => (el.style.display = 'flex'));
     }
 
     const mean = (state.times.reduce((a, b) => a + b.value, 0) / n).toFixed(2);
+    if (meanElem) meanElem.textContent = isFinite(mean) ? formatTime(parseFloat(mean)) : 'DNF';
     let ao5 = null;
     let mo3 = null;
 
@@ -333,14 +326,50 @@ function calculateStats() {
     tft = tft ? tft : '-';
     tft = !isNaN(tft) ? formatTime(tft) : tft;
 
-    if (meanElem)
-        meanElem.textContent = mean
-            ? isFinite(mean)
-                ? formatTime(parseFloat(mean))
-                : 'DNF'
-            : '0.00';
-    if (bpaElem) bpaElem.textContent = bpa === 'DNF' ? 'DNF' : !isNaN(bpa) ? formatTime(bpa) : '-';
-    if (wpaElem) wpaElem.textContent = wpa === 'DNF' ? 'DNF' : !isNaN(wpa) ? formatTime(wpa) : '-';
+    // Show PR rank for BPA and WPA
+    // Helper to set value and PR rank below
+    function setStatWithPr(elem, value, prRank) {
+        if (!elem) return;
+        elem.innerHTML = '';
+        elem.style.position = 'relative';
+        const valueDiv = document.createElement('div');
+        valueDiv.textContent = value;
+        valueDiv.style.position = 'relative';
+        valueDiv.style.zIndex = '1';
+        elem.appendChild(valueDiv);
+        if (prRank) {
+            const prDiv = document.createElement('div');
+            prDiv.className = 'pr-rank-pill';
+            prDiv.textContent = `PR #${prRank}`;
+            prDiv.style.opacity = '0.8';
+            prDiv.style.fontSize = '0.7em';
+            prDiv.style.position = 'absolute';
+            prDiv.style.left = '50%';
+            prDiv.style.transform = 'translate(-50%, 100%)';
+            prDiv.style.bottom = '0';
+            prDiv.style.zIndex = '2';
+            elem.appendChild(prDiv);
+        }
+    }
+
+    // BPA
+    if (bpaElem) {
+        let bpaText = bpa === 'DNF' ? 'DNF' : !isNaN(bpa) ? formatTime(bpa) : '-';
+        let bpaRank = null;
+        if (bpa !== '-' && bpa !== 'DNF' && isFinite(bpa)) {
+            bpaRank = getAverageRank(bpa);
+        }
+        setStatWithPr(bpaElem, bpaText, bpaRank);
+    }
+    // WPA
+    if (wpaElem) {
+        let wpaText = wpa === 'DNF' ? 'DNF' : !isNaN(wpa) ? formatTime(wpa) : '-';
+        let wpaRank = null;
+        if (wpa !== '-' && wpa !== 'DNF' && isFinite(wpa)) {
+            wpaRank = getAverageRank(wpa);
+        }
+        setStatWithPr(wpaElem, wpaText, wpaRank);
+    }
     if (tftElem) tftElem.textContent = tft;
 
     const event = document.getElementById('event-type').value;
@@ -349,12 +378,9 @@ function calculateStats() {
         const avgId = state.times[state.times.length - 1].averageId;
 
         const alreadySaved = state.averageTags.some((tag) => tag.averageId === avgId);
-        console.log(alreadySaved);
         if (!alreadySaved) {
             const newTag = { average: mo3, times: state.times.slice(-3), event, averageId: avgId };
-            console.log(newTag);
             state.averageTags.push(newTag);
-            console.log(state.averageTags);
             state.previousAverage = newTag;
 
             const moVal = parseFloat(mo3);
@@ -370,7 +396,13 @@ function calculateStats() {
             saveAverages();
             deleteStorage(`ct_incomplete_${event}`);
             state.userAverages.push(mo3 === 'DNF' ? 'DNF' : parseFloat(mo3));
-            averageElem.innerText = mo3 === 'DNF' ? 'DNF' : formatTime(parseFloat(mo3));
+            // Show PR rank for Mo3 below
+            let mo3Text = mo3 === 'DNF' ? 'DNF' : formatTime(parseFloat(mo3));
+            let mo3Rank = null;
+            if (mo3 !== 'DNF' && isFinite(mo3)) {
+                mo3Rank = getAverageRank(mo3);
+            }
+            setStatWithPr(averageElem, mo3Text, mo3Rank);
             displayTags();
             updateProgress();
             updateSessionStats();
@@ -382,12 +414,9 @@ function calculateStats() {
         const avgId = state.times[state.times.length - 1].averageId;
 
         const alreadySaved = state.averageTags.some((tag) => tag.averageId === avgId);
-        console.log(alreadySaved);
         if (!alreadySaved) {
             const newTag = { average: ao5, times: state.times.slice(-5), event, averageId: avgId };
-            console.log(newTag);
             state.averageTags.push(newTag);
-            console.log(state.averageTags);
             state.previousAverage = newTag;
 
             const aoVal = parseFloat(ao5);
@@ -403,7 +432,13 @@ function calculateStats() {
             saveAverages();
             deleteStorage(`ct_incomplete_${event}`);
             state.userAverages.push(ao5 === 'DNF' ? 'DNF' : parseFloat(ao5));
-            averageElem.innerText = ao5 === 'DNF' ? 'DNF' : formatTime(parseFloat(ao5));
+            // Show PR rank for Ao5 below
+            let ao5Text = ao5 === 'DNF' ? 'DNF' : formatTime(parseFloat(ao5));
+            let ao5Rank = null;
+            if (ao5 !== 'DNF' && isFinite(ao5)) {
+                ao5Rank = getAverageRank(ao5);
+            }
+            setStatWithPr(averageElem, ao5Text, ao5Rank);
             displayTags();
             updateProgress();
             updateSessionStats();
@@ -871,11 +906,20 @@ async function fetchUserData(wcaId) {
         }),
     ]);
 
-    state.userSolves = Array.isArray(solvesData?.allResults) ? solvesData.allResults : [];
-    state.userAverages = Array.isArray(averagesData?.allAverages) ? averagesData.allAverages : [];
+    // Do not overwrite existing solves/averages
+    const newSolves = Array.isArray(solvesData?.allResults) ? solvesData.allResults : [];
+    const newAverages = Array.isArray(averagesData?.allAverages) ? averagesData.allAverages : [];
 
-    state.userSolves = state.userSolves.map((t) => (t <= 0 ? Infinity : t / 100));
-    state.userAverages = state.userAverages.map((t) => (t <= 0 ? Infinity : t / 100));
+    // Convert and append, avoiding duplicates
+    const convertedSolves = newSolves.map((t) => (t <= 0 ? Infinity : t / 100));
+    const convertedAverages = newAverages.map((t) => (t <= 0 ? Infinity : t / 100));
+
+    // Append only new solves/averages that are not already present
+    state.userSolves = [
+        ...state.userSolves,
+        ...convertedSolves.filter((t) => !state.userSolves.includes(t)),
+    ];
+    state.userAverages = [...state.userAverages];
 }
 
 // === Rank helpers ===
@@ -1285,6 +1329,27 @@ eventSelector.addEventListener('change', async (e) => {
     updatePrTarget();
     updateTargetDisplay();
     fetchScramble();
+
+    // Reload WCA data if a valid WCA ID is present, since rankings are event-specific
+    const wcaId = document.getElementById('wca').value.trim().toUpperCase();
+    if (/\d{4}[a-zA-Z]{4}\d{2}/.test(wcaId)) {
+        try {
+            console.log('Reloading WCA data for new event:', newEvent);
+            await fetchUserData(wcaId);
+            calculateStats();
+            updatePrTarget();
+        } catch (err) {
+            console.error(err);
+            window.showUserErrorPopup({
+                title: 'Could not load WCA data',
+                message: 'WCA results could not be loaded for the average calculator.',
+                error: err,
+                reportTitle: 'Average calculator failed to load WCA data on event switch',
+                reportContext: `Loading WCA data failed for ${wcaId} in event ${newEvent} after switching from ${lastEventType}.`,
+                dedupeKey: `average-wca:${wcaId}:${newEvent}`,
+            });
+        }
+    }
 
     // Keep timer event select in sync
     if (timerEventSelect) timerEventSelect.value = newEvent;
@@ -1705,6 +1770,63 @@ function addTimerTime(time) {
             scramble: state.currentScramble,
             event: event,
         };
+    }
+
+    // If the time is a new PR single, have "🎉" explode out of the target display
+    const isPr = getSingleRank(time) === 1;
+    if (isPr && state.userSolves.length > 1) {
+        triggerPRAnimation();
+    }
+
+    function triggerPRAnimation() {
+        const targetEl = document.getElementById('timerDisplay');
+
+        const targetRect = targetEl.getBoundingClientRect();
+        const originX = targetRect.left + targetRect.width / 2;
+        const originY = targetRect.top;
+        const count = 10;
+
+        // pixels per metre - tune this to taste
+        const SCALE = 150;
+        const GRAVITY = 9.81 * SCALE; // px/s²
+
+        for (let i = 0; i < count; i++) {
+            const particle = document.createElement('div');
+            particle.textContent = '🎉';
+            particle.style.cssText = `
+                position: fixed;
+                left: ${originX}px;
+                top: ${originY}px;
+                font-size: ${14 + Math.random() * 18}px;
+                pointer-events: none;
+                z-index: 9999;
+            `;
+            document.body.appendChild(particle);
+
+            // Spread horizontally, always launch upward
+            const vx = (Math.random() * 2 - 1) * SCALE * 2; // ±150 px/s horizontal
+            const vy = -(2 + Math.random() * 3) * SCALE; // 2–5 m/s upward (negative = up)
+            const startTime = performance.now();
+
+            function animate(now) {
+                const t = (now - startTime) / 1000;
+                const x = originX + vx * t;
+                const y = originY + vy * t + 0.5 * GRAVITY * t * t;
+                const opacity = Math.max(0, 1 - t / 2);
+
+                particle.style.left = `${x}px`;
+                particle.style.top = `${y}px`;
+                particle.style.opacity = opacity;
+
+                if (y < window.innerHeight + 50 && opacity > 0) {
+                    requestAnimationFrame(animate);
+                } else {
+                    particle.remove();
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
     }
 
     calculateStats();
