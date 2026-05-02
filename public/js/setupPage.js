@@ -526,19 +526,18 @@ async function addFooterTag() {
     const bottom = document.createElement('div');
     bottom.className = 'footer-tag__links';
 
-    [
-        { label: 'Made by Sebastian Kling', href: '/contact' },
-        { label: 'GitHub', href: 'https://github.com/s-kling/cubingtools.de', external: true },
-    ].forEach(({ label, href, external }) => {
-        const a = document.createElement('a');
-        a.textContent = label;
-        a.href = href;
-        if (external) {
-            a.target = '_blank';
-            a.rel = 'noopener noreferrer';
-        }
-        bottom.appendChild(a);
-    });
+    [{ label: 'Made by Sebastian Kling', href: '/contact' }].forEach(
+        ({ label, href, external }) => {
+            const a = document.createElement('a');
+            a.textContent = label;
+            a.href = href;
+            if (external) {
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+            }
+            bottom.appendChild(a);
+        },
+    );
 
     bar.appendChild(top);
     bar.appendChild(bottom);

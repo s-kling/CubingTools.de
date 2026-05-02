@@ -1,6 +1,6 @@
 {
   "name": "cubingtools",
-  "version": "1.2.11",
+  "version": "1.2.12",
   "main": "backend/server.js",
   "scripts": {
     "debug": "node inspect backend/server.js",
@@ -12,6 +12,7 @@
   "author": "S. Kling",
   "license": "MIT",
   "description": "",
+  "type": "module",
   "dependencies": {
     "@google-cloud/recaptcha-enterprise": "^6.4.0",
     "axios": "^1.7.9",
@@ -23,6 +24,8 @@
     "firebase-admin": "^13.8.0",
     "nodemailer": "^8.0.4",
     "npm": "^11.7.0",
-    "sanitize-html": "^2.17.0"
+    "readline": "^1.3.0",
+    "sanitize-html": "^2.17.0",
+    "unzipper": "^0.12.3"
   }
 }

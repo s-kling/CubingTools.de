@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <script>(function(){try{var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t);}catch(e){}})()</script>
+    <!-- Basic Metadata -->
+    <title>WCA Competition Analyzer</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Search competitions, explore rounds, and see statistical competitor rankings; including live updates during ongoing events.">
+    <!-- Slogan used only in the carousel -->
+    <meta name="slogan" content="Explore rounds, analyze competitors.">
+    <meta name="keywords" content="WCA, world cube association, cubing, speedcubing, tool, tools, cubingtools, cubing tool, cubing tools, competition, rounds, analyzer, statistics, rankings, live results, competitor analysis">
+    
+    <!-- Other Fancy Things -->
+    <link rel="icon" href="/assets/favicon.ico" type="image/x-icon">
+    <link rel="apple-touch-icon" href="/assets/logo_no_text.png">
+
+    <!-- Open Graph Metadata (Facebook, LinkedIn, WhatsApp, Discord, etc.) -->
+    <meta property="og:title" content="CubingTools.de Competition Analyzer" />
+    <meta property="og:description" content="Search competitions, explore rounds, and see statistical competitor rankings; including live updates during ongoing events." />
+    <meta property="og:image" content="/assets/rounds_logo.png" />
+    <meta property="og:image:alt" content="CubingTools.de Logo" />
+    <meta property="og:url" content="https://cubingtools.de/tools/rounds" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="en_US" />
+    
+    <!-- Twitter Card Metadata -->
+    <!-- We boycott Twitter/X -->
+  
+    <!-- Fallback Metadata -->
+    <meta name="robots" content="index, follow">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  
+    <!-- Structured Data (for Google) -->
+    <script type="application/ld+json">
+        {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "CubingTools.de Competition Analyzer",
+        "description": "Search competitions, explore rounds, and see statistical competitor rankings; including live updates during ongoing events.",
+        "image": "https://cubingtools.de/assets/rounds_logo.png",
+        "url": "https://cubingtools.de/tools/rounds"
+        }
+    </script>
+  
+    <!-- CSS Stylesheets -->
+    <link rel="stylesheet" href="https://cdn.cubing.net/v0/css/@cubing/icons/css">
+    <link rel="stylesheet" href="../../css/global.css">
+    <link rel="stylesheet" href="/css/rounds">
+
+    <!-- JS Files -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+    <script src="../../js/setupPage.js" defer></script>
+    <script src="/js/rounds" defer></script>
+</head>
+
+<body>
+    <div class="container">
+        <nav id="navbar"></nav>
+
+        <div id="sidebar">
+            <h2>Tools</h2>
+        </div>
+
+        <main>
+            <section class="heading">
+                <div class="scout-root">
+                
+                <!-- Page heading -->
+                <div class="scout-header">
+                    <h1>WCA Competition Round Analyzer</h1>
+                    <p>Search competitions, explore rounds, and see statistical competitor rankings — including live updates during ongoing events.</p>
+                </div>
+                
+                <!-- Search + country filter -->
+                <div class="scout-search-row">
+                    <div class="scout-search-wrap">
+                    <svg class="scout-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <input
+                        id="scoutSearch"
+                        class="scout-search-input"
+                        type="text"
+                        placeholder="Search by name or city…"
+                        autocomplete="off"
+                        spellcheck="false"
+                    />
+                    <button class="scout-search-clear" id="scoutSearchClear" aria-label="Clear search">✕</button>
+                    </div>
+                    <select id="scoutCountry" class="scout-country-select" aria-label="Filter by country">
+                        <option value="">🌍 All countries</option>
+                        <option value="DE">🇩🇪 Germany</option>
+                        <option value="AT">🇦🇹 Austria</option>
+                        <option value="CH">🇨🇭 Switzerland</option>
+                        <option value="US">🇺🇸 USA</option>
+                        <option value="GB">🇬🇧 UK</option>
+                        <option value="FR">🇫🇷 France</option>
+                        <option value="NL">🇳🇱 Netherlands</option>
+                        <option value="PL">🇵🇱 Poland</option>
+                        <option value="CN">🇨🇳 China</option>
+                        <option value="JP">🇯🇵 Japan</option>
+                        <option value="AU">🇦🇺 Australia</option>
+                        <option value="BR">🇧🇷 Brazil</option>
+                        <option value="CA">🇨🇦 Canada</option>
+                        <option value="ES">🇪🇸 Spain</option>
+                        <option value="IT">🇮🇹 Italy</option>
+                        <option value="SE">🇸🇪 Sweden</option>
+                        <option value="CZ">🇨🇿 Czechia</option>
+                    </select>
+                </div>
+                
+                <!-- Filter chips -->
+                <div class="scout-filters">
+                    <button class="scout-chip active" data-filter="all">All</button>
+                    <button class="scout-chip" data-filter="ongoing">🟢 Live now</button>
+                    <button class="scout-chip" data-filter="upcoming">Upcoming</button>
+                </div>
+                
+                <!-- Results list -->
+                <div id="scoutResults" class="scout-results">
+                    <div class="scout-loading"><div class="scout-spinner"></div>Loading competitions…</div>
+                    <button class="scout-comp-card" data-id="HessenOpen2026" aria-label="Hessen Open 2026">
+                        <span class="scout-status-dot"></span>
+                        <span class="scout-comp-info">
+                            <span class="scout-comp-name">Hessen Open 2026</span>
+                            <span class="scout-comp-meta">
+                            <span>🇩🇪 Lampertheim-Hofheim</span>
+                            <span>16 May 2026 – 17 May 2026</span>
+                            
+                            </span>
+                        </span>
+                        <span class="scout-comp-arrow">›</span>
+                        </button>
+                </div>
+                
+                </div><!-- /.scout-root -->
+
+            <div class="scout-backdrop" id="scoutBackdrop"></div>
+            <aside class="scout-drawer" id="scoutDrawer" role="dialog" aria-modal="true" aria-labelledby="scoutDrawerTitle">
+            <div class="scout-drawer-head">
+                <div class="scout-drawer-head-info">
+                <div class="scout-drawer-title" id="scoutDrawerTitle">Competition</div>
+                <div class="scout-drawer-meta" id="scoutDrawerMeta"></div>
+                </div>
+                <button class="scout-close-btn" id="scoutDrawerClose" aria-label="Close">✕</button>
+            </div>
+            <div class="scout-drawer-body" id="scoutDrawerBody">
+                <div class="scout-loading"><div class="scout-spinner"></div>Loading events…</div>
+            </div>
+            </aside>
+            
+            <div class="scout-overlay" id="scoutOverlay">
+                <div class="scout-overlay-panel">
+                    <div class="scout-overlay-head">
+                    <button class="scout-back-btn" id="scoutOverlayBack" aria-label="Back">← Back</button>
+                    <div class="scout-overlay-title" id="scoutOverlayTitle">Round Analysis</div>
+                    <button class="scout-refresh-btn" id="scoutRefreshBtn" aria-label="Refresh">
+                        <span class="scout-refresh-icon">↻</span> Refresh
+                    </button>
+                    </div>
+                    <div class="scout-overlay-body" id="scoutOverlayBody">
+                    <div class="scout-loading"><div class="scout-spinner"></div>Analysing competitors…</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="scout-inspector" id="scoutInspector" role="dialog" aria-modal="true" aria-labelledby="scoutInspectorName">
+                <div class="scout-inspector-bg" id="scoutInspectorBg"></div>
+                <div class="scout-inspector-card">
+                    <div class="scout-inspector-head">
+                    <div class="scout-avatar" id="scoutInspAvatar">?</div>
+                    <div class="scout-inspector-name-wrap">
+                        <div class="scout-inspector-name" id="scoutInspectorName">Competitor</div>
+                        <div class="scout-inspector-sub" id="scoutInspectorSub"></div>
+                    </div>
+                    <button class="scout-close-btn" id="scoutInspClose" aria-label="Close inspector">✕</button>
+                    </div>
+                    <div class="scout-inspector-body" id="scoutInspectorBody">
+                    <div class="scout-loading"><div class="scout-spinner"></div>Loading…</div>
+                    </div>
+                </div>
+            </div>
+            </section>
+        </main>
+        
+        <footer id="footer"></footer>
+    </div>
+</body>
+
+</html>

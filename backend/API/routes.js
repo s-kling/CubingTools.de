@@ -1,9 +1,10 @@
-const express = require('express');
-const path = require('path');
+import express from 'express';
+import path from 'path';
 const router = express.Router();
-const events = require('../events');
+import events from '../events.js';
 
 // Import logging from ../server.js
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
 // Allowlist: tool/asset names may only contain alphanumeric chars, hyphens, and underscores.
 const SAFE_NAME_RE = /^[a-zA-Z0-9_-]+$/;
@@ -39,7 +40,7 @@ router.get('/events', (req, res) => {
     res.json({ events: events });
 });
 
-['/privacy-policy', '/privacy'].forEach(route => {
+['/privacy-policy', '/privacy'].forEach((route) => {
     router.get(route, (req, res) => {
         res.sendFile(path.join(__dirname, '..', '../public/html', 'privacy.html'));
     });
@@ -205,4 +206,4 @@ router.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '..', '../public/html', '404.html'), (err) => {});
 });
 
-module.exports = router;
+export default router;

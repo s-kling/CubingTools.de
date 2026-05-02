@@ -149,6 +149,21 @@ stop_tnoodle() {
 }
 
 start_server() {
+    # Stop offline server if running
+    local OFFLINE_PORT
+    if [ "$TYPE" = "beta" ]; then
+        OFFLINE_PORT=8001
+    else
+        OFFLINE_PORT=8000
+    fi
+    if lsof -i:"$OFFLINE_PORT" > /dev/null 2>&1; then
+        EXISTING_OFFLINE_PID=$(lsof -ti:"$OFFLINE_PORT" 2>/dev/null | head -1)
+        echo -e "${YELLOW}Offline server running on port $OFFLINE_PORT (PID: ${EXISTING_OFFLINE_PID:-unknown}). Stopping it...${NC}"
+        lsof -ti:"$OFFLINE_PORT" | xargs kill -9 2>/dev/null
+        sleep 0.3
+        echo -e "${GREEN}Offline server stopped.${NC}"
+    fi
+
     if lsof -i:"$PORT" > /dev/null 2>&1; then
         EXISTING_PID=$(lsof -ti:"$PORT" 2>/dev/null | head -1)
         echo -e "${YELLOW}Port $PORT is already in use (PID: ${EXISTING_PID:-unknown}). Killing existing process...${NC}"
@@ -172,7 +187,77 @@ stop_server() {
         wait "$SERVER_PID" 2>/dev/null
         echo -e "${GREEN}$TYPE server stopped.${NC}"
         SERVER_PID=""
+        start_offline
     fi
+}
+
+start_offline() {
+    # Start offline server (offline.js) on the correct port
+    local OFFLINE_PORT
+    if [ "$TYPE" = "beta" ]; then
+        OFFLINE_PORT=8001
+    else
+        OFFLINE_PORT=8000
+    fi
+
+    # Stop main server if running on the same port
+    if lsof -i:"$OFFLINE_PORT" > /dev/null 2>&1; then
+        # Try to detect if it's the main server (backend/server.js) and not offline.js
+        EXISTING_PID=$(lsof -ti:"$OFFLINE_PORT" 2>/dev/null | head -1)
+        if [ -n "$EXISTING_PID" ]; then
+            CMDLINE=$(ps -p "$EXISTING_PID" -o args=)
+            if [[ "$CMDLINE" == *"backend/server.js"* ]]; then
+                echo -e "${YELLOW}Main server running on port $OFFLINE_PORT (PID: $EXISTING_PID). Stopping it...${NC}"
+                kill -9 "$EXISTING_PID" 2>/dev/null
+                sleep 0.3
+                echo -e "${GREEN}Main server stopped.${NC}"
+            fi
+        fi
+    fi
+
+    # Kill any process using the offline port
+    if lsof -i:"$OFFLINE_PORT" > /dev/null 2>&1; then
+        EXISTING_PID=$(lsof -ti:"$OFFLINE_PORT" 2>/dev/null | head -1)
+        echo -e "${YELLOW}Port $OFFLINE_PORT is already in use (PID: ${EXISTING_PID:-unknown}). Killing existing process...${NC}"
+        lsof -ti:"$OFFLINE_PORT" | xargs kill -9 2>/dev/null
+        sleep 0.3
+    fi
+
+    echo -e "${CYAN}Starting offline server on port $OFFLINE_PORT...${NC}"
+    node "$ROOT_DIR/offline/offline.js" $BETA_FLAG &
+    OFFLINE_PID=$!
+    echo -e "${GREEN}Offline server started (PID: $OFFLINE_PID, port: $OFFLINE_PORT).${NC}"
+}
+
+stop_offline() {
+    # Stop offline server if running
+    local OFFLINE_PORT
+    if [ "$TYPE" = "beta" ]; then
+        OFFLINE_PORT=8001
+    else
+        OFFLINE_PORT=8000
+    fi
+
+    # Find and kill process using the offline port
+    if lsof -i:"$OFFLINE_PORT" > /dev/null 2>&1; then
+        EXISTING_PID=$(lsof -ti:"$OFFLINE_PORT" 2>/dev/null | head -1)
+        echo -e "${CYAN}Stopping offline server (PID: ${EXISTING_PID:-unknown})...${NC}"
+        lsof -ti:"$OFFLINE_PORT" | xargs kill -9 2>/dev/null
+        echo -e "${GREEN}Offline server stopped.${NC}"
+    else
+        echo -e "${YELLOW}No offline server running on port $OFFLINE_PORT.${NC}"
+    fi
+}
+
+restart_server() {
+    if [ -n "$SERVER_PID" ]; then
+        echo -e "${CYAN}Stopping $TYPE server (PID: $SERVER_PID)...${NC}"
+        kill "$SERVER_PID" 2>/dev/null
+        wait "$SERVER_PID" 2>/dev/null
+        echo -e "${GREEN}$TYPE server stopped.${NC}"
+        SERVER_PID=""
+    fi
+    start_server
 }
 
 pre_generate_scrambles() {
@@ -242,8 +327,7 @@ while true; do
             ;;
         rn)
             echo -e "${YELLOW}Restarting $TYPE server...${NC}"
-            stop_server
-            start_server
+            restart_server
             echo -e "${CYAN}Commands: [r] restart all   [rn] restart node   [rt] restart tnoodle   [s] stop all   [sn] stop node   [st] stop tnoodle${NC}"
             ;;
         rt)

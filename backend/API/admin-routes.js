@@ -1,8 +1,9 @@
-const express = require('express');
-const path = require('path');
+import express from 'express';
+import path from 'path';
 const router = express.Router();
 
 // Serve the admin page
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
 router.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, '..', '../public/html/admin', 'admin.html'));
 });
@@ -27,4 +28,4 @@ router.get('/admin/users', (req, res) => {
     res.sendFile(path.join(__dirname, '..', '../public/html/admin', 'users.html'));
 });
 
-module.exports = router;
+export default router;

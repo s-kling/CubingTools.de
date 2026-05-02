@@ -282,6 +282,9 @@ function calculateStats() {
     const duringAverageElem = document.querySelectorAll('.during-average');
     const afterAverageElem = document.querySelectorAll('.after-average');
 
+    const mean = (state.times.reduce((a, b) => a + b.value, 0) / n).toFixed(2);
+    if (meanElem) meanElem.textContent = isFinite(mean) ? formatTime(parseFloat(mean)) : 'DNF';
+
     if (n !== required && n !== required - 1) {
         if (bpaElem) bpaElem.textContent = '-';
         if (wpaElem) wpaElem.textContent = '-';
@@ -298,8 +301,6 @@ function calculateStats() {
         afterAverageElem.forEach((el) => (el.style.display = 'flex'));
     }
 
-    const mean = (state.times.reduce((a, b) => a + b.value, 0) / n).toFixed(2);
-    if (meanElem) meanElem.textContent = isFinite(mean) ? formatTime(parseFloat(mean)) : 'DNF';
     let ao5 = null;
     let mo3 = null;
 
@@ -348,6 +349,7 @@ function calculateStats() {
             prDiv.style.transform = 'translate(-50%, 100%)';
             prDiv.style.bottom = '0';
             prDiv.style.zIndex = '2';
+            prDiv.style.background = getPrPillColor(prRank, 'average');
             elem.appendChild(prDiv);
         }
     }
@@ -500,7 +502,7 @@ function calculateBpaWpaTft(times, target) {
         let bpa, wpa;
         if (dnfCount === 1) {
             // WPA is impossible if 1 DNF (best+avg), BPA can still be computed
-            bpa = (sum - worst) / 3;
+            bpa = sum / 3;
             wpa = 'DNF';
         } else {
             bpa = (sum - worst) / 3;
@@ -529,6 +531,30 @@ function displayCurrentTimes() {
     const container = document.getElementById('currentTimes');
     container.innerHTML = '';
 
+    // Find best and worst solves (exclude DNFs for best, include all for worst)
+    let bestIdx = -1,
+        worstIdx = -1;
+    let bestValue = Infinity,
+        worstValue = -Infinity;
+    state.times.forEach((solve, idx) => {
+        if (solve.penalty === 'dnf') {
+            // For worst, DNF is always worst
+            if (worstValue !== 'dnf') {
+                worstValue = 'dnf';
+                worstIdx = idx;
+            }
+        } else {
+            if (solve.value < bestValue) {
+                bestValue = solve.value;
+                bestIdx = idx;
+            }
+            if (worstValue !== 'dnf' && solve.value > worstValue) {
+                worstValue = solve.value;
+                worstIdx = idx;
+            }
+        }
+    });
+
     state.times.forEach((solve, i) => {
         const wrapper = document.createElement('div');
         wrapper.classList.add('solve');
@@ -542,12 +568,35 @@ function displayCurrentTimes() {
             displayText = formatTime(solve.raw);
         }
 
-        const rank = getSingleRank(solve.value);
-        if (rank) displayText += ` (PR${rank})`;
-
+        // Highlight best/worst
         const textSpan = document.createElement('span');
         textSpan.classList.add('solve-text');
+        if (i === bestIdx) {
+            textSpan.style.color = 'var(--success)';
+            displayText = `(${displayText})`;
+        } else if (i === worstIdx) {
+            textSpan.style.color = 'var(--error)';
+            displayText = `(${displayText})`;
+        }
+
+        const rank = getSingleRank(solve.value);
+
+        // Add PR pill if rank exists
         textSpan.textContent = displayText;
+        if (rank) {
+            const prPill = document.createElement('span');
+            prPill.classList.add('pr-pill');
+            prPill.textContent = `#${rank}`;
+            prPill.style.marginLeft = '0.5em';
+            prPill.style.background = getPrPillColor(rank, 'single');
+            prPill.style.color = '#fff';
+            prPill.style.borderRadius = '999px';
+            prPill.style.fontSize = '0.65em';
+            prPill.style.padding = '0.1em 0.6em';
+            prPill.style.verticalAlign = 'middle';
+            prPill.style.opacity = '0.8';
+            textSpan.appendChild(prPill);
+        }
         wrapper.appendChild(textSpan);
 
         const btns = document.createElement('div');
@@ -592,6 +641,41 @@ function displayCurrentTimes() {
 
         container.appendChild(wrapper);
     });
+}
+
+// PR Pill color creator
+function getPrPillColor(rank, format) {
+    // from var(--success) for #1 to var(--error) for the worst ranked solve, with a gradient in between
+    const successColor =
+        getComputedStyle(document.documentElement).getPropertyValue('--success').trim() ||
+        '#28a745';
+    const errorColor =
+        getComputedStyle(document.documentElement).getPropertyValue('--error').trim() || '#dc3545';
+    const successRGB = hexToRgb(successColor);
+    const errorRGB = hexToRgb(errorColor);
+
+    const max = format === 'average' ? state.userAverages.length : state.userSolves.length;
+
+    const ratio = Math.min(rank / max, 1);
+    const r = Math.round(successRGB.r * (1 - ratio) + errorRGB.r * ratio);
+    const g = Math.round(successRGB.g * (1 - ratio) + errorRGB.g * ratio);
+    const b = Math.round(successRGB.b * (1 - ratio) + errorRGB.b * ratio);
+    return `rgb(${r}, ${g}, ${b})`;
+}
+
+function hexToRgb(hex) {
+    const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+    hex = hex.replace(shorthandRegex, (m, r, g, b) => {
+        return r + r + g + g + b + b;
+    });
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result
+        ? {
+              r: parseInt(result[1], 16),
+              g: parseInt(result[2], 16),
+              b: parseInt(result[3], 16),
+          }
+        : null;
 }
 
 // === Create a button helper ===
@@ -1334,7 +1418,6 @@ eventSelector.addEventListener('change', async (e) => {
     const wcaId = document.getElementById('wca').value.trim().toUpperCase();
     if (/\d{4}[a-zA-Z]{4}\d{2}/.test(wcaId)) {
         try {
-            console.log('Reloading WCA data for new event:', newEvent);
             await fetchUserData(wcaId);
             calculateStats();
             updatePrTarget();

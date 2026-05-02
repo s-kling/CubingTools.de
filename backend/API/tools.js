@@ -1,6 +1,6 @@
-const express = require('express');
-const path = require('path');
-const fs = require('fs');
+import express from 'express';
+import path from 'path';
+import fs from 'fs';
 const router = express.Router();
 
 // Function to extract metadata from an HTML file
@@ -26,6 +26,7 @@ function extractMetadata(filePath) {
 
 // API endpoint to get the list of HTML files with metadata
 router.get('/api/tools', (req, res) => {
+    const __dirname = path.dirname(new URL(import.meta.url).pathname);
     const toolsDir = path.join(__dirname, '../../public/tools');
 
     fs.readdir(toolsDir, (err, folders) => {
@@ -61,4 +62,4 @@ router.get('/api/tools', (req, res) => {
     });
 });
 
-module.exports = router;
+export default router;

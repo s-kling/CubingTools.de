@@ -1,9 +1,10 @@
-const express = require('express');
-const fs = require('fs');
-const path = require('path');
-const http = require('http');
-const sanitizeHtml = require('sanitize-html');
+import express from 'express';
+import fs from 'fs';
+import path from 'path';
+import http from 'http';
+import sanitizeHtml from 'sanitize-html';
 
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
 
 const app = express();
@@ -194,10 +195,15 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(require('./API/tools'));
-app.use(require('./API/api'));
-app.use(require('./API/admin-routes'));
-app.use(require('./API/routes'));
+import toolsRouter from './API/tools.js';
+import apiRouter from './API/api.js';
+import adminRoutesRouter from './API/admin-routes.js';
+import routesRouter from './API/routes.js';
+
+app.use(toolsRouter);
+app.use(apiRouter);
+app.use(adminRoutesRouter);
+app.use(routesRouter);
 
 /* =========================
    Server

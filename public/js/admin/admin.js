@@ -54,9 +54,14 @@ async function attemptLogin() {
         });
         const verifyData = verifyRes.ok ? await verifyRes.json() : {};
         showDashboard(verifyData.role, verifyData.username, verifyData.color);
-    } catch {
+    } catch (err) {
         adminError.textContent = 'Invalid username or password';
         adminError.style.display = 'block';
+        showUserErrorPopup({
+            title: 'Login failed',
+            message: 'Please check your username and password and try again.',
+            error: err,
+        });
     }
 }
 
@@ -66,6 +71,10 @@ usernameInput.addEventListener('keydown', (event) => {
 
 passwordInput.addEventListener('keydown', async (event) => {
     if (event.key === 'Enter') await attemptLogin();
+});
+
+document.getElementById('admin-login-btn').addEventListener('click', async () => {
+    await attemptLogin();
 });
 
 function showChangePasswordForm() {
@@ -216,14 +225,20 @@ function appendColorPicker(role, username, currentColor) {
     colorInput.className = 'users-color-input';
     colorInput.title = 'Change your color';
 
+    const colorInputButton = document.createElement('button');
+    colorInputButton.type = 'button';
+    colorInputButton.id = 'colorInputButton';
+    colorInputButton.textContent = 'Save';
+    colorInputButton.className = 'admin-color-save-btn';
+
     const statusEl = document.createElement('span');
     statusEl.className = 'admin-color-status';
 
-    colorInput.addEventListener('close', () => {
+    colorInput.addEventListener('input', () => {
         applyUserColorStyles(colorBadge, colorInput.value);
     });
 
-    colorInput.addEventListener('change', async () => {
+    colorInputButton.addEventListener('click', async () => {
         try {
             const res = await fetch('/api/admin/users/me/color', {
                 method: 'PATCH',
@@ -249,7 +264,7 @@ function appendColorPicker(role, username, currentColor) {
         }
     });
 
-    label.append(colorBadge, colorInput, statusEl);
+    label.append(colorBadge, colorInput, colorInputButton, statusEl);
     section.appendChild(label);
     dashboard.appendChild(section);
 }

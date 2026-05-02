@@ -247,4 +247,4 @@ const events = [
     { id: 'dino', name: 'Dino Cube', shortName: 'Dino' },
 ];
 
-module.exports = events;
+export default events;

@@ -20,3 +20,5 @@ package-lock.json
 
 /backend/tests
 /backend/secret
+
+/wca_export
