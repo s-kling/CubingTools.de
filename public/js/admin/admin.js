@@ -201,6 +201,7 @@ function showDashboard(role, username, color) {
     if (role === 'admin') appendErrorThresholdSlider();
 
     if (role) loadPeriodicTasks(role, username);
+    loadWcaExportSection(role);
     const _dashToken = sessionStorage.getItem(SESSION_KEY);
     if (_dashToken) loadDashboardBadges(_dashToken);
 }
@@ -626,3 +627,149 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Not authenticated — show login form
     }
 });
+
+async function loadWcaExportSection(role) {
+    const token = sessionStorage.getItem(SESSION_KEY);
+    if (!token) return;
+
+    const section = document.createElement('section');
+    section.className = 'admin-color-section card admin-wca-section';
+    section.id = 'admin-wca-section';
+    dashboard.appendChild(section);
+
+    function render(meta, statusText, statusClass) {
+        const isAdmin = role === 'admin';
+
+        function fmtDate(iso) {
+            if (!iso) return '—';
+            return new Date(iso).toLocaleString(undefined, {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+        }
+
+        const persons = meta?.personCount != null ? meta.personCount.toLocaleString() : '—';
+        const results = meta?.resultCount != null ? meta.resultCount.toLocaleString() : '—';
+        const competitions =
+            meta?.competitionCount != null ? meta.competitionCount.toLocaleString() : '—';
+
+        section.innerHTML = `
+            <div class="admin-wca-header">
+                <h3 class="admin-wca-title">WCA Export</h3>
+                ${
+                    isAdmin
+                        ? `<button type="button" id="wca-refresh-btn" class="admin-wca-btn" ${meta?.isRefreshing ? 'disabled' : ''}>
+                    ${meta?.isRefreshing ? 'Refreshing…' : 'Refresh Export'}
+                </button>`
+                        : ''
+                }
+            </div>
+            <dl class="admin-wca-stats">
+                <div class="admin-wca-stat">
+                    <dt>Export date</dt>
+                    <dd>${fmtDate(meta?.exportDate)}</dd>
+                </div>
+                <div class="admin-wca-stat">
+                    <dt>Next check</dt>
+                    <dd>${fmtDate(meta?.nextScheduledCheck)}</dd>
+                </div>
+                <div class="admin-wca-stat">
+                    <dt>Persons</dt>
+                    <dd>${persons}</dd>
+                </div>
+                <div class="admin-wca-stat">
+                    <dt>Results</dt>
+                    <dd>${results}</dd>
+                </div>
+                <div class="admin-wca-stat">
+                    <dt>Competitions</dt>
+                    <dd>${competitions}</dd>
+                </div>
+            </dl>
+            ${statusText ? `<p class="admin-wca-status ${statusClass}">${statusText}</p>` : ''}
+        `;
+
+        if (isAdmin) {
+            document
+                .getElementById('wca-refresh-btn')
+                ?.addEventListener('click', () => triggerRefresh());
+        }
+    }
+
+    async function fetchMeta() {
+        const res = await fetch('/api/admin/wca-metadata', {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('Failed to load metadata');
+        return res.json();
+    }
+
+    let pollTimer = null;
+
+    function startPolling() {
+        if (pollTimer) return;
+        pollTimer = setInterval(async () => {
+            try {
+                const meta = await fetchMeta();
+                if (!meta.isRefreshing) {
+                    clearInterval(pollTimer);
+                    pollTimer = null;
+                    render(meta, 'Export updated successfully.', 'admin-wca-status--success');
+                } else {
+                    render(
+                        meta,
+                        'Refresh in progress — this may take several minutes.',
+                        'admin-wca-status--info',
+                    );
+                }
+            } catch {
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+        }, 5000);
+    }
+
+    async function triggerRefresh() {
+        try {
+            const res = await fetch('/api/admin/update', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.status === 409) {
+                render(lastMeta, 'A refresh is already in progress.', 'admin-wca-status--info');
+                startPolling();
+                return;
+            }
+            if (!res.ok) throw new Error('Failed to start refresh');
+            lastMeta = { ...lastMeta, isRefreshing: true };
+            render(
+                lastMeta,
+                'Refresh started — this may take several minutes.',
+                'admin-wca-status--info',
+            );
+            startPolling();
+        } catch {
+            render(lastMeta, 'Failed to start refresh.', 'admin-wca-status--error');
+        }
+    }
+
+    let lastMeta = null;
+    try {
+        lastMeta = await fetchMeta();
+        render(lastMeta, null, '');
+        if (lastMeta.isRefreshing) {
+            render(
+                lastMeta,
+                'Refresh in progress — this may take several minutes.',
+                'admin-wca-status--info',
+            );
+            startPolling();
+        }
+    } catch {
+        section.innerHTML =
+            '<p class="admin-wca-status admin-wca-status--error">Failed to load WCA export metadata.</p>';
+    }
+}

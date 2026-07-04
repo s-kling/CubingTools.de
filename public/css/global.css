@@ -2,6 +2,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
 /* Import Font Awesome for icons */
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css');
+/* Import cubing icons */
+@import url('https://cdn.cubing.net/v0/css/@cubing/icons/css');
 
 /* Root Variables */
 :root {
@@ -57,6 +59,10 @@
     /* Padding & Margin */
     --main-padding: 16px;
     --main-margin: 8px;
+
+    /* Mobile bottom bar height */
+    --mobile-bottom-bar: 64px;
+    --mobile-nav-height: 56px;
 }
 
 /* Light Mode - data-theme attribute */
@@ -142,7 +148,7 @@
     font-size: var(--font-size-base);
 }
 
-/* Body with animated gradient background */
+/* Body */
 body {
     background-color: var(--main-background);
     color: var(--main-text);
@@ -152,7 +158,7 @@ body {
 
 /* ---------- Unordered List Styles ---------- */
 ul {
-    list-style: none; /* remove default bullets */
+    list-style: none;
     margin: var(--space-sm) 0;
     padding: 0;
     background: var(--main-lighter);
@@ -161,7 +167,6 @@ ul {
     border: 1px solid var(--input-border);
 }
 
-/* each list item */
 ul li {
     position: relative;
     color: var(--main-text);
@@ -172,7 +177,6 @@ ul li {
     border-bottom: 1px solid var(--card-border);
 }
 
-/* custom bullet using a pseudo-element */
 ul li::before {
     content: "•";
     position: absolute;
@@ -183,12 +187,10 @@ ul li::before {
     line-height: 1;
 }
 
-/* remove border from last item */
 ul li:last-child {
     border-bottom: none;
 }
 
-/* hover effect for interactive lists */
 ul li:hover {
     background: var(--hover-background);
     color: var(--hover-text);
@@ -703,6 +705,7 @@ footer {
     font-weight: 600;
     color: var(--main-text);
     white-space: nowrap;
+    text-overflow: clip;
 }
 
 .footer-tag__num {
@@ -823,7 +826,6 @@ main input[type="checkbox"] {
     transition: background .12s ease, border-color .12s ease, box-shadow .12s ease, transform .06s ease;
 }
 
-/* accent on checked */
 main input[type="checkbox"]:checked {
     background: linear-gradient(90deg, var(--button-background), rgba(79,70,229,0.9));
     border-color: var(--button-background);
@@ -831,14 +833,11 @@ main input[type="checkbox"]:checked {
     transform: translateY(-1px);
 }
 
-/* focus ring */
 main input[type="checkbox"]:focus {
     outline: none;
     box-shadow: 0 0 0 5px rgba(63,167,214,0.10);
 }
 
-/* show small checkmark using an overlay pseudo element on the input's sibling label — works regardless of browser.
-   Important: keep labels next to inputs for consistent layout. */
 main input[type="checkbox"] + label::before {
     content: "";
     display: inline-block;
@@ -874,81 +873,454 @@ main input[type="checkbox"] + label::before {
     display: none;
 }
 
-/* Media Queries */
+/* ============================================================
+   MOBILE BOTTOM BAR + TOOLS SHEET  (≤ 650px)
+   ============================================================ */
+
+/* ── Mobile bottom navigation bar ── */
+#mobile-bottom-bar {
+    display: none;
+}
+
+/* ── Tools bottom sheet ── */
+#mobile-tools-sheet {
+    display: none;
+}
+
 @media only screen and (max-width: 650px) {
-    .container { 
+
+    /* Reset body overflow so the sheet can appear */
+    body {
+        overflow: hidden;
+    }
+
+    /* ── Grid: full-width single column, no sidebar row ── */
+    .container {
         grid-template-columns: 1fr;
-        grid-template-rows: 0.5fr 0.6fr 5.0fr;
+        grid-template-rows: var(--mobile-nav-height) 1fr;
         grid-template-areas:
             "nav"
-            "sidebar"
             "main";
-            /* "footer"; */
+        grid-gap: 0;
+        height: 100svh;
+    }
+
+    /* Hide legacy sidebar and footer in the grid */
+    #sidebar {
+        display: none !important;
     }
 
     footer {
-        display: none;
+        display: none !important;
+    }
+
+    /* ── Top nav on mobile: slim, logo centred ── */
+    nav {
+        border-radius: 0;
+        height: var(--mobile-nav-height);
         justify-content: center;
-        gap: var(--space-sm);
-        flex-wrap: wrap;
-        padding: var(--space-xs) var(--main-padding);
-    }
-
-    .footer-tag__links {
-        display: none;
-    }
-
-    .footer-tag__author {
-        display: none;
-    }
-
-    main .heading {
-        margin: 0 2%;
-    }
-
-    #sidebar {
-        display: flex;
-        overflow-x: auto;
-        grid-area: sidebar;
         padding: 0 var(--main-padding);
     }
 
-    #sidebar h2 {
-        display: none;
+    nav a.logo {
+        position: static;
+        margin: 0 auto;
     }
 
-    #sidebar h3 {
-        font-size: .8em;
+    /* Hide desktop hamburger on mobile — we use bottom bar instead */
+    .checkbtn {
+        display: none !important;
     }
 
-    #sidebar .tool-tag {
+    /* Hide desktop nav list — links live in bottom bar sheet */
+    nav ul {
+        display: none !important;
+    }
+
+    /* ── Main: fill all space above bottom bar ── */
+    main {
+        padding-bottom: calc(var(--mobile-bottom-bar) + var(--space-md));
+        grid-area: main;
+        overflow-y: scroll;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    main .heading {
+        margin: var(--space-xs) 0;
+        padding: var(--space-md);
+    }
+
+    /* ── Mobile Bottom Navigation Bar ── */
+    #mobile-bottom-bar {
         display: flex;
-        flex: 0 0 auto;
-        font-size: 14px;
-        text-align: center;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: var(--mobile-bottom-bar);
+        background: var(--secondary-background);
+        border-top: 1px solid var(--card-border);
+        z-index: 800;
+        align-items: stretch;
+        /* safe area for notched phones */
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.35);
+    }
+
+    .mobile-bottom-bar__btn {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        background: transparent;
+        border: none;
+        color: var(--secondary-text);
+        font-size: 11px;
+        font-weight: 500;
+        padding: 0;
+        cursor: pointer;
+        transition: color 0.15s ease, background 0.15s ease;
+        border-radius: 0;
+        /* override global button styles */
+        min-height: unset;
+    }
+
+    .mobile-bottom-bar__btn:hover,
+    .mobile-bottom-bar__btn.is-active {
+        color: var(--main-text);
+        background: var(--subtle-hover);
+    }
+
+    .mobile-bottom-bar__btn i {
+        font-size: 20px;
+        line-height: 1;
+    }
+
+    .mobile-bottom-bar__btn span {
+        font-size: 11px;
+        font-family: var(--font-main);
+    }
+
+    /* ── Tools Bottom Sheet ── */
+    #mobile-tools-sheet {
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        bottom: var(--mobile-bottom-bar);
+        left: 0;
+        right: 0;
+        /* starts hidden below the viewport */
+        max-height: 80svh;
+        background: var(--secondary-background);
+        border-top: 1px solid var(--card-border);
+        border-radius: 18px 18px 0 0;
+        z-index: 790;
+        box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.5);
+        transform: translateY(100%);
+        transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: hidden;
+    }
+
+    #mobile-tools-sheet.is-open {
+        transform: translateY(0);
+    }
+
+    /* Drag handle */
+    .mobile-tools-sheet__handle {
+        flex-shrink: 0;
+        display: flex;
         justify-content: center;
         align-items: center;
-        margin-right: var(--main-margin);
-        width: 30%;
+        padding: var(--space-sm) 0 var(--space-xs);
+        cursor: grab;
     }
 
-    #sidebar::-webkit-scrollbar {
-        display: none;
+    .mobile-tools-sheet__handle::after {
+        content: '';
+        width: 40px;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--input-border);
     }
 
-    #sidebar {
-        -ms-overflow-style: none;  /* IE and Edge */
-        scrollbar-width: none;  /* Firefox */
+    /* Sheet header */
+    .mobile-tools-sheet__header {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 var(--main-padding) var(--space-sm);
     }
 
-    .container>* {
-        border-radius: 0;
+    .mobile-tools-sheet__title {
+        font-size: 17px;
+        font-weight: 600;
+        color: var(--main-text);
     }
 
-    a.logo {
+    .mobile-tools-sheet__close {
+        background: transparent;
+        color: var(--secondary-text);
+        border: none;
+        font-size: 22px;
+        padding: 4px 8px;
+        min-height: unset;
+        border-radius: var(--main-radius);
+        cursor: pointer;
+        line-height: 1;
+    }
+
+    .mobile-tools-sheet__close:hover {
+        background: var(--subtle-hover);
+        color: var(--main-text);
+    }
+
+    /* Sheet search */
+    .mobile-tools-sheet__search-wrap {
+        flex-shrink: 0;
+        padding: 0 var(--main-padding) var(--space-sm);
+    }
+
+    .mobile-tools-sheet__search {
+        width: 100%;
+        padding: var(--space-xs) var(--space-sm);
+        background: var(--input-background);
+        border: 1px solid var(--input-border);
+        border-radius: 999px;
+        color: var(--main-text);
+        font-size: 15px;
+        outline: none;
+        /* override global input margin */
+        margin-left: 0 !important;
+    }
+
+    .mobile-tools-sheet__search::placeholder {
+        color: var(--secondary-text);
+    }
+
+    .mobile-tools-sheet__search:focus {
+        border-color: var(--button-background);
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+    }
+
+    /* Sheet section labels */
+    .mobile-tools-sheet__section-label {
+        padding: var(--space-xs) var(--main-padding) var(--space-xxs);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--secondary-text);
+    }
+
+    /* Scrollable tool list */
+    .mobile-tools-sheet__list {
+        flex: 1;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 0 var(--space-xs) var(--space-md);
+        background: none;
+        border: none;
+        margin: 0 5px;
+    }
+
+    /* Reset ul / li defaults inside the sheet */
+    .mobile-tools-sheet__list,
+    .mobile-tools-sheet__list li {
+        list-style: none;
+        background: none;
+        border: none;
+        padding: 0;
         margin: 0;
     }
 
+    .mobile-tools-sheet__list li::before {
+        display: none;
+    }
+
+    .mobile-tools-sheet__list li:hover {
+        background: none;
+    }
+
+    /* Individual tool row */
+    .mobile-sheet-tool {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        padding: var(--space-sm) var(--space-sm);
+        border-radius: 10px;
+        margin-bottom: 4px;
+        color: var(--main-text);
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 15px;
+        transition: background 0.12s ease;
+        /* remove underline animation */
+        position: static;
+    }
+
+    .mobile-sheet-tool::before {
+        display: none !important;
+    }
+
+    .mobile-sheet-tool:hover,
+    .mobile-sheet-tool:active {
+        background: var(--hover-background);
+        color: var(--hover-text);
+    }
+
+    .mobile-sheet-tool__icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 9px;
+        background: var(--button-background);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 16px;
+        color: #fff;
+    }
+
+    /* Featured badge */
+    .mobile-sheet-tool__badge {
+        margin-left: auto;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        background: rgba(79, 70, 229, 0.18);
+        color: var(--color-info-text);
+        border-radius: 4px;
+        padding: 2px 6px;
+    }
+
+    /* Empty / no-results state */
+    .mobile-tools-sheet__empty {
+        text-align: center;
+        padding: var(--space-xl) var(--space-md);
+        color: var(--secondary-text);
+        font-size: 14px;
+    }
+
+    /* ── Nav sheet (menu drawer from bottom) ── */
+    #mobile-nav-sheet {
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        bottom: var(--mobile-bottom-bar);
+        left: 0;
+        right: 0;
+        background: var(--secondary-background);
+        border-top: 1px solid var(--card-border);
+        border-radius: 18px 18px 0 0;
+        z-index: 790;
+        box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.5);
+        transform: translateY(100%);
+        transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: hidden;
+        padding-bottom: var(--space-sm);
+    }
+
+    #mobile-nav-sheet.is-open {
+        transform: translateY(0);
+    }
+
+    /* Handle */
+    .mobile-nav-sheet__handle {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: var(--space-sm) 0 var(--space-xs);
+        cursor: grab;
+    }
+
+    .mobile-nav-sheet__handle::after {
+        content: '';
+        width: 40px;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--input-border);
+    }
+
+    /* Nav items in the sheet */
+    .mobile-nav-sheet__list {
+        background: none;
+        border: none;
+        margin: 0;
+        padding: var(--space-xs) var(--space-sm) 0;
+    }
+
+    .mobile-nav-sheet__list,
+    .mobile-nav-sheet__list li {
+        list-style: none;
+        background: none;
+        border: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .mobile-nav-sheet__list li::before {
+        display: none;
+    }
+
+    .mobile-nav-sheet__list li:hover {
+        background: none;
+    }
+
+    .mobile-nav-sheet__item {
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+        padding: var(--space-sm) var(--space-md);
+        border-radius: 10px;
+        color: var(--main-text);
+        text-decoration: none;
+        font-size: 16px;
+        font-weight: 500;
+        transition: background 0.12s ease;
+        position: static;
+        margin-bottom: 4px;
+        cursor: pointer;
+    }
+
+    .mobile-nav-sheet__item::before {
+        display: none !important;
+    }
+
+    .mobile-nav-sheet__item:hover,
+    .mobile-nav-sheet__item:active {
+        background: var(--hover-background);
+        color: var(--hover-text);
+    }
+
+    .mobile-nav-sheet__item i {
+        width: 24px;
+        text-align: center;
+        color: var(--secondary-text);
+        font-size: 18px;
+        flex-shrink: 0;
+    }
+
+    /* Sheet backdrop (shared) */
+    .mobile-sheet-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 780;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .mobile-sheet-backdrop.is-visible {
+        display: block;
+        opacity: 1;
+    }
+
+    /* Misc utility classes */
     .big-screen {
         display: none;
     }
@@ -968,7 +1340,6 @@ main input[type="checkbox"] + label::before {
     .user-feedback-popup__actions {
         flex-direction: column;
     }
-
 
     .user-feedback-popup__primary,
     .user-feedback-popup__dismiss {

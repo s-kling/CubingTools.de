@@ -89,7 +89,36 @@ if (!fs.existsSync(logDir)) {
     fs.mkdirSync(logDir, { recursive: true });
 }
 
-const logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+function cleanOldLogs(filePath) {
+    if (!fs.existsSync(filePath)) return;
+    const retentionMs = config.log_retention_days * 24 * 60 * 60 * 1000;
+    const cutoff = Date.now() - retentionMs;
+    const lines = fs.readFileSync(filePath, 'utf8').split('\n').filter(Boolean);
+    const kept = lines.filter((line) => {
+        try {
+            return new Date(JSON.parse(line).time).getTime() >= cutoff;
+        } catch {
+            return true;
+        }
+    });
+    if (kept.length < lines.length) {
+        debugLog(
+            `log cleanup: removed ${lines.length - kept.length} entries older than ${config.log_retention_days} days`,
+        );
+        fs.writeFileSync(filePath, kept.join('\n') + (kept.length ? '\n' : ''));
+    }
+}
+
+cleanOldLogs(logFilePath);
+let logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+setInterval(() => {
+    logStream.end(() => {
+        cleanOldLogs(logFilePath);
+        logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+    });
+}, ONE_DAY_MS);
 
 function logRequest(req, res, startTime) {
     const durationMs = Date.now() - startTime;

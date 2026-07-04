@@ -645,51 +645,58 @@ function loadAverageToolData() {
         eventType.value = event;
     }
 
-    const stored = localStorage.getItem('ct_averages');
-    if (!stored) {
-        setEmptyState('No averages found for this event in the Average Calculator.');
-        return;
-    }
-
-    let allAverages;
-    try {
-        allAverages = JSON.parse(stored);
-    } catch {
-        setEmptyState('Could not parse stored average data.');
-        return;
-    }
-
-    if (!Array.isArray(allAverages) || allAverages.length === 0) {
-        setEmptyState('No averages found for this event in the Average Calculator.');
-        return;
-    }
-
-    // Filter to current event and deserialize compact format
-    // Compact format: [average, event, averageId, [[raw, penalty, averageId, scramble], ...]]
-    const eventAverages = allAverages.filter((avg) => avg[1] === event);
-
-    if (eventAverages.length === 0) {
-        setEmptyState('No averages found for this event in the Average Calculator.');
-        return;
-    }
-
     const allTimes = [];
-    for (const avg of eventAverages) {
-        const solves = avg[3];
-        if (!Array.isArray(solves)) continue;
-        for (const solve of solves) {
-            const raw = Number(solve[0]);
-            const penalty = solve[1];
-            if (penalty === 'dnf') continue;
-            const value = penalty === 'plus2' ? raw + 2 : raw;
-            if (Number.isFinite(value) && value > 0) {
-                allTimes.push(Math.round(value * 100));
+
+    // Load completed averages
+    // Compact format: [average, event, averageId, [[raw, penalty, averageId, scramble], ...]]
+    const stored = localStorage.getItem('ct_averages');
+    if (stored) {
+        let allAverages;
+        try {
+            allAverages = JSON.parse(stored);
+        } catch {
+            /* skip malformed data */
+        }
+        if (Array.isArray(allAverages)) {
+            for (const avg of allAverages.filter((avg) => avg[1] === event)) {
+                const solves = avg[3];
+                if (!Array.isArray(solves)) continue;
+                for (const solve of solves) {
+                    const raw = Number(solve[0]);
+                    const penalty = solve[1];
+                    if (penalty === 'dnf') continue;
+                    const value = penalty === 'plus2' ? raw + 2 : raw;
+                    if (Number.isFinite(value) && value > 0) {
+                        allTimes.push(Math.round(value * 100));
+                    }
+                }
             }
         }
     }
 
+    // Also include incomplete (in-progress) solves for this event
+    const incompleteStored = localStorage.getItem(`ct_incomplete_${event}`);
+    if (incompleteStored) {
+        try {
+            const incomplete = JSON.parse(incompleteStored);
+            if (Array.isArray(incomplete)) {
+                for (const solve of incomplete) {
+                    const raw = Number(solve[0]);
+                    const penalty = solve[1];
+                    if (penalty === 'dnf') continue;
+                    const value = penalty === 'plus2' ? raw + 2 : raw;
+                    if (Number.isFinite(value) && value > 0) {
+                        allTimes.push(Math.round(value * 100));
+                    }
+                }
+            }
+        } catch {
+            /* skip malformed data */
+        }
+    }
+
     if (allTimes.length === 0) {
-        setEmptyState('No valid solve times found in stored averages.');
+        setEmptyState('No averages found for this event in the Average Calculator.');
         return;
     }
 

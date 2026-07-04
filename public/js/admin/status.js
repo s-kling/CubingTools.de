@@ -365,7 +365,35 @@ async function renderStatus() {
         }
         if (issues.length > 0) {
             alertEl.className = 'admin-page-alert admin-page-alert--error';
-            alertEl.innerHTML = issues.join('<br>');
+
+            // if it's a status error && we're an admin, handle it
+            const noticeButton = document.createElement('button');
+            noticeButton.type = 'button';
+            noticeButton.textContent = 'Handle';
+            noticeButton.addEventListener('click', async () => {
+                // set threshold to the error rate to acknowledge the issue and hide the alert until a new issue arises
+                threshold = errorRate + 0.01;
+                // change threshold on server side
+                await fetch('/api/admin/config/error-rate-threshold', {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${state.token}`,
+                    },
+                    body: JSON.stringify({ threshold }),
+                });
+                renderStatus();
+            });
+
+            // button styling
+            noticeButton.style.marginLeft = 'auto';
+            noticeButton.style.padding = '4px 8px';
+            noticeButton.style.fontSize = '0.875rem';
+            noticeButton.style.opacity = '0.8';
+
+            alertEl.appendChild(noticeButton);
+
+            alertEl.innerHTML += issues.join('<br>');
             alertEl.style.display = 'block';
         } else {
             alertEl.style.display = 'none';

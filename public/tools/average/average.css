@@ -36,35 +36,30 @@ ul li::before {
 .sub-navbar {
     display: flex;
     justify-content: center;
-    padding: var(--space-sm) 0 var(--space-md) 0;
+    padding: var(--space-sm) 0 0 0;
 }
 
 .sub-navbar-track {
     position: relative;
     display: flex;
-    background: var(--main-lighter);
-    border-radius: 12px;
-    padding: 3px;
-    gap: 2px;
-    border: 1px solid var(--card-border);
+    background: transparent;
+    border-radius: 0;
+    padding: 0;
+    gap: 0;
+    border: none;
+    border-bottom: 1px solid var(--card-border);
+    width: 100%;
+    max-width: 600px;
 }
 
 .sub-navbar-indicator {
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    height: calc(100% - 6px);
-    width: calc(33.33% - 6px);
-    background: var(--button-background);
-    border-radius: 10px;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 0;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+    display: none;
 }
 
 .sub-navbar-tab {
     position: relative;
     z-index: 1;
+    flex: 1;
     padding: var(--space-xs) var(--space-lg);
     border: none;
     background: transparent;
@@ -73,20 +68,24 @@ ul li::before {
     font-size: var(--font-size-base);
     font-weight: 400;
     cursor: pointer;
-    border-radius: 10px;
+    border-radius: 0;
     transition: color 0.25s ease;
     user-select: none;
     white-space: nowrap;
-    min-width: 100px;
+    min-width: 80px;
     text-align: center;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
 }
 
 .sub-navbar-tab:hover {
     background: transparent !important;
+    color: var(--main-text);
 }
 
 .sub-navbar-tab.active {
-    color: var(--button-color);
+    color: var(--button-background);
+    border-bottom-color: var(--button-background);
     font-weight: 600;
 }
 
@@ -269,6 +268,21 @@ ul li::before {
     color: var(--button-color);
 }
 
+.settings-sub-row {
+    padding-left: calc(var(--space-md) + 0.75rem);
+    background: var(--subtle-hover);
+}
+
+.goal-auto-target-value {
+    font-family: 'Courier New', monospace;
+    font-size: var(--font-size-base);
+    font-weight: 700;
+    color: var(--link-color);
+    min-width: 80px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
 /* === HEADING === */
 
 .heading {
@@ -385,14 +399,8 @@ ul li::before {
     text-align: center;
     min-height: 1.5em;
     margin: 0;
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 4;
-    -webkit-box-orient: vertical;
-    line-clamp: 4;
-    max-height: calc(1.5em * 4 + 2px);
-    text-overflow: ellipsis;
     white-space: normal;
+    word-break: break-word;
     cursor: pointer;
 }
 
@@ -453,8 +461,179 @@ ul li::before {
     color: var(--success);
 }
 
+.timer-display.holding {
+    color: var(--warning, #f0a500);
+}
+
 .timer-display.running {
     color: var(--link-color);
+}
+
+.timer-display.inspecting {
+    color: var(--secondary-text);
+}
+
+.timer-display.inspection-plus2 {
+    color: var(--warning, #f0a500);
+}
+
+.timer-display.inspection-dnf {
+    color: var(--error);
+}
+
+.timer-display.inspection-holding {
+    color: var(--warning, #f0a500);
+}
+
+.timer-display.inspection-ready {
+    color: var(--success);
+}
+
+.inspection-hint {
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--secondary-text);
+    margin-top: -0.5rem;
+    margin-bottom: 0.5rem;
+    user-select: none;
+}
+
+.solve-inspection-time {
+    display: inline-block;
+    font-size: 0.78em;
+    color: var(--secondary-text);
+    margin-left: 0.5em;
+    opacity: 0.75;
+    font-weight: 400;
+}
+
+/* Inspection badge (clock indicator over timer) */
+.inspection-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    padding: 0.25em 0.75em;
+    border-radius: 999px;
+    background: var(--accent, #4a90e2);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    margin-bottom: 0.5rem;
+    opacity: 0.9;
+    user-select: none;
+}
+
+/* Stats view toggle alignment */
+.stats-view-toggle {
+    flex-shrink: 0;
+}
+
+.averages-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+/* Solves list view — rows share base style from .averages-section li */
+#solvesContainer {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.solve-num {
+    font-size: 0.75rem;
+    color: var(--secondary-text);
+    min-width: 2.5ch;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.solves-empty {
+    text-align: center;
+    color: var(--secondary-text);
+    padding: 1rem 0;
+    font-size: 0.9rem;
+    list-style: none;
+}
+
+/* Stats charts section */
+.stats-charts-section {
+    background: var(--main-lighter);
+    border: 1px solid var(--card-border);
+    border-radius: var(--main-radius);
+    padding: var(--space-sm);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.stats-chart-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+}
+
+.stats-chart-labels {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.stats-chart-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.stats-chart-legend-dot.avg-dot {
+    background: var(--link-color);
+}
+
+.stats-chart-legend-dot.insp-dot {
+    background: var(--warning, #f0a500);
+}
+
+.stats-chart-legend-label {
+    font-size: 0.78rem;
+    color: var(--secondary-text);
+}
+
+.stats-slider-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.stats-slider-label {
+    font-size: 0.78rem;
+    color: var(--secondary-text);
+    white-space: nowrap;
+}
+
+.stats-slider {
+    width: 80px;
+    accent-color: var(--link-color);
+    cursor: pointer;
+}
+
+.stats-chart-wrap {
+    height: 110px;
+    position: relative;
+}
+
+.stats-chart-wrap + .stats-chart-wrap {
+    border-top: 1px solid var(--card-border);
+    padding-top: var(--space-xs);
+    margin-top: var(--space-xs);
 }
 
 /* Progress bar */
@@ -552,10 +731,42 @@ ul li::before {
     align-items: center;
     gap: var(--space-xxs);
     padding: var(--space-sm) var(--space-md);
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: var(--main-radius);
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--card-border);
+    border-radius: 0;
     min-width: 80px;
+    position: relative;
+}
+
+.stat-card:last-child {
+    border-right: none;
+}
+
+.stat-prob {
+    display: inline-block;
+    background: var(--button-background, #4F46E5);
+    color: var(--button-color, #fff);
+    font-weight: 600;
+    font-size: 0.7em;
+    padding: 0 10px;
+    height: 22px;
+    line-height: 22px;
+    border-radius: 11px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+    border: 1px solid var(--card-border, #333);
+    pointer-events: none;
+    white-space: nowrap;
+    position: absolute;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    top: 0;
+    opacity: 0.6;
+    z-index: 2;
+}
+
+.stat-prob:empty {
+    display: none;
 }
 
 .stat-label {
@@ -570,6 +781,10 @@ ul li::before {
     font-size: var(--font-size-lg);
     font-weight: 600;
     color: var(--main-text);
+}
+
+.card-hidden {
+    display: none !important;
 }
 
 /* === SOLVES SIDEBAR === */
@@ -876,10 +1091,9 @@ ul li::before {
 
 .stats-box {
     flex: 1;
-    background: var(--main-lighter);
-    border: 1px solid var(--input-border);
-    border-radius: var(--main-radius);
-    padding: var(--space-md);
+    background: transparent;
+    border: none;
+    padding: var(--space-sm);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -947,6 +1161,14 @@ main.timer-running .timer-area {
 
 main.timer-running .timer-display {
     font-size: 6rem;
+}
+
+main.timer-running .inspection-badge {
+    display: none !important;
+}
+
+main.timer-running .compsim-toolbar {
+    display: none !important;
 }
 
 /* === PROGRESS POPUP === */
@@ -1487,29 +1709,23 @@ main.timer-running .timer-display {
 /* ===== RESPONSIVE DESIGN ===== */
 
 @media (max-width: 940px) {
-    /* Sub-navbar */
+    /* Sub-navbar: tighter sizing on mobile */
     .sub-navbar {
-        padding: var(--space-xs) 0 var(--space-xs) 0;
+        padding: 0;
     }
 
     .sub-navbar-tab {
-        padding: var(--space-xs) var(--space-md);
-        min-width: 80px;
-        font-size: 0.9rem;
+        padding: var(--space-xs) var(--space-sm);
+        min-width: 0;
+        min-height: 40px;
+        font-size: 0.85rem;
     }
 
-    /* Scramble text: wrap on mobile */
+    /* Scramble text: wrap on mobile, clamp to 3 lines */
     .scramble-text {
         white-space: normal;
-        overflow: hidden;
-        text-overflow: ellipsis;
         word-break: break-word;
         max-width: 100%;
-        display: -webkit-box;
-        -webkit-line-clamp: 3;
-        -webkit-box-orient: vertical;
-        line-clamp: 3;
-        max-height: calc(1.5em * 3 + 2px);
     }
 
     /* Settings */
@@ -1557,15 +1773,13 @@ main.timer-running .timer-display {
         justify-content: center;
     }
 
-    /* Scramble: minimal top text, constrained height */
+    /* Scramble: minimal top text, grows with content */
     .scramble-container {
         max-width: 100%;
         background: transparent;
         border: none;
         padding: var(--space-xs) var(--space-md);
         margin-bottom: 0;
-        max-height: 4.5em;
-        overflow-y: auto;
         flex-shrink: 0;
     }
 
@@ -1574,9 +1788,18 @@ main.timer-running .timer-display {
     }
 
     .scramble-text {
-        font-size: 0.8rem;
-        color: var(--secondary-text);
-        line-height: 1.4;
+        font-size: 0.95rem;
+        font-weight: 500;
+        line-height: 1.6;
+        word-spacing: 0.3em;
+        overflow: visible;
+        display: block;
+        -webkit-line-clamp: unset;
+        line-clamp: unset;
+        text-overflow: clip;
+        white-space: normal;
+        word-break: break-word;
+        max-width: 100%;
     }
 
     /* Timer display: dominant */
@@ -1584,14 +1807,14 @@ main.timer-running .timer-display {
         font-size: 4rem;
         width: 90%;
         max-width: 100%;
-        margin: var(--space-xl) 0;
+        margin: var(--space-lg) 0;
     }
 
     .timer-display {
         font-size: 5rem;
         min-width: unset;
         width: 90%;
-        margin: var(--space-xl) 0;
+        margin: var(--space-lg) 0;
     }
 
     /* Progress bar */
@@ -1606,14 +1829,13 @@ main.timer-running .timer-display {
         margin-bottom: var(--space-xxs);
     }
 
-    /* ── Bottom row: stack on mobile ── */
+    /* ── Bottom row: scramble + stats (wrapping) ── */
     .bottom-row {
         margin: 0;
         flex-direction: row;
         flex-wrap: wrap;
         gap: var(--space-xs);
-        margin-top: 0;
-        padding: var(--space-xs) var(--space-sm);
+        padding: var(--space-xxs) var(--space-sm);
         border-top: 1px solid var(--card-border);
     }
 
@@ -1642,46 +1864,61 @@ main.timer-running .timer-display {
     .stats-box .stats {
         gap: var(--space-xs);
         flex-wrap: wrap;
+        justify-content: center;
     }
 
     .stats-box .stat-card {
-        min-width: unset;
-        padding: var(--space-xxs) var(--space-xs);
-        background: transparent;
-        border: none;
-        flex-direction: row;
-        gap: var(--space-xxs);
+        min-width: 72px;
+        padding: var(--space-xxs) var(--space-sm);
+        gap: 1px;
+    }
+
+    .stats-box .stat-prob {
+        display: none;
     }
 
     .stats-box .stat-label {
-        font-size: 0.6rem;
+        font-size: 0.62rem;
     }
 
     .stats-box .stat-value {
-        font-size: 0.8rem;
+        font-size: 0.82rem;
+        font-weight: 600;
     }
 
-    /* ── Mobile penalty sheet ── */
+    /* PR rank pill: inline on mobile so it doesn't overflow below cards */
+    .stats-box .pr-rank-pill {
+        position: static;
+        transform: none;
+        display: block;
+        margin: 2px auto 0;
+        left: auto;
+        bottom: auto;
+        font-size: 0.72em;
+        height: 18px;
+        line-height: 18px;
+    }
+
+    /* ── Inline solve result bar (auto-shows after each solve) ── */
     .mobile-penalty-sheet {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        z-index: 9000;
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
+        flex-wrap: wrap;
         align-items: center;
-        gap: var(--space-sm);
-        padding: var(--space-sm) var(--space-md) var(--space-lg);
-        background: linear-gradient(180deg, var(--popup-bg-from), var(--popup-bg-to));
-        border-top: 1px solid var(--card-border);
-        border-radius: 16px 16px 0 0;
-        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
-        transform: translateY(100%);
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        justify-content: center;
+        gap: var(--space-xs) var(--space-sm);
+        padding: var(--space-xs) var(--space-md);
+        margin-top: var(--space-sm);
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: var(--main-radius);
+        opacity: 0;
+        transform: translateY(-6px);
+        transition: opacity 0.25s ease, transform 0.25s ease;
     }
 
     .mobile-penalty-sheet.visible {
+        opacity: 1;
         transform: translateY(0);
     }
 
@@ -1689,16 +1926,16 @@ main.timer-running .timer-display {
         display: none !important;
     }
 
-    .penalty-sheet-handle {
-        width: 36px;
-        height: 4px;
-        border-radius: 2px;
-        background: var(--secondary-text);
-        opacity: 0.4;
+    .penalty-sheet-label {
+        font-size: 0.65rem;
+        font-weight: 700;
+        color: var(--secondary-text);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
     }
 
     .penalty-sheet-time {
-        font-size: 1.5rem;
+        font-size: 1.3rem;
         font-weight: 600;
         color: var(--main-text);
         font-family: var(--font-main);
@@ -1706,7 +1943,7 @@ main.timer-running .timer-display {
 
     .penalty-sheet-buttons {
         display: flex;
-        gap: var(--space-sm);
+        gap: var(--space-xs);
     }
 
     .penalty-sheet-buttons .penalty-btn {
@@ -1716,60 +1953,132 @@ main.timer-running .timer-display {
         min-height: 44px;
         font-size: 1.1rem;
     }
+
+    /* ── Touch-friendly tap targets ── */
+    .icon-btn {
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    .toolbar-zen-btn {
+        width: 44px;
+        height: 44px;
+    }
+
+    /* ── Always show actions (touch devices have no hover state) ── */
+    .avg-delete,
+    .avg-action-btn {
+        opacity: 1;
+    }
+
+    /* ── Averages list: minimum tap target height ── */
+    .averages-section li {
+        min-height: 48px;
+    }
+
+    /* ── Stats charts: slightly taller on mobile ── */
+    .stats-chart-wrap {
+        height: 130px;
+    }
 }
 
 @media (max-width: 650px) {
     main.timer-running ~ footer {
         display: none;
     }
+
+    main {
+        padding-bottom: calc(var(--mobile-bottom-bar) + var(--space-md) + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* ── Modals: cap height so they don't extend under the bottom nav ── */
+    .avg-detail-popup,
+    .progress-popup {
+        max-height: calc(100dvh - var(--mobile-bottom-bar) - var(--space-xl));
+        overflow-y: auto;
+    }
 }
 
 @media (max-width: 480px) {
-    /* Sub-navbar: shrink tabs to fit */
+    /* Sub-navbar: keep underline style, tighter padding */
     .sub-navbar-tab {
-        padding: var(--space-xs) var(--space-sm);
-        min-width: 64px;
+        padding: var(--space-xxs) var(--space-sm);
+        min-width: 0;
+        min-height: 40px;
         font-size: 0.82rem;
     }
 
     #timeInput {
         font-size: 3.2rem;
+        touch-action: manipulation;
     }
 
     .timer-display {
         font-size: 4rem;
+        touch-action: manipulation;
     }
 
-    /* Scramble: tighter cap for long scrambles */
-    .scramble-container {
-        max-height: 3.5em;
-    }
-
+    /* Scramble: slightly smaller text on tiny screens, still 3-line clamp */
     .scramble-text {
-        font-size: 0.75rem;
+        font-size: 0.88rem;
+        word-spacing: 0.3em;
+        line-height: 1.5;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        line-clamp: 3;
+        text-overflow: ellipsis;
     }
 
-    /* Bottom row: stack vertically when too narrow */
+    /* Bottom row: hide scramble drawing on small phones, stats take full width */
     .bottom-row {
-        flex-direction: column;
-        align-items: stretch;
+        flex-wrap: nowrap;
+        align-items: flex-start;
+        overflow: hidden;
     }
 
     .scramble-box {
+        display: none !important;
+    }
+
+    .stats-box {
+        overflow: hidden;
+        padding: var(--space-xxs) 0;
         width: 100%;
     }
 
-    .scramble-box twisty-player {
-        width: 120px;
-        height: 100px;
+    /* Stats carousel */
+    .stats-box .stats {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding-bottom: var(--space-xxs);
+        padding-right: var(--space-sm);
+        justify-content: flex-start;
+    }
+
+    .stats-box .stats::-webkit-scrollbar {
+        display: none;
+    }
+
+    .stats-box .stat-card {
+        flex: 0 0 78px;
+        scroll-snap-align: start;
+        min-width: 0;
+        width: auto;
+        border-right: 1px solid var(--card-border);
     }
 
     .penalty-sheet-buttons .penalty-btn {
-        width: 40px;
-        height: 40px;
-        min-width: 40px;
-        min-height: 40px;
-        font-size: 1rem;
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        min-height: 44px;
+        font-size: 1.1rem;
     }
 }
 
@@ -1853,5 +2162,474 @@ main.timer-running .timer-display {
     #timeInput {
         margin: var(--space-xs) 0;
         font-size: 2.5rem;
+    }
+}
+
+/* ===== COMPSIM TOOLBAR ===== */
+
+.compsim-toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-md);
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--card-border);
+    border-radius: 0;
+    margin-bottom: 0;
+    flex-shrink: 0;
+}
+
+/* Cancel inspection button */
+.cancel-inspection-btn[hidden] {
+    display: none;
+}
+.cancel-inspection-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    padding: 0.3em 1em;
+    border-radius: 999px;
+    background: transparent;
+    border: 1px solid var(--error);
+    color: var(--error);
+    font-size: 0.82rem;
+    font-family: var(--font-main);
+    font-weight: 500;
+    cursor: pointer;
+    margin-top: var(--space-xs);
+    transition: background 0.15s ease, color 0.15s ease;
+    user-select: none;
+}
+
+.cancel-inspection-btn:hover {
+    background: var(--error);
+    color: #fff;
+}
+
+/* Event picker pill */
+.toolbar-event-pill {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xxs);
+    background: var(--input-background);
+    border: 1px solid var(--input-border);
+    border-radius: var(--main-radius);
+    padding: var(--space-xxs) var(--space-sm);
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: border-color 0.2s ease;
+}
+
+.toolbar-event-pill:hover {
+    border-color: var(--link-color);
+}
+
+.toolbar-event-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    color: var(--main-text);
+    flex-shrink: 0;
+    font-size: 1.2rem;
+    line-height: 1;
+}
+
+.toolbar-event-select {
+    background: transparent;
+    border: none;
+    color: var(--main-text);
+    font-size: var(--font-size-base);
+    font-family: var(--font-main);
+    cursor: pointer;
+    outline: none;
+    padding: 0;
+    max-width: 110px;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+/* Solve counter */
+.toolbar-solve-counter {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
+}
+
+.solve-dots {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.solve-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1.5px solid var(--input-border);
+    background: transparent;
+    transition: background 0.25s ease, border-color 0.25s ease, transform 0.2s ease;
+}
+
+.solve-dot.filled {
+    background: var(--button-background);
+    border-color: var(--button-background);
+    transform: scale(1.2);
+}
+
+#toolbarSolveLabel {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--secondary-text);
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.toolbar-spacer {
+    flex: 0;
+    min-width: 0;
+}
+
+/* Target pill */
+.toolbar-target-pill {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--main-radius);
+    padding: var(--space-xxs) var(--space-sm);
+    font-size: 0.8rem;
+    color: var(--secondary-text);
+    flex-shrink: 0;
+    white-space: nowrap;
+    font-family: monospace;
+}
+
+.toolbar-target-icon {
+    color: var(--link-color);
+    font-style: normal;
+}
+
+/* Zen mode button */
+.toolbar-zen-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--input-border);
+    border-radius: var(--main-radius);
+    color: var(--secondary-text);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.toolbar-zen-btn:hover {
+    color: var(--main-text);
+    border-color: var(--link-color);
+    background: var(--subtle-hover);
+}
+
+.toolbar-zen-btn.zen-active {
+    color: var(--button-background);
+    border-color: var(--button-background);
+    background: rgba(79, 70, 229, 0.12);
+}
+
+@media (max-width: 940px) {
+    .compsim-toolbar {
+        padding: var(--space-xxs) var(--space-sm);
+        gap: var(--space-xs);
+    }
+
+    .toolbar-event-pill {
+        padding: var(--space-xxs) var(--space-xs);
+    }
+
+    .toolbar-event-select {
+        max-width: 80px;
+        font-size: 0.82rem;
+    }
+
+    #toolbarSolveLabel {
+        font-size: 0.65rem;
+    }
+
+    .solve-dot {
+        width: 7px;
+        height: 7px;
+    }
+}
+
+@media (max-width: 480px) {
+    .compsim-toolbar {
+        padding: var(--space-xxs) var(--space-xs);
+    }
+
+    #toolbarSolveLabel {
+        display: none;
+    }
+
+    .toolbar-event-select {
+        max-width: 70px;
+        font-size: 0.78rem;
+    }
+}
+
+/* ===== ZEN MODE ===== */
+
+main.zen-mode .sub-navbar {
+    display: none !important;
+}
+
+main.zen-mode .compsim-toolbar {
+    background: transparent;
+    border-color: transparent;
+    justify-content: flex-end;
+    padding: var(--space-xxs) var(--space-sm);
+    margin-bottom: 0;
+    gap: 0;
+}
+
+main.zen-mode .compsim-toolbar > *:not(.toolbar-zen-btn) {
+    display: none !important;
+}
+
+main.zen-mode .bottom-row {
+    display: none !important;
+}
+
+main.zen-mode .progress-label {
+    display: none !important;
+}
+
+main.zen-mode .scramble-container {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    padding: var(--space-xxs) var(--space-md);
+}
+
+main.zen-mode .scramble-text {
+    font-size: 0.9rem;
+}
+
+main.zen-mode .timer-area {
+    justify-content: center;
+    flex: 1 1 auto;
+    min-height: 55vh;
+}
+
+main.zen-mode #timeInput {
+    font-size: 5rem;
+    margin: var(--space-lg) 0;
+}
+
+main.zen-mode .timer-display {
+    font-size: 6rem;
+    margin: var(--space-lg) 0;
+}
+
+/* On mobile zen mode the scramble also gets clamped tighter */
+@media (max-width: 940px) {
+    main.zen-mode .scramble-text {
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+    }
+
+    main.zen-mode #timeInput,
+    main.zen-mode .timer-display {
+        font-size: 4.5rem;
+    }
+}
+
+/* === COMPETITION PAGE === */
+
+.comp-page-content {
+    max-width: 600px;
+    width: 100%;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    padding: var(--space-sm) 0 var(--space-lg);
+}
+
+.comp-header-row {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+}
+
+.comp-wca-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 180px;
+}
+
+.comp-field-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--secondary-text);
+}
+
+.comp-wca-input {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+    font-family: monospace !important;
+    text-transform: uppercase;
+}
+
+.comp-solves-section {
+    background: var(--main-lighter);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.comp-solves-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.comp-solve-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-md);
+    border-bottom: 1px solid var(--card-border);
+    transition: background 0.12s ease;
+    position: relative;
+}
+
+.comp-solve-row:last-child {
+    border-bottom: none;
+}
+
+.comp-solve-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--secondary-text);
+    min-width: 22px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.comp-solve-input {
+    flex: 1;
+    font-size: 1.6rem;
+    font-family: monospace !important;
+    font-weight: 600;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--main-text);
+    outline: none;
+    padding: var(--space-xxs) var(--space-xs);
+    min-width: 0;
+    transition: border-color 0.2s ease, color 0.15s ease;
+    text-align: right;
+}
+
+.comp-solve-input:focus {
+    border-bottom-color: var(--link-color);
+    color: var(--main-text) !important;
+}
+
+.comp-solve-input::placeholder {
+    color: var(--secondary-text);
+    opacity: 0.35;
+    font-weight: 400;
+    font-size: 1.2rem;
+}
+
+/* Best / worst highlighting (Ao5 only) */
+.comp-solve-row.best-solve .comp-solve-input:not(:focus) {
+    color: var(--success);
+}
+
+.comp-solve-row.worst-solve .comp-solve-input:not(:focus) {
+    color: var(--error);
+}
+
+/* +2 penalty text color */
+.comp-solve-row[data-penalty="plus2"] .comp-solve-input:not(:focus) {
+    color: var(--warning, #f59e0b);
+}
+
+/* Penalty buttons: hidden until row is hovered/focused */
+.comp-solve-row .penalty-buttons {
+    position: static;
+    opacity: 0;
+    transform: none;
+    transition: opacity 0.15s ease;
+    flex-shrink: 0;
+    width: auto;
+}
+
+.comp-solve-row:hover .penalty-buttons,
+.comp-solve-row:focus-within .penalty-buttons {
+    opacity: 1;
+}
+
+.comp-stats-section {
+    background: var(--main-lighter);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: var(--space-md);
+    display: flex;
+    justify-content: center;
+}
+
+/* Per-solve PR pill container */
+.comp-single-pr {
+    flex-shrink: 0;
+    min-width: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+/* Override global absolute positioning for inline solve-row pills */
+.comp-single-pr-pill {
+    position: static;
+    transform: none;
+    font-size: 0.72em;
+    padding: 0 7px;
+    height: 20px;
+    line-height: 20px;
+}
+
+/* On mobile, always show penalty buttons for easier touch interaction */
+@media (max-width: 600px) {
+    .comp-solve-row {
+        padding: var(--space-sm) var(--space-md);
+        min-height: 56px;
+    }
+
+    .comp-solve-input {
+        font-size: 1.3rem;
+    }
+
+    .comp-solve-row .penalty-buttons {
+        opacity: 1;
     }
 }

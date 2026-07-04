@@ -643,7 +643,7 @@ export default class ContactApi {
                 hostname.includes(':8001') || hostname.includes('beta.cubingtools.de')
                     ? 'beta.cubingtools.de'
                     : 'cubingtools.de';
-            const confirmationLink = `https://${hostname}/contact/confirm?id=${id}`;
+            const confirmationLink = `<a href="https://${hostname}/contact/confirm?id=${id}">Confirm your message</a>`;
 
             const templatePath = path.join(__dirname, '..', 'mail', 'confirm.html');
             const htmlContent = fs

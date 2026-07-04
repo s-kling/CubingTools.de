@@ -700,10 +700,10 @@
             // Unranked
             unranked.forEach((u) => {
                 html += `<tr class="scout-unranked">
-          <td><span class="scout-rank">—</span></td>
-          <td colspan="3" style="font-size:0.8rem;color:var(--secondary-text)">${esc(u.name)} <span style="opacity:0.6">(no history)</span></td>
-          <td></td>
-        </tr>`;
+                            <td><span class="scout-rank">—</span></td>
+                            <td colspan="3" style="font-size:0.8rem;color:var(--secondary-text)">${esc(u.name)} <span style="opacity:0.6">(no history)</span></td>
+                            <td></td>
+                        </tr>`;
             });
 
             html += `</tbody></table></div>`;

@@ -316,8 +316,321 @@ window.addEventListener('unhandledrejection', (event) => {
 document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
         closeUserFeedbackPopup();
+        closeMobileSheets();
     }
 });
+
+// ─────────────────────────────────────────────────────────────
+//  MOBILE BOTTOM SHEETS
+// ─────────────────────────────────────────────────────────────
+
+/** Cached tool data so we only fetch once */
+let _cachedTools = null;
+
+function isMobileLayout() {
+    return window.matchMedia('(max-width: 650px)').matches;
+}
+
+/**
+ * Build and inject the bottom bar + two sheets (tools, nav) into the DOM.
+ * Called once after the tools list is available.
+ */
+function setupMobileBottomBar(tools) {
+    // ── Backdrop ──────────────────────────────────────────────
+    const backdrop = document.createElement('div');
+    backdrop.className = 'mobile-sheet-backdrop';
+    backdrop.id = 'mobile-sheet-backdrop';
+    document.body.appendChild(backdrop);
+
+    // ── Tools Sheet ───────────────────────────────────────────
+    const toolsSheet = document.createElement('div');
+    toolsSheet.id = 'mobile-tools-sheet';
+    toolsSheet.setAttribute('role', 'dialog');
+    toolsSheet.setAttribute('aria-modal', 'true');
+    toolsSheet.setAttribute('aria-label', 'Tools');
+    toolsSheet.innerHTML = buildToolsSheetHTML(tools);
+    document.body.appendChild(toolsSheet);
+
+    // ── Nav Sheet ─────────────────────────────────────────────
+    const navSheet = document.createElement('div');
+    navSheet.id = 'mobile-nav-sheet';
+    navSheet.setAttribute('role', 'dialog');
+    navSheet.setAttribute('aria-modal', 'true');
+    navSheet.setAttribute('aria-label', 'Menu');
+    navSheet.innerHTML = buildNavSheetHTML();
+    document.body.appendChild(navSheet);
+
+    // ── Bottom Bar ────────────────────────────────────────────
+    const bar = document.createElement('div');
+    bar.id = 'mobile-bottom-bar';
+    bar.setAttribute('role', 'navigation');
+    bar.setAttribute('aria-label', 'Main navigation');
+    bar.innerHTML = `
+        <button class="mobile-bottom-bar__btn" id="mbb-home" aria-label="Home">
+            <i class="fas fa-home"></i>
+            <span>Home</span>
+        </button>
+        <button class="mobile-bottom-bar__btn" id="mbb-tools" aria-label="Tools" aria-expanded="false" aria-controls="mobile-tools-sheet">
+            <i class="fas fa-wrench"></i>
+            <span>Tools</span>
+        </button>
+        <button class="mobile-bottom-bar__btn" id="mbb-menu" aria-label="Menu" aria-expanded="false" aria-controls="mobile-nav-sheet">
+            <i class="fas fa-bars"></i>
+            <span>Menu</span>
+        </button>
+    `;
+    document.body.appendChild(bar);
+
+    // ── Event wiring ──────────────────────────────────────────
+    document.getElementById('mbb-home').addEventListener('click', () => {
+        closeMobileSheets();
+        window.location.href = '/';
+    });
+
+    document.getElementById('mbb-tools').addEventListener('click', () => {
+        toggleSheet('tools');
+    });
+
+    document.getElementById('mbb-menu').addEventListener('click', () => {
+        toggleSheet('nav');
+    });
+
+    backdrop.addEventListener('click', closeMobileSheets);
+
+    // Tools sheet: close button
+    toolsSheet
+        .querySelector('.mobile-tools-sheet__close')
+        ?.addEventListener('click', closeMobileSheets);
+
+    // Tools sheet: live search filter
+    const searchInput = toolsSheet.querySelector('.mobile-tools-sheet__search');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => filterToolsSheet(searchInput.value, tools));
+    }
+
+    // Nav sheet: theme toggle button
+    const themeBtn = navSheet.querySelector('#mobile-nav-theme-toggle');
+    if (themeBtn) {
+        themeBtn.addEventListener('click', () => {
+            const html = document.documentElement;
+            const newTheme = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            const icon = themeBtn.querySelector('i');
+            if (icon) {
+                icon.className = `fas fa-${newTheme === 'dark' ? 'sun' : 'moon'}`;
+            }
+            const label = themeBtn.querySelector('.mobile-nav-sheet__theme-label');
+            if (label) {
+                label.textContent = newTheme === 'dark' ? 'Light mode' : 'Dark mode';
+            }
+        });
+    }
+}
+
+function buildToolsSheetHTML(tools) {
+    const featured = (tools || []).filter((t) => t.filename.includes('guildford'));
+    const other = (tools || []).filter((t) => !t.filename.includes('guildford'));
+
+    function toolRow(tool, isFeatured) {
+        const href = `/tools/${tool.filename.replace('.html', '')}`;
+        const badge = isFeatured ? '<span class="mobile-sheet-tool__badge">Featured</span>' : '';
+        return `
+            <li>
+                <a class="mobile-sheet-tool" href="${href}">
+                    <span class="mobile-sheet-tool__icon"><i class="fas fa-cube"></i></span>
+                    <span>${tool.title}</span>
+                    ${badge}
+                </a>
+            </li>`;
+    }
+
+    const featuredHTML = featured.map((t) => toolRow(t, true)).join('');
+    const otherHTML = other.map((t) => toolRow(t, false)).join('');
+
+    return `
+        <div class="mobile-tools-sheet__handle" aria-hidden="true"></div>
+        <div class="mobile-tools-sheet__header">
+            <span class="mobile-tools-sheet__title">Tools</span>
+            <button class="mobile-tools-sheet__close" aria-label="Close tools">&times;</button>
+        </div>
+        <div class="mobile-tools-sheet__search-wrap">
+            <input class="mobile-tools-sheet__search" type="search" placeholder="Search tools…" aria-label="Search tools">
+        </div>
+        <ul class="mobile-tools-sheet__list" id="mobile-tools-list">
+            ${featured.length ? `<li class="mobile-tools-sheet__section-label">Featured</li>${featuredHTML}` : ''}
+            ${other.length ? `<li class="mobile-tools-sheet__section-label">All Tools</li>${otherHTML}` : ''}
+        </ul>
+    `;
+}
+
+function buildNavSheetHTML() {
+    const isDark = (localStorage.getItem('theme') || 'dark') === 'dark';
+    const themeLabel = isDark ? 'Light mode' : 'Dark mode';
+    const themeIcon = isDark ? 'sun' : 'moon';
+
+    const betaLabel = (() => {
+        if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+            return location.port === '8001' ? 'Full Release' : 'Beta';
+        }
+        return location.hostname === 'beta.cubingtools.de' ? 'Full Release' : 'Beta';
+    })();
+
+    const betaHref = (() => {
+        if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return '#';
+        if (location.hostname === 'beta.cubingtools.de')
+            return location.href.replace('beta.cubingtools.de', 'cubingtools.de');
+        return location.href.replace('cubingtools.de', 'beta.cubingtools.de');
+    })();
+
+    return `
+        <div class="mobile-nav-sheet__handle" aria-hidden="true"></div>
+        <ul class="mobile-nav-sheet__list">
+            <li>
+                <a class="mobile-nav-sheet__item" href="/">
+                    <i class="fas fa-home"></i>Home
+                </a>
+            </li>
+            <li>
+                <a class="mobile-nav-sheet__item" href="/contact">
+                    <i class="fas fa-envelope"></i>Contact
+                </a>
+            </li>
+            <li>
+                <a class="mobile-nav-sheet__item" href="/privacy-policy">
+                    <i class="fas fa-shield-alt"></i>Privacy Policy
+                </a>
+            </li>
+            <li>
+                <a class="mobile-nav-sheet__item" href="${betaHref}">
+                    <i class="fas fa-flask"></i>${betaLabel}
+                </a>
+            </li>
+            <li>
+                <button id="mobile-nav-theme-toggle" class="mobile-nav-sheet__item" style="width:100%;border:none;background:transparent;text-align:left;cursor:pointer;font-size:16px;font-weight:500;color:var(--main-text);">
+                    <i class="fas fa-${themeIcon}"></i><span class="mobile-nav-sheet__theme-label">${themeLabel}</span>
+                </button>
+            </li>
+        </ul>
+    `;
+}
+
+/** Filter tool rows in the tools sheet based on the search query */
+function filterToolsSheet(query, tools) {
+    const list = document.getElementById('mobile-tools-list');
+    if (!list) return;
+
+    const q = query.trim().toLowerCase();
+    if (!q) {
+        // Restore full list
+        const sheet = document.getElementById('mobile-tools-sheet');
+        if (sheet) {
+            const listEl = sheet.querySelector('#mobile-tools-list');
+            if (listEl) listEl.innerHTML = buildToolsSheetInnerHTML(tools);
+        }
+        return;
+    }
+
+    const matched = (tools || []).filter((t) => t.title.toLowerCase().includes(q));
+    if (matched.length === 0) {
+        list.innerHTML = `<li class="mobile-tools-sheet__empty">No tools match "<strong>${q}</strong>"</li>`;
+        return;
+    }
+
+    list.innerHTML = matched
+        .map((t) => {
+            const href = `/tools/${t.filename.replace('.html', '')}`;
+            return `<li><a class="mobile-sheet-tool" href="${href}">
+            <span class="mobile-sheet-tool__icon"><i class="fas fa-cube"></i></span>
+            <span>${t.title}</span>
+        </a></li>`;
+        })
+        .join('');
+}
+
+function buildToolsSheetInnerHTML(tools) {
+    const featured = (tools || []).filter((t) => t.filename.includes('guildford'));
+    const other = (tools || []).filter((t) => !t.filename.includes('guildford'));
+
+    function toolRow(tool, isFeatured) {
+        const href = `/tools/${tool.filename.replace('.html', '')}`;
+        const badge = isFeatured ? '<span class="mobile-sheet-tool__badge">Featured</span>' : '';
+        return `<li><a class="mobile-sheet-tool" href="${href}">
+            <span class="mobile-sheet-tool__icon"><i class="fas fa-cube"></i></span>
+            <span>${tool.title}</span>${badge}</a></li>`;
+    }
+
+    return [
+        ...(featured.length
+            ? [
+                  `<li class="mobile-tools-sheet__section-label">Featured</li>`,
+                  ...featured.map((t) => toolRow(t, true)),
+              ]
+            : []),
+        ...(other.length
+            ? [
+                  `<li class="mobile-tools-sheet__section-label">All Tools</li>`,
+                  ...other.map((t) => toolRow(t, false)),
+              ]
+            : []),
+    ].join('');
+}
+
+let _activeSheet = null;
+
+function toggleSheet(which) {
+    if (_activeSheet === which) {
+        closeMobileSheets();
+        return;
+    }
+    closeMobileSheets(false); // close without animation reset so we can open immediately
+
+    _activeSheet = which;
+
+    const toolsSheet = document.getElementById('mobile-tools-sheet');
+    const navSheet = document.getElementById('mobile-nav-sheet');
+    const backdrop = document.getElementById('mobile-sheet-backdrop');
+    const toolsBtn = document.getElementById('mbb-tools');
+    const menuBtn = document.getElementById('mbb-menu');
+
+    if (which === 'tools' && toolsSheet) {
+        toolsSheet.classList.add('is-open');
+        toolsBtn?.setAttribute('aria-expanded', 'true');
+        toolsBtn?.classList.add('is-active');
+        // Focus the search input for immediate typing
+        setTimeout(() => toolsSheet.querySelector('.mobile-tools-sheet__search')?.focus(), 50);
+    } else if (which === 'nav' && navSheet) {
+        navSheet.classList.add('is-open');
+        menuBtn?.setAttribute('aria-expanded', 'true');
+        menuBtn?.classList.add('is-active');
+    }
+
+    backdrop?.classList.add('is-visible');
+}
+
+function closeMobileSheets(resetActive = true) {
+    const toolsSheet = document.getElementById('mobile-tools-sheet');
+    const navSheet = document.getElementById('mobile-nav-sheet');
+    const backdrop = document.getElementById('mobile-sheet-backdrop');
+    const toolsBtn = document.getElementById('mbb-tools');
+    const menuBtn = document.getElementById('mbb-menu');
+
+    toolsSheet?.classList.remove('is-open');
+    navSheet?.classList.remove('is-open');
+    backdrop?.classList.remove('is-visible');
+
+    toolsBtn?.setAttribute('aria-expanded', 'false');
+    toolsBtn?.classList.remove('is-active');
+    menuBtn?.setAttribute('aria-expanded', 'false');
+    menuBtn?.classList.remove('is-active');
+
+    if (resetActive) _activeSheet = null;
+}
+
+// Expose globally so Escape key handler can reach it
+window.closeMobileSheets = closeMobileSheets;
+
+// ─────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
     // COOKIE CONSENT
@@ -387,9 +700,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         addCookieConsentBanner();
     }
 
-    loadTools();
-    addFooterTag();
     setupNavbar();
+    addFooterTag();
+    await loadTools(); // wait so mobile bar has tools data
 });
 
 function addCookieConsentBanner() {
@@ -419,7 +732,6 @@ function addCookieConsentBanner() {
     const primaryButton = document.querySelector('.user-feedback-popup__primary');
     const dismissButton = document.querySelector('.user-feedback-popup__dismiss');
 
-    // Have the cursor be pointer
     primaryButton.style.cursor = 'pointer';
     dismissButton.style.cursor = 'pointer';
 
@@ -447,7 +759,7 @@ function handleConsent(isAccepted) {
 
 async function loadTools() {
     const toolsContainer = document.getElementById('sidebar');
-    toolsContainer.innerHTML = '';
+    if (toolsContainer) toolsContainer.innerHTML = '';
 
     try {
         const tools = await window.fetchJsonOrThrow('/api/tools', {
@@ -455,42 +767,50 @@ async function loadTools() {
         });
 
         if (Array.isArray(tools)) {
-            const featuredTools = tools.filter((tool) => tool.filename.includes('guildford'));
-            const otherTools = tools.filter((tool) => !tool.filename.includes('guildford'));
+            _cachedTools = tools;
 
-            toolsContainer.innerHTML += '<h3 class="big-screen">Featured</h3>';
-            featuredTools.forEach((tool) => {
-                const toolElement = document.createElement('a');
-                toolElement.className = 'tool-tag';
-                toolElement.href = `/tools/${tool.filename.replace('.html', '')}`;
-                toolElement.rel = 'noopener noreferrer';
+            // ── Desktop sidebar (unchanged) ───────────────────
+            if (toolsContainer) {
+                const featuredTools = tools.filter((tool) => tool.filename.includes('guildford'));
+                const otherTools = tools.filter((tool) => !tool.filename.includes('guildford'));
 
-                toolElement.innerHTML = `
-                        <h3 class="tool-title">${tool.title}</h3>
-                    `;
+                toolsContainer.innerHTML += '<h3 class="big-screen">Featured</h3>';
+                featuredTools.forEach((tool) => {
+                    const toolElement = document.createElement('a');
+                    toolElement.className = 'tool-tag';
+                    toolElement.href = `/tools/${tool.filename.replace('.html', '')}`;
+                    toolElement.rel = 'noopener noreferrer';
+                    toolElement.innerHTML = `<h3 class="tool-title">${tool.title}</h3>`;
+                    toolsContainer.appendChild(toolElement);
+                });
 
-                toolsContainer.appendChild(toolElement);
-            });
+                toolsContainer.innerHTML += '<h3 class="big-screen">Tools</h3>';
+                otherTools.forEach((tool) => {
+                    const toolElement = document.createElement('a');
+                    toolElement.className = 'tool-tag';
+                    toolElement.href = `/tools/${tool.filename.replace('.html', '')}`;
+                    toolElement.rel = 'noopener noreferrer';
+                    toolElement.innerHTML = `<h3 class="tool-title">${tool.title}</h3>`;
+                    toolsContainer.appendChild(toolElement);
+                });
+            }
 
-            toolsContainer.innerHTML += '<h3 class="big-screen">Tools</h3>';
-            otherTools.forEach((tool) => {
-                const toolElement = document.createElement('a');
-                toolElement.className = 'tool-tag';
-                toolElement.href = `/tools/${tool.filename.replace('.html', '')}`;
-                toolElement.rel = 'noopener noreferrer';
-
-                toolElement.innerHTML = `
-                        <h3 class="tool-title">${tool.title}</h3>
-                    `;
-
-                toolsContainer.appendChild(toolElement);
-            });
+            // ── Mobile bottom bar (only injected once) ────────
+            if (!document.getElementById('mobile-bottom-bar')) {
+                setupMobileBottomBar(tools);
+            }
         } else {
             throw new Error('Unexpected tool list response.');
         }
     } catch (error) {
         console.error('Error loading tools:', error);
-        toolsContainer.innerHTML = '<h3>Tools unavailable</h3>';
+        if (toolsContainer) toolsContainer.innerHTML = '<h3>Tools unavailable</h3>';
+
+        // Still inject the bottom bar even on error — nav + menu still work
+        if (!document.getElementById('mobile-bottom-bar')) {
+            setupMobileBottomBar([]);
+        }
+
         window.showUserErrorPopup({
             title: 'Could not load the tool list',
             message: 'The sidebar tools could not be loaded right now.',
@@ -505,9 +825,8 @@ async function loadTools() {
 
 async function addFooterTag() {
     const bar = document.getElementById('footer');
+    if (!bar) return;
     bar.innerHTML = '';
-
-    let footer = 'unknown';
 
     // ── Top row ──────────────────────────────────────────
     const top = document.createElement('div');
@@ -546,8 +865,7 @@ async function addFooterTag() {
     try {
         const response = await fetch('/api/version');
         const data = await response.json();
-        version = data.version || 'unknown';
-
+        const version = data.version || 'unknown';
         versionLink.innerHTML = `${window.location.hostname}&nbsp;<span class="footer-tag__num">v${version}</span>`;
     } catch {
         versionLink.textContent = window.location.hostname;
@@ -653,14 +971,14 @@ function setupNavbar() {
     const savedTheme = localStorage.getItem('theme') || 'dark';
     document.documentElement.setAttribute('data-theme', savedTheme);
 
-    // Hide navbar when clicking outside of it
+    // Hide desktop navbar menu when clicking outside
     document.addEventListener('click', (event) => {
         if (!navbar.contains(event.target) && !label.contains(event.target)) {
             hamburger.checked = false;
         }
     });
 
-    // Swipe to hide navbar
+    // Swipe to hide desktop navbar
     let touchStartX = 0;
     let touchEndX = 0;
 
@@ -671,8 +989,9 @@ function setupNavbar() {
     document.addEventListener('touchend', (event) => {
         touchEndX = event.changedTouches[0].screenX;
         if (touchEndX < touchStartX - 50) {
-            // Adding a threshold for swipe
             hamburger.checked = false;
+            // Also close mobile sheets on swipe-left
+            closeMobileSheets?.();
         }
     });
 }

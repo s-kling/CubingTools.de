@@ -16,6 +16,11 @@ const state = {
     previousAverage: null,
     sessionPrSingle: {},
     sessionPrAverage: {},
+    // Inspection
+    inspectionRunning: false,
+    inspectionStart: null,
+    inspectionAnimFrame: null,
+    inspectionTime: null, // seconds used in the last inspection
 };
 
 const meanEvents = ['666', '777', '444bf', '555bf', '333bf'];
@@ -139,37 +144,75 @@ function updateProgress() {
 // === Update session stats ===
 function updateSessionStats() {
     const currentEvent = document.getElementById('event-type').value;
-    const eventAverages = state.averageTags.filter((tag) => tag.event === currentEvent);
+    const statsView = window._statsView || 'averages';
 
     const bestElem = document.getElementById('sessionBest');
     const avgElem = document.getElementById('sessionAvg');
     const countElem = document.getElementById('sessionCount');
     const deleteShame = document.getElementById('deleteStatShame');
+    const countLabel = countElem?.closest('.stat-card')?.querySelector('.stat-label');
 
-    if (eventAverages.length === 0) {
-        if (bestElem) bestElem.textContent = '-';
-        if (avgElem) avgElem.textContent = '-';
-        if (countElem) countElem.textContent = '0';
-        if (deleteShame) deleteShame.textContent = state.deleteStatShameCounter || 0;
-        return;
-    }
-
-    const validAverages = eventAverages
-        .map((a) => parseFloat(a.average))
-        .filter((a) => !isNaN(a) && isFinite(a));
-
-    if (validAverages.length > 0) {
-        const best = Math.min(...validAverages);
-        const mean = validAverages.reduce((a, b) => a + b, 0) / validAverages.length;
-        if (bestElem) bestElem.textContent = formatTime(best);
-        if (avgElem) avgElem.textContent = formatTime(mean);
-    } else {
-        if (bestElem) bestElem.textContent = 'DNF';
-        if (avgElem) avgElem.textContent = 'DNF';
-    }
-
-    if (countElem) countElem.textContent = eventAverages.length;
     if (deleteShame) deleteShame.textContent = state.deleteStatShameCounter || 0;
+
+    if (statsView === 'solves') {
+        if (countLabel) countLabel.textContent = 'Solves';
+
+        const allSolves = [];
+        state.averageTags
+            .filter((tag) => tag.event === currentEvent)
+            .forEach((tag) => (tag.times || []).forEach((s) => allSolves.push(s)));
+        state.times.forEach((s) => allSolves.push(s));
+
+        if (countElem) countElem.textContent = allSolves.length;
+
+        if (allSolves.length === 0) {
+            if (bestElem) bestElem.textContent = '-';
+            if (avgElem) avgElem.textContent = '-';
+            return;
+        }
+
+        const validSolves = allSolves
+            .map((s) =>
+                s.penalty === 'dnf' ? Infinity : s.penalty === 'plus2' ? s.raw + 2 : s.raw,
+            )
+            .filter((v) => isFinite(v));
+
+        if (validSolves.length > 0) {
+            const best = Math.min(...validSolves);
+            const mean = validSolves.reduce((a, b) => a + b, 0) / validSolves.length;
+            if (bestElem) bestElem.textContent = formatTime(best);
+            if (avgElem) avgElem.textContent = formatTime(mean);
+        } else {
+            if (bestElem) bestElem.textContent = 'DNF';
+            if (avgElem) avgElem.textContent = 'DNF';
+        }
+    } else {
+        if (countLabel) countLabel.textContent = 'Averages';
+
+        const eventAverages = state.averageTags.filter((tag) => tag.event === currentEvent);
+
+        if (countElem) countElem.textContent = eventAverages.length;
+
+        if (eventAverages.length === 0) {
+            if (bestElem) bestElem.textContent = '-';
+            if (avgElem) avgElem.textContent = '-';
+            return;
+        }
+
+        const validAverages = eventAverages
+            .map((a) => parseFloat(a.average))
+            .filter((a) => !isNaN(a) && isFinite(a));
+
+        if (validAverages.length > 0) {
+            const best = Math.min(...validAverages);
+            const mean = validAverages.reduce((a, b) => a + b, 0) / validAverages.length;
+            if (bestElem) bestElem.textContent = formatTime(best);
+            if (avgElem) avgElem.textContent = formatTime(mean);
+        } else {
+            if (bestElem) bestElem.textContent = 'DNF';
+            if (avgElem) avgElem.textContent = 'DNF';
+        }
+    }
 }
 
 // === Update averages empty state ===
@@ -178,13 +221,402 @@ function updateAveragesEmptyState() {
     const eventAverages = state.averageTags.filter((tag) => tag.event === currentEvent);
     const emptyEl = document.getElementById('averagesEmpty');
     const listEl = document.getElementById('tagContainer');
+    const solvesEl = document.getElementById('solvesContainer');
 
-    if (emptyEl) {
-        emptyEl.style.display = eventAverages.length === 0 ? 'block' : 'none';
+    const statsView = window._statsView || 'averages';
+
+    if (statsView === 'solves') {
+        if (emptyEl) emptyEl.style.display = 'none';
+        if (listEl) listEl.style.display = 'none';
+        if (solvesEl) solvesEl.style.display = 'block';
+    } else {
+        if (emptyEl) {
+            emptyEl.style.display = eventAverages.length === 0 ? 'block' : 'none';
+        }
+        if (listEl) {
+            listEl.style.display = eventAverages.length === 0 ? 'none' : 'block';
+        }
+        if (solvesEl) solvesEl.style.display = 'none';
     }
-    if (listEl) {
-        listEl.style.display = eventAverages.length === 0 ? 'none' : 'block';
+}
+
+// === STATS PAGE CHARTS ===
+
+let statsAvgChart = null;
+let statsInspChart = null;
+
+// === Normal distribution helpers (used by bell-curve MLA calculation) ===
+function normalPdf(z) {
+    return Math.exp(-0.5 * z * z) / Math.sqrt(2 * Math.PI);
+}
+
+function normalCdf(z) {
+    // Abramowitz & Stegun erf approximation, max error < 1.5e-7
+    const sign = z >= 0 ? 1 : -1;
+    const a = Math.abs(z) / Math.SQRT2;
+    const t = 1 / (1 + 0.3275911 * a);
+    const erf =
+        sign *
+        (1 -
+            (0.254829592 * t +
+                t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429)))) *
+                Math.exp(-a * a));
+    return 0.5 * (1 + erf);
+}
+
+function calcStatsTrend(data) {
+    const n = data.length;
+    if (n < 2) return data.map(() => null);
+    let sumX = 0,
+        sumY = 0,
+        sumXY = 0,
+        sumXX = 0,
+        count = 0;
+    data.forEach((y, i) => {
+        if (y === null || y === undefined) return;
+        const x = i + 1;
+        sumX += x;
+        sumY += y;
+        sumXY += x * y;
+        sumXX += x * x;
+        count++;
+    });
+    if (count < 2) return data.map(() => null);
+    const slope = (count * sumXY - sumX * sumY) / (count * sumXX - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / count;
+    return data.map((_, i) => +(slope * (i + 1) + intercept).toFixed(4));
+}
+
+function renderStatsCharts() {
+    if (!window.Chart) return;
+    const currentEvent = document.getElementById('event-type').value;
+    updateSliderMax(currentEvent);
+    const n = parseInt(document.getElementById('statsHistorySlider')?.value || '30', 10);
+    const sliderValEl = document.getElementById('statsSliderVal');
+    if (sliderValEl) sliderValEl.textContent = n;
+
+    const rootStyles = getComputedStyle(document.documentElement);
+    const linkColor = rootStyles.getPropertyValue('--link-color').trim();
+    const secondaryText = rootStyles.getPropertyValue('--secondary-text').trim();
+    const mainLighter = rootStyles.getPropertyValue('--main-lighter').trim();
+    const successColor = (rootStyles.getPropertyValue('--success') || '#28a745').trim();
+    const warningColor = (rootStyles.getPropertyValue('--warning') || '#f0a500').trim();
+
+    // Build all individual solves for current event (used for both singles chart + inspection chart)
+    const allSolves = [];
+    state.averageTags
+        .filter((tag) => tag.event === currentEvent)
+        .forEach((tag) => (tag.times || []).forEach((s) => allSolves.push(s)));
+    state.times.forEach((s) => allSolves.push(s));
+
+    // ── First chart: Averages or Singles depending on stats view ───
+    const statsView = window._statsView || 'averages';
+    const avgLabelEl = document.getElementById('statsLegendAvgLabel');
+    const avgCanvas = document.getElementById('statsAvgChart');
+
+    if (avgCanvas) {
+        if (statsAvgChart) {
+            statsAvgChart.destroy();
+            statsAvgChart = null;
+        }
+
+        let chartData, chartLabels, meanVal;
+
+        if (statsView === 'solves') {
+            if (avgLabelEl) avgLabelEl.textContent = 'Singles';
+            const recentSolves = allSolves.slice(-n);
+            chartData = recentSolves.map((s) =>
+                s.penalty === 'dnf' ? null : s.penalty === 'plus2' ? s.raw + 2 : s.raw,
+            );
+            chartLabels = recentSolves.map(
+                (_, i) => allSolves.length - recentSolves.length + i + 1,
+            );
+            const validSingles = chartData.filter((v) => v !== null);
+            meanVal = validSingles.length
+                ? validSingles.reduce((a, b) => a + b, 0) / validSingles.length
+                : 0;
+        } else {
+            if (avgLabelEl) avgLabelEl.textContent = 'Averages';
+            const eventTags = state.averageTags.filter((tag) => tag.event === currentEvent);
+            const recentTags = eventTags.slice(-n);
+            chartData = recentTags.map((tag) => {
+                const v = parseFloat(tag.average);
+                return isNaN(v) || !isFinite(v) ? null : v;
+            });
+            chartLabels = recentTags.map((_, i) => eventTags.length - recentTags.length + i + 1);
+            const validAvg = chartData.filter((v) => v !== null);
+            meanVal = validAvg.length ? validAvg.reduce((a, b) => a + b, 0) / validAvg.length : 0;
+        }
+
+        if (chartData.length > 1) {
+            const trend = calcStatsTrend(chartData);
+            statsAvgChart = new window.Chart(avgCanvas, {
+                type: 'line',
+                data: {
+                    labels: chartLabels,
+                    datasets: [
+                        {
+                            data: Array(chartData.length).fill(meanVal),
+                            borderColor: 'red',
+                            borderWidth: 1.5,
+                            borderDash: [6, 6],
+                            pointRadius: 0,
+                            fill: false,
+                            label: 'Mean',
+                            order: 0,
+                        },
+                        {
+                            data: trend,
+                            borderColor: successColor,
+                            borderWidth: 1.5,
+                            borderDash: [5, 6],
+                            pointRadius: 0,
+                            fill: false,
+                            label: 'Trend',
+                            order: 1,
+                        },
+                        {
+                            data: chartData,
+                            borderColor: linkColor,
+                            borderWidth: 1.5,
+                            pointRadius: chartData.length > 40 ? 0 : 2,
+                            pointHoverRadius: 4,
+                            pointBackgroundColor: linkColor,
+                            backgroundColor: linkColor + '18',
+                            fill: true,
+                            tension: 0.35,
+                            label: statsView === 'solves' ? 'Single' : 'Average',
+                            order: 2,
+                            spanGaps: true,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 200 },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) =>
+                                    ctx.raw !== null ? ` ${formatTime(ctx.raw)}` : ' DNF',
+                            },
+                        },
+                    },
+                    scales: {
+                        x: { display: false },
+                        y: {
+                            grid: { color: mainLighter },
+                            ticks: {
+                                color: secondaryText,
+                                font: { family: 'Courier New', size: 10 },
+                                maxTicksLimit: 5,
+                                callback: (v) => formatTime(v),
+                            },
+                        },
+                    },
+                },
+            });
+        }
     }
+
+    // ── Inspection chart ────────────────────────────────────
+    const recentSolves = allSolves.slice(-n);
+    const inspVals = recentSolves.map((s) => s.inspectionTime ?? null);
+    const hasInsp = inspVals.some((v) => v !== null);
+
+    const inspChartWrap = document.getElementById('statsInspChartWrap');
+    const inspCanvas = document.getElementById('statsInspChart');
+    const legendInspDot = document.getElementById('statsLegendInspDot');
+    const legendInspLabel = document.getElementById('statsLegendInspLabel');
+    if (inspChartWrap) inspChartWrap.hidden = !hasInsp;
+    if (legendInspDot) legendInspDot.hidden = !hasInsp;
+    if (legendInspLabel) legendInspLabel.hidden = !hasInsp;
+
+    if (inspCanvas) {
+        if (statsInspChart) {
+            statsInspChart.destroy();
+            statsInspChart = null;
+        }
+        if (hasInsp && recentSolves.length > 1) {
+            const validInsp = inspVals.filter((v) => v !== null);
+            const inspMean = validInsp.reduce((a, b) => a + b, 0) / validInsp.length;
+            const inspTrend = calcStatsTrend(inspVals);
+
+            statsInspChart = new window.Chart(inspCanvas, {
+                type: 'line',
+                data: {
+                    labels: recentSolves.map(
+                        (_, i) => allSolves.length - recentSolves.length + i + 1,
+                    ),
+                    datasets: [
+                        {
+                            data: Array(recentSolves.length).fill(inspMean),
+                            borderColor: 'red',
+                            borderWidth: 1.5,
+                            borderDash: [6, 6],
+                            pointRadius: 0,
+                            fill: false,
+                            label: 'Mean',
+                            order: 0,
+                        },
+                        {
+                            data: inspTrend,
+                            borderColor: successColor,
+                            borderWidth: 1.5,
+                            borderDash: [5, 6],
+                            pointRadius: 0,
+                            fill: false,
+                            label: 'Trend',
+                            order: 1,
+                        },
+                        {
+                            data: inspVals,
+                            borderColor: warningColor,
+                            borderWidth: 1.5,
+                            pointRadius: recentSolves.length > 40 ? 0 : 2,
+                            pointHoverRadius: 4,
+                            pointBackgroundColor: warningColor,
+                            backgroundColor: warningColor + '18',
+                            fill: true,
+                            tension: 0.35,
+                            label: 'Inspection',
+                            order: 2,
+                            spanGaps: true,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 200 },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => (ctx.raw !== null ? ` ${ctx.raw.toFixed(2)}s` : ''),
+                            },
+                        },
+                    },
+                    scales: {
+                        x: { display: false },
+                        y: {
+                            grid: { color: mainLighter },
+                            ticks: {
+                                color: secondaryText,
+                                font: { family: 'Courier New', size: 10 },
+                                maxTicksLimit: 5,
+                                callback: (v) => `${v.toFixed(1)}s`,
+                            },
+                        },
+                    },
+                },
+            });
+        }
+    }
+}
+
+// === SOLVES VIEW (stats page) ===
+
+function displaySolves() {
+    const container = document.getElementById('solvesContainer');
+    if (!container) return;
+
+    const currentEvent = document.getElementById('event-type').value;
+    // Build {solve, tag} pairs so each solve knows its parent average
+    const allItems = [];
+
+    state.averageTags
+        .filter((tag) => tag.event === currentEvent)
+        .forEach((tag) => {
+            (tag.times || []).forEach((solve) => allItems.push({ solve, tag }));
+        });
+
+    // In-progress solves have no parent average yet
+    state.times.forEach((solve) => allItems.push({ solve, tag: null }));
+
+    container.innerHTML = '';
+
+    if (allItems.length === 0) {
+        const li = document.createElement('li');
+        li.className = 'solves-empty';
+        li.textContent = 'No solves yet.';
+        container.appendChild(li);
+        return;
+    }
+
+    // Show most recent first
+    [...allItems].reverse().forEach(({ solve, tag }, idx) => {
+        const li = document.createElement('li');
+        if (tag) li.style.cursor = 'pointer';
+
+        const avgRow = document.createElement('div');
+        avgRow.classList.add('avg-row');
+
+        // Left: number + time + rank
+        const leftSide = document.createElement('span');
+        leftSide.style.cssText = 'display:flex;align-items:baseline;gap:0.5em;';
+
+        const numSpan = document.createElement('span');
+        numSpan.className = 'solve-num';
+        numSpan.textContent = `${allItems.length - idx}.`;
+        leftSide.appendChild(numSpan);
+
+        const timeSpan = document.createElement('span');
+        timeSpan.classList.add('avg-value');
+        if (solve.penalty === 'dnf') {
+            timeSpan.textContent = 'DNF';
+            timeSpan.style.color = 'var(--error)';
+        } else if (solve.penalty === 'plus2') {
+            timeSpan.textContent = formatTime(solve.raw + 2) + '+';
+            timeSpan.style.color = 'var(--warning, #f0a500)';
+        } else {
+            timeSpan.textContent = formatTime(solve.raw);
+        }
+        leftSide.appendChild(timeSpan);
+
+        const solveVal =
+            solve.penalty === 'dnf'
+                ? Infinity
+                : solve.penalty === 'plus2'
+                  ? solve.raw + 2
+                  : solve.raw;
+        const rank = isFinite(solveVal) ? getSingleRank(solveVal) : null;
+        if (rank) {
+            const rankSpan = document.createElement('span');
+            rankSpan.classList.add('avg-rank');
+            rankSpan.textContent = `PR${rank}`;
+            leftSide.appendChild(rankSpan);
+        }
+
+        avgRow.appendChild(leftSide);
+
+        // Right: action button (only for solves that belong to a completed average)
+        if (tag) {
+            const rightBtns = document.createElement('span');
+            rightBtns.classList.add('avg-actions');
+
+            const openBtn = document.createElement('button');
+            openBtn.classList.add('avg-action-btn');
+            openBtn.innerHTML = '<i class="fas fa-layer-group"></i>';
+            openBtn.title = 'View average';
+            openBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                showAverageDetail(tag);
+            });
+            rightBtns.appendChild(openBtn);
+            avgRow.appendChild(rightBtns);
+
+            li.addEventListener('click', () => showAverageDetail(tag));
+        }
+
+        li.appendChild(avgRow);
+        container.appendChild(li);
+    });
+
+    // Refresh charts after solves update
+    renderStatsCharts();
 }
 
 // === Add time ===
@@ -200,7 +632,7 @@ function addTime() {
     }
 
     if (time == 'DNF') {
-        time = -1;
+        time = '-1';
         penalty = 'dnf';
     }
 
@@ -261,6 +693,7 @@ function addTime() {
     updateUndoButton();
     saveIncomplete();
     fetchScramble();
+    window._showMobileSolveResult?.();
 }
 
 // === Calculate stats for current session ===
@@ -289,6 +722,21 @@ function calculateStats() {
         if (bpaElem) bpaElem.textContent = '-';
         if (wpaElem) wpaElem.textContent = '-';
         if (tftElem) tftElem.textContent = '–';
+
+        const probBpaElemReset = document.getElementById('bpa-prob');
+        const probWpaElemReset = document.getElementById('wpa-prob');
+        if (probBpaElemReset) {
+            probBpaElemReset.textContent = '';
+            probBpaElemReset.style.color = '';
+        }
+        if (probWpaElemReset) {
+            probWpaElemReset.textContent = '';
+            probWpaElemReset.style.color = '';
+        }
+        const mlaEarlyReset = document.getElementById('mla');
+        const mlaSolveEarlyReset = document.getElementById('mla-solve');
+        if (mlaEarlyReset) mlaEarlyReset.textContent = '-';
+        if (mlaSolveEarlyReset) mlaSolveEarlyReset.textContent = '';
 
         duringAverageElem.forEach((el) => (el.style.display = 'flex'));
         afterAverageElem.forEach((el) => (el.style.display = 'none'));
@@ -338,7 +786,7 @@ function calculateStats() {
         valueDiv.style.position = 'relative';
         valueDiv.style.zIndex = '1';
         elem.appendChild(valueDiv);
-        if (prRank) {
+        if (prRank && getStorage('setting_show_pr_pills') !== false) {
             const prDiv = document.createElement('div');
             prDiv.className = 'pr-rank-pill';
             prDiv.textContent = `PR #${prRank}`;
@@ -373,6 +821,118 @@ function calculateStats() {
         setStatWithPr(wpaElem, wpaText, wpaRank);
     }
     if (tftElem) tftElem.textContent = tft;
+
+    // === Probability of BPA / WPA based on historical solve distribution ===
+    const probBpaElem = document.getElementById('bpa-prob');
+    const probWpaElem = document.getElementById('wpa-prob');
+    const canShowProb =
+        n === 4 &&
+        !meanEvents.includes(state.eventType) &&
+        typeof bpa === 'number' &&
+        isFinite(bpa) &&
+        typeof wpa === 'number' &&
+        isFinite(wpa) &&
+        state.userSolves.length >= 5;
+
+    if (canShowProb) {
+        const currentValues = state.times.map((t) =>
+            t.penalty === 'dnf' || t.value === Infinity ? Infinity : t.value,
+        );
+        const validCurrent = currentValues.filter((v) => isFinite(v));
+        const best4 = Math.min(...validCurrent);
+        const worst4 = Math.max(...validCurrent);
+        const total = state.userSolves.length;
+        // P(BPA): next solve ≤ current best → new best dropped, remaining average = BPA
+        const pBpa = state.userSolves.filter((s) => isFinite(s) && s <= best4).length / total;
+        // P(WPA): next solve ≥ current worst (incl. DNF) → new worst dropped, remaining average = WPA
+        const pWpa = state.userSolves.filter((s) => s >= worst4).length / total;
+
+        if (probBpaElem) {
+            if (getStorage('setting_show_prob_pills') !== false) {
+                const pct = (pBpa * 100).toFixed(1);
+                probBpaElem.textContent = `${pct}%`;
+                probBpaElem.style.background = 'gray';
+                probBpaElem.style.opacity = 0.6;
+                probBpaElem.style.color = '#fff';
+            } else {
+                probBpaElem.textContent = '';
+                probBpaElem.style.background = '';
+                probBpaElem.style.color = '';
+            }
+        }
+
+        if (probWpaElem) {
+            if (getStorage('setting_show_prob_pills') !== false) {
+                const pct = (pWpa * 100).toFixed(1);
+                probWpaElem.textContent = `${pct}%`;
+                probWpaElem.style.background = 'gray';
+                probWpaElem.style.opacity = 0.6;
+                probWpaElem.style.color = '#fff';
+            } else {
+                probWpaElem.textContent = '';
+                probWpaElem.style.background = '';
+                probWpaElem.style.color = '';
+            }
+        }
+
+        // === Most Likely Average: Monte Carlo simulation sampling from actual solve history ===
+        const mlaElem = document.getElementById('mla');
+        const mlaSolveElem = document.getElementById('mla-solve');
+        if (mlaElem) {
+            const finiteSolves = state.userSolves.filter((s) => isFinite(s));
+            if (finiteSolves.length < 5) {
+                mlaElem.textContent = '-';
+                if (mlaSolveElem) mlaSolveElem.textContent = '';
+            } else {
+                // Sample 5th solve from historical distribution and compute expected ao5
+                const iterations = 5000;
+                const results = [];
+                for (let i = 0; i < iterations; i++) {
+                    const x5 = finiteSolves[Math.floor(Math.random() * finiteSolves.length)];
+                    const all5 = [...currentValues, x5].sort((a, b) => a - b);
+                    const dnfCount5 = all5.filter((v) => !isFinite(v)).length;
+                    if (dnfCount5 > 1) {
+                        results.push(Infinity);
+                        continue;
+                    }
+                    const middle3 = all5.slice(1, 4);
+                    if (middle3.some((v) => !isFinite(v))) {
+                        results.push(Infinity);
+                        continue;
+                    }
+                    results.push((middle3[0] + middle3[1] + middle3[2]) / 3);
+                }
+                const finiteResults = results.filter((r) => isFinite(r));
+                const expectedMla = finiteResults.length
+                    ? finiteResults.reduce((a, b) => a + b, 0) / finiteResults.length
+                    : null;
+
+                const sortedSolves = [...finiteSolves].sort((a, b) => a - b);
+                const medianSolve = sortedSolves[Math.floor(sortedSolves.length / 2)];
+                if (mlaSolveElem) mlaSolveElem.textContent = `if ${formatTime(medianSolve)}`;
+                if (expectedMla === null) {
+                    mlaElem.textContent = 'DNF';
+                } else {
+                    setStatWithPr(mlaElem, formatTime(expectedMla), getAverageRank(expectedMla));
+                }
+            }
+        }
+    } else {
+        if (probBpaElem) {
+            probBpaElem.textContent = '';
+            probBpaElem.style.background = '';
+            probBpaElem.style.color = '';
+        }
+        if (probWpaElem) {
+            probWpaElem.textContent = '';
+            probWpaElem.style.background = '';
+            probWpaElem.style.color = '';
+        }
+        const mlaElemReset = document.getElementById('mla');
+        const mlaSolveElemReset = document.getElementById('mla-solve');
+        if (mlaElemReset) mlaElemReset.textContent = '-';
+        if (mlaSolveElemReset) mlaSolveElemReset.textContent = '';
+    }
 
     const event = document.getElementById('event-type').value;
 
@@ -409,6 +969,8 @@ function calculateStats() {
             updateProgress();
             updateSessionStats();
             updatePrTarget();
+            updateGoalTargetAfterAverage(parseFloat(mo3));
+            celebrateAverage(moVal, mo3Rank);
         }
     }
 
@@ -445,6 +1007,8 @@ function calculateStats() {
             updateProgress();
             updateSessionStats();
             updatePrTarget();
+            updateGoalTargetAfterAverage(parseFloat(ao5));
+            celebrateAverage(aoVal, ao5Rank);
         }
     }
 }
@@ -654,12 +1218,19 @@ function getPrPillColor(rank, format) {
     const successRGB = hexToRgb(successColor);
     const errorRGB = hexToRgb(errorColor);
 
-    const max = format === 'average' ? state.userAverages.length : state.userSolves.length;
+    const max =
+        format === 'average'
+            ? state.userAverages.length === 0
+                ? 1
+                : state.userAverages.length
+            : state.userSolves.length === 0
+              ? 1
+              : state.userSolves.length;
 
-    const ratio = Math.min(rank / max, 1);
-    const r = Math.round(successRGB.r * (1 - ratio) + errorRGB.r * ratio);
-    const g = Math.round(successRGB.g * (1 - ratio) + errorRGB.g * ratio);
-    const b = Math.round(successRGB.b * (1 - ratio) + errorRGB.b * ratio);
+    const ratio = 1 - Math.min(rank / max, 1);
+    const r = Math.round(successRGB.r * ratio + errorRGB.r * (1 - ratio));
+    const g = Math.round(successRGB.g * ratio + errorRGB.g * (1 - ratio));
+    const b = Math.round(successRGB.b * ratio + errorRGB.b * (1 - ratio));
     return `rgb(${r}, ${g}, ${b})`;
 }
 
@@ -880,10 +1451,10 @@ function deleteTime(index) {
             state.deleteStatShameCounter = (parseInt(state.deleteStatShameCounter, 10) || 0) + 1;
             localStorage.setItem('deleteStatShameCounter', state.deleteStatShameCounter);
 
-            calculateStats();
             displayCurrentTimes();
             updateProgress();
             saveIncomplete();
+            calculateStats();
         },
     );
 }
@@ -941,7 +1512,59 @@ function clearAllAverages() {
     );
 }
 
+// === STATS SLIDER HELPER ===
+
+function updateSliderMax(event) {
+    const slider = document.getElementById('statsHistorySlider');
+    const sliderValEl = document.getElementById('statsSliderVal');
+    if (!slider) return;
+
+    const currentEvent = event || document.getElementById('event-type').value;
+    const statsView = window._statsView || 'averages';
+
+    let count;
+    if (statsView === 'solves') {
+        const allSolves = [];
+        state.averageTags
+            .filter((tag) => tag.event === currentEvent)
+            .forEach((tag) => (tag.times || []).forEach((s) => allSolves.push(s)));
+        state.times.forEach((s) => allSolves.push(s));
+        count = allSolves.length;
+    } else {
+        count = state.averageTags.filter((tag) => tag.event === currentEvent).length;
+    }
+
+    const newMax = Math.max(5, count);
+    slider.max = newMax;
+    if (parseInt(slider.value, 10) > newMax) {
+        slider.value = newMax;
+    }
+    if (sliderValEl) sliderValEl.textContent = slider.value;
+}
+
 document.getElementById('clearAllBtn').addEventListener('click', clearAllAverages);
+
+document.getElementById('statsViewAverages')?.addEventListener('click', () => {
+    window._statsView = 'averages';
+    document.getElementById('statsViewAverages').classList.add('active');
+    document.getElementById('statsViewSolves').classList.remove('active');
+    updateAveragesEmptyState();
+    updateSliderMax();
+    updateSessionStats();
+    renderStatsCharts();
+});
+
+document.getElementById('statsViewSolves')?.addEventListener('click', () => {
+    window._statsView = 'solves';
+    document.getElementById('statsViewSolves').classList.add('active');
+    document.getElementById('statsViewAverages').classList.remove('active');
+    updateSliderMax();
+    updateSessionStats();
+    displaySolves();
+    updateAveragesEmptyState();
+});
+
+document.getElementById('statsHistorySlider')?.addEventListener('input', renderStatsCharts);
 
 // ! WCA DATA
 
@@ -981,14 +1604,18 @@ document.getElementById('wca').addEventListener('input', async () => {
 
 // === Fetch solves & averages for ranking ===
 async function fetchUserData(wcaId) {
+    const eventType = state.eventType;
     const [solvesData, averagesData] = await Promise.all([
-        window.fetchJsonOrThrow(`/api/wca/${wcaId}/${state.eventType}?getsolves=true`, {
+        window.fetchJsonOrThrow(`/api/wca/${wcaId}/${eventType}?getsolves=true`, {
             errorContext: 'Could not load WCA solves',
         }),
-        window.fetchJsonOrThrow(`/api/wca/${wcaId}/${state.eventType}?getaverages=true`, {
+        window.fetchJsonOrThrow(`/api/wca/${wcaId}/${eventType}?getaverages=true`, {
             errorContext: 'Could not load WCA averages',
         }),
     ]);
+
+    // Bail out if the user switched events while this fetch was in flight
+    if (state.eventType !== eventType) return;
 
     // Do not overwrite existing solves/averages
     const newSolves = Array.isArray(solvesData?.allResults) ? solvesData.allResults : [];
@@ -1004,6 +1631,10 @@ async function fetchUserData(wcaId) {
         ...convertedSolves.filter((t) => !state.userSolves.includes(t)),
     ];
     state.userAverages = [...state.userAverages];
+
+    // Keep competition page WCA-only data in sync
+    compState.wcaSolves = convertedSolves.filter((t) => isFinite(t));
+    compState.wcaAverages = convertedAverages.filter((t) => isFinite(t));
 }
 
 // === Rank helpers ===
@@ -1050,6 +1681,8 @@ const targetInput = document.getElementById('target');
 
 usePrCheckbox.addEventListener('change', () => {
     if (usePrCheckbox.checked) {
+        // Disable goal mode when PR mode is enabled
+        setGoalModeEnabled(false);
         updatePrTarget();
     } else {
         targetInput.disabled = false;
@@ -1058,6 +1691,173 @@ usePrCheckbox.addEventListener('change', () => {
     setStorage('setting_usePr', usePrCheckbox.checked);
     calculateStats();
     updateTargetDisplay();
+});
+
+// === GOAL MODE ===
+
+// Asymmetric EMA: respond quickly to improvement, slowly to regression
+const GOAL_ALPHA_IMPROVE = 0.3;
+const GOAL_ALPHA_REGRESS = 0.05;
+// Step toward goal per completed average (10% of the remaining gap)
+const GOAL_GRADIENT = 0.1;
+
+function getGoalEventKey() {
+    return document.getElementById('event-type').value;
+}
+
+function formattedTimeToSeconds(str) {
+    if (!str || str === '' || str === 'DNF') return NaN;
+    if (str.includes(':')) {
+        const parts = str.split(':');
+        if (parts.length === 2) {
+            const mins = parseInt(parts[0], 10);
+            const secs = parseFloat(parts[1]);
+            if (!isNaN(mins) && !isNaN(secs)) return mins * 60 + secs;
+        }
+        return NaN;
+    }
+    return parseFloat(str);
+}
+
+function getSmoothedPerf() {
+    const v = getStorage(`setting_smoothed_perf_${getGoalEventKey()}`);
+    return v !== null ? parseFloat(v) : null;
+}
+
+function initSmoothedPerfFromHistory() {
+    const event = getGoalEventKey();
+    const eventTags = state.averageTags.filter((tag) => tag.event === event);
+    if (eventTags.length === 0) return null;
+    const validAvgs = eventTags
+        .slice(-10)
+        .map((t) => parseFloat(t.average))
+        .filter((v) => !isNaN(v) && isFinite(v));
+    if (validAvgs.length === 0) return null;
+    const mean = validAvgs.reduce((a, b) => a + b, 0) / validAvgs.length;
+    setStorage(`setting_smoothed_perf_${event}`, mean.toFixed(4));
+    return mean;
+}
+
+function updateSmoothedPerf(newAvg) {
+    const event = getGoalEventKey();
+    let smoothed = getSmoothedPerf();
+    if (smoothed === null) {
+        smoothed = newAvg;
+    } else {
+        const alpha = newAvg < smoothed ? GOAL_ALPHA_IMPROVE : GOAL_ALPHA_REGRESS;
+        smoothed = smoothed * (1 - alpha) + newAvg * alpha;
+    }
+    setStorage(`setting_smoothed_perf_${event}`, smoothed.toFixed(4));
+    return smoothed;
+}
+
+function getGoalTime() {
+    const event = getGoalEventKey();
+    const v = getStorage(`setting_goal_time_${event}`);
+    return v !== null ? parseFloat(v) : null;
+}
+
+function calculateGoalAutoTarget() {
+    if (getStorage('setting_goal_enabled') !== true) return null;
+    const goalTime = getGoalTime();
+    if (goalTime === null || !isFinite(goalTime) || goalTime <= 0) return null;
+    let smoothed = getSmoothedPerf();
+    if (smoothed === null) smoothed = initSmoothedPerfFromHistory();
+    if (smoothed === null) return null;
+    // If already at or below goal, just keep the goal as the target
+    if (smoothed <= goalTime) return goalTime;
+    const autoTarget = smoothed - (smoothed - goalTime) * GOAL_GRADIENT;
+    return parseFloat(autoTarget.toFixed(2));
+}
+
+function applyGoalTarget() {
+    if (getStorage('setting_goal_enabled') !== true) return;
+    const auto = calculateGoalAutoTarget();
+    const el = document.getElementById('target');
+    el.value = auto !== null ? auto.toFixed(2) : '';
+    el.disabled = true;
+    setStorage('setting_target', el.value);
+    calculateStats();
+    updateTargetDisplay();
+    updateGoalAutoTargetDisplay();
+}
+
+function updateGoalAutoTargetDisplay() {
+    const displayEl = document.getElementById('goalAutoTargetDisplay');
+    if (displayEl) {
+        const auto = calculateGoalAutoTarget();
+        displayEl.textContent = auto !== null ? formatTime(auto) : '–';
+    }
+    const stEl = document.getElementById('settingsTarget');
+    if (stEl) stEl.value = document.getElementById('target').value;
+}
+
+function updateGoalTimeInput() {
+    const goalTimeEl = document.getElementById('settingsGoalTime');
+    if (!goalTimeEl) return;
+    const savedGoalTime = getGoalTime();
+    goalTimeEl.value = savedGoalTime !== null ? formatTime(savedGoalTime) : '';
+}
+
+function setGoalModeEnabled(enabled) {
+    setStorage('setting_goal_enabled', enabled);
+    const subEl = document.getElementById('goalSubSettings');
+    if (subEl) subEl.style.display = enabled ? 'block' : 'none';
+    const goalModeEl = document.getElementById('settingsGoalMode');
+    if (goalModeEl) goalModeEl.checked = enabled;
+    if (enabled) {
+        applyGoalTarget();
+    } else {
+        const targetEl = document.getElementById('target');
+        targetEl.disabled = false;
+        targetEl.value = '';
+        setStorage('setting_target', '');
+        const stEl = document.getElementById('settingsTarget');
+        if (stEl) {
+            stEl.disabled = false;
+            stEl.value = '';
+        }
+        calculateStats();
+        updateTargetDisplay();
+    }
+    updateGoalAutoTargetDisplay();
+}
+
+function updateGoalTargetAfterAverage(avgValue) {
+    if (getStorage('setting_goal_enabled') !== true) return;
+    if (typeof avgValue !== 'number' || !isFinite(avgValue)) return;
+    updateSmoothedPerf(avgValue);
+    applyGoalTarget();
+}
+
+// Settings → Goal Mode toggle
+document.getElementById('settingsGoalMode')?.addEventListener('change', (e) => {
+    if (e.target.checked) {
+        // Disable PR mode first
+        const usePrEl = document.getElementById('usePrTarget');
+        const settingsUsePrEl = document.getElementById('settingsUsePr');
+        if (usePrEl && usePrEl.checked) {
+            usePrEl.checked = false;
+            if (settingsUsePrEl) settingsUsePrEl.checked = false;
+            setStorage('setting_usePr', false);
+            targetInput.disabled = false;
+        }
+        setGoalModeEnabled(true);
+    } else {
+        setGoalModeEnabled(false);
+    }
+});
+
+// Settings → Goal Time input
+document.getElementById('settingsGoalTime')?.addEventListener('input', (e) => {
+    formatInputField(e.target);
+    const seconds = formattedTimeToSeconds(e.target.value);
+    if (!isNaN(seconds) && isFinite(seconds) && seconds > 0) {
+        setStorage(`setting_goal_time_${getGoalEventKey()}`, seconds.toFixed(4));
+        if (getStorage('setting_goal_enabled') === true) {
+            applyGoalTarget();
+        }
+    }
 });
 
 // === STORAGE HELPERS (localStorage) ===
@@ -1088,15 +1888,29 @@ function deleteStorage(name) {
 // Average array: [average, event, averageId, [[raw, penalty, averageId, scramble], ...]]
 
 function serializeSolve(solve) {
-    return [solve.raw, solve.penalty ?? null, solve.averageId, solve.scramble ?? null];
+    return [
+        solve.raw,
+        solve.penalty ?? null,
+        solve.averageId,
+        solve.scramble ?? null,
+        solve.inspectionTime ?? null,
+    ];
 }
 
 function deserializeSolve(arr, event) {
-    const [raw, penalty, averageId, scramble] = arr;
+    const [raw, penalty, averageId, scramble, inspectionTime] = arr;
     let value = raw;
     if (penalty === 'dnf') value = Infinity;
     else if (penalty === 'plus2') value = raw + 2;
-    return { raw, penalty, value, event, averageId, scramble };
+    return {
+        raw,
+        penalty,
+        value,
+        event,
+        averageId,
+        scramble,
+        inspectionTime: inspectionTime ?? null,
+    };
 }
 
 function serializeTag(tag) {
@@ -1172,8 +1986,8 @@ function flushSave() {
 })();
 
 // === SAVE & LOAD INCOMPLETE SOLVES ===
-function saveIncomplete() {
-    const event = document.getElementById('event-type').value || state.eventType;
+function saveIncomplete(explicitEvent) {
+    const event = explicitEvent || document.getElementById('event-type').value || state.eventType;
     if (state.times.length > 0 && state.times.length < getRequiredSolves()) {
         setStorage(`ct_incomplete_${event}`, state.times.map(serializeSolve));
     } else {
@@ -1195,6 +2009,12 @@ function loadIncomplete() {
     const saved = getStorage(`ct_incomplete_${event}`);
     if (saved && Array.isArray(saved) && saved.length > 0) {
         state.times = saved.map((s) => deserializeSolve(s, event));
+        // Include incomplete solves in userSolves so rankings account for them
+        state.times.forEach((t) => {
+            if (t.penalty !== 'dnf' && isFinite(t.value) && t.value > 0) {
+                state.userSolves.push(t.value);
+            }
+        });
         displayCurrentTimes();
     }
 }
@@ -1369,6 +2189,8 @@ function displayTags() {
         });
 
     updateAveragesEmptyState();
+    // Re-render history charts whenever the averages list changes
+    renderStatsCharts();
 }
 
 // === Confirm before switching event mid-solve ===
@@ -1383,26 +2205,20 @@ eventSelector.addEventListener('change', async (e) => {
     setStorage('setting_event', newEvent);
 
     // Save incomplete solves for current event before switching
-    saveIncomplete();
+    saveIncomplete(lastEventType);
 
     // Load incomplete solves for the new event if they exist
-    const incompleteSolves = getStorage(`incomplete_${newEvent}`);
-    if (incompleteSolves && Array.isArray(incompleteSolves)) {
-        state.times = incompleteSolves;
-        displayCurrentTimes();
-    } else {
-        state.times = [];
-        displayCurrentTimes();
-    }
+    state.times = [];
+    loadIncomplete();
+    if (state.times.length === 0) displayCurrentTimes();
 
     // Reset session-specific rankings
     state.userSolves = [];
     state.userAverages = [];
     state.averageTags = [];
-    calculateStats();
-
     lastEventType = newEvent;
     state.eventType = newEvent;
+    calculateStats();
     state.undoData = null;
     updateUndoButton();
 
@@ -1411,6 +2227,10 @@ eventSelector.addEventListener('change', async (e) => {
     calculateStats();
     updateProgress();
     updatePrTarget();
+    updateGoalTimeInput();
+    if (getStorage('setting_goal_enabled') === true) {
+        applyGoalTarget();
+    }
     updateTargetDisplay();
     fetchScramble();
 
@@ -1440,6 +2260,18 @@ eventSelector.addEventListener('change', async (e) => {
     // Update analyze button link
     const analyzeBtn = document.getElementById('analyzeBtn');
     if (analyzeBtn) analyzeBtn.href = `/tools/globalCalc?source=average&event=${newEvent}`;
+
+    // Reinit competition page for new event (may change solve count)
+    initCompSolves();
+
+    // If we're on the stats page, click the currently selected button to update the stats display
+    if (window._statsView === 'averages') {
+        document.getElementById('statsViewAverages').click();
+    } else if (window._statsView === 'solves') {
+        document.getElementById('statsViewSolves').click();
+    }
+
+    calculateStats();
 });
 
 // Timer page event selector → sync to hidden event-type
@@ -1455,6 +2287,22 @@ window.addEventListener('beforeunload', () => {
     saveIncomplete();
 });
 
+// === Stats display visibility ===
+const DISPLAY_SETTINGS = [
+    ['settingsShowMean', 'setting_show_mean', 'card-mean'],
+    ['settingsShowBpa', 'setting_show_bpa', 'card-bpa'],
+    ['settingsShowWpa', 'setting_show_wpa', 'card-wpa'],
+    ['settingsShowMla', 'setting_show_mla', 'card-mla'],
+    ['settingsShowTft', 'setting_show_tft', 'card-tft'],
+];
+
+function applyStatVisibility() {
+    for (const [, settingKey, cardId] of DISPLAY_SETTINGS) {
+        const el = document.getElementById(cardId);
+        if (el) el.classList.toggle('card-hidden', getStorage(settingKey) === false);
+    }
+}
+
 // === Auto-load averages on page load ===
 window.addEventListener('DOMContentLoaded', () => {
     // Restore saved settings
@@ -1466,6 +2314,8 @@ window.addEventListener('DOMContentLoaded', () => {
     const savedWca = getStorage('setting_wca');
     if (savedWca) {
         document.getElementById('wca').value = savedWca;
+        const compWcaEl = document.getElementById('compWcaInput');
+        if (compWcaEl) compWcaEl.value = savedWca;
     }
 
     const savedTarget = getStorage('setting_target');
@@ -1479,15 +2329,71 @@ window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('target').disabled = true;
     }
 
+    // Restore goal mode settings
+    const savedGoalEnabled = getStorage('setting_goal_enabled') === true;
+    const goalModeEl = document.getElementById('settingsGoalMode');
+    if (goalModeEl) goalModeEl.checked = savedGoalEnabled;
+    const goalSubEl = document.getElementById('goalSubSettings');
+    if (goalSubEl) goalSubEl.style.display = savedGoalEnabled ? 'block' : 'none';
+    updateGoalTimeInput();
+    if (savedGoalEnabled) {
+        applyGoalTarget();
+    }
+
     const savedHoldDuration = getStorage('setting_holdDuration');
     if (savedHoldDuration !== null && !isNaN(savedHoldDuration)) {
         currentHoldDuration = savedHoldDuration;
     }
 
+    // Restore inspection settings
+    const inspEnabled = getStorage('setting_inspection_enabled') === true;
+    const inspEnabledEl = document.getElementById('settingsInspectionEnabled');
+    if (inspEnabledEl) {
+        inspEnabledEl.checked = inspEnabled;
+        const subEl = document.getElementById('inspectionSubSettings');
+        if (subEl) subEl.style.display = inspEnabled ? 'block' : 'none';
+    }
+    const inspEvents = getStorage('setting_inspection_events') || 'notBlind';
+    const inspAllBtn = document.getElementById('settingsInspectionEventsAll');
+    const inspNotBlindBtn = document.getElementById('settingsInspectionEventsNotBlind');
+    if (inspAllBtn && inspNotBlindBtn) {
+        if (inspEvents === 'all') {
+            inspAllBtn.classList.add('active');
+            inspNotBlindBtn.classList.remove('active');
+        } else {
+            inspNotBlindBtn.classList.add('active');
+            inspAllBtn.classList.remove('active');
+        }
+    }
+    const inspType = getStorage('setting_inspection_type') || 'normal';
+    const inspNormalBtn = document.getElementById('settingsInspectionNormal');
+    const inspInfiniteBtn = document.getElementById('settingsInspectionInfinite');
+    if (inspNormalBtn && inspInfiniteBtn) {
+        if (inspType === 'infinite') {
+            inspInfiniteBtn.classList.add('active');
+            inspNormalBtn.classList.remove('active');
+        } else {
+            inspNormalBtn.classList.add('active');
+            inspInfiniteBtn.classList.remove('active');
+        }
+    }
+
+    // Restore display settings
+    for (const [elemId, settingKey] of DISPLAY_SETTINGS) {
+        const el = document.getElementById(elemId);
+        if (el) el.checked = getStorage(settingKey) !== false;
+    }
+    const prPillEl = document.getElementById('settingsShowPrPills');
+    if (prPillEl) prPillEl.checked = getStorage('setting_show_pr_pills') !== false;
+    const probPillEl = document.getElementById('settingsShowProbPills');
+    if (probPillEl) probPillEl.checked = getStorage('setting_show_prob_pills') !== false;
+    applyStatVisibility();
+
     state.deleteStatShameCounter =
         parseInt(localStorage.getItem('deleteStatShameCounter'), 10) || 0;
 
     state.eventType = document.getElementById('event-type').value;
+    lastEventType = state.eventType;
     if (timerEventSelect) timerEventSelect.value = state.eventType;
 
     // Set initial analyze button link
@@ -1496,7 +2402,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
     loadAverages();
     loadIncomplete();
-    calculateStats();
     updateProgress();
     updateUndoButton();
     updateTargetDisplay();
@@ -1524,6 +2429,8 @@ window.addEventListener('DOMContentLoaded', () => {
     if (activeTab && subNavIndicator) {
         subNavIndicator.style.width = `${activeTab.offsetWidth}px`;
     }
+    calculateStats();
+    displayCurrentTimes();
 });
 
 // === SCRAMBLE ===
@@ -1538,6 +2445,7 @@ const PUZZLE_MAP = {
     '333bf': '3x3x3',
     '333oh': '3x3x3',
     'clock': 'clock',
+    'fto': 'fto',
     'minx': 'megaminx',
     'pyram': 'pyraminx',
     'skewb': 'skewb',
@@ -1633,6 +2541,7 @@ function setMode(mode) {
         modeInputBtn.classList.remove('active');
         resetTimerDisplay();
     }
+    updateInspectionBadge();
 }
 
 modeInputBtn.addEventListener('click', () => setMode('input'));
@@ -1682,6 +2591,13 @@ subNavTabs.forEach((tab) => {
             displayTags();
             updateSessionStats();
             updateAveragesEmptyState();
+            renderStatsCharts();
+        }
+        // Initialize competition page when shown
+        if (targetTab === 'comp') {
+            initCompSolves();
+            const compWcaEl = document.getElementById('compWcaInput');
+            if (compWcaEl) compWcaEl.value = document.getElementById('wca').value;
         }
     });
 });
@@ -1696,6 +2612,39 @@ function syncToSettings() {
         document.getElementById('usePrTarget').checked;
     document.getElementById('settingsHoldDuration').value = currentHoldDuration;
 
+    // Sync inspection settings
+    const inspEnabledEl = document.getElementById('settingsInspectionEnabled');
+    if (inspEnabledEl) {
+        const enabled = getStorage('setting_inspection_enabled') === true;
+        inspEnabledEl.checked = enabled;
+        const subEl = document.getElementById('inspectionSubSettings');
+        if (subEl) subEl.style.display = enabled ? 'block' : 'none';
+    }
+    const inspEvents = getStorage('setting_inspection_events') || 'notBlind';
+    const inspAllBtn = document.getElementById('settingsInspectionEventsAll');
+    const inspNotBlindBtn = document.getElementById('settingsInspectionEventsNotBlind');
+    if (inspAllBtn && inspNotBlindBtn) {
+        if (inspEvents === 'all') {
+            inspAllBtn.classList.add('active');
+            inspNotBlindBtn.classList.remove('active');
+        } else {
+            inspNotBlindBtn.classList.add('active');
+            inspAllBtn.classList.remove('active');
+        }
+    }
+    const inspType = getStorage('setting_inspection_type') || 'normal';
+    const inspNormalBtn = document.getElementById('settingsInspectionNormal');
+    const inspInfiniteBtn = document.getElementById('settingsInspectionInfinite');
+    if (inspNormalBtn && inspInfiniteBtn) {
+        if (inspType === 'infinite') {
+            inspInfiniteBtn.classList.add('active');
+            inspNormalBtn.classList.remove('active');
+        } else {
+            inspNormalBtn.classList.add('active');
+            inspInfiniteBtn.classList.remove('active');
+        }
+    }
+
     // Sync mode toggle
     const settingsModeInput = document.getElementById('settingsModeInput');
     const settingsModeTimer = document.getElementById('settingsModeTimer');
@@ -1708,6 +2657,29 @@ function syncToSettings() {
         settingsModeInput.classList.remove('active');
         localStorage.setItem('lastMode', 'timer');
     }
+
+    // Sync display settings
+    for (const [elemId, settingKey] of DISPLAY_SETTINGS) {
+        const el = document.getElementById(elemId);
+        if (el) el.checked = getStorage(settingKey) !== false;
+    }
+    const prPillEl = document.getElementById('settingsShowPrPills');
+    if (prPillEl) prPillEl.checked = getStorage('setting_show_pr_pills') !== false;
+    const probPillEl = document.getElementById('settingsShowProbPills');
+    if (probPillEl) probPillEl.checked = getStorage('setting_show_prob_pills') !== false;
+    const mlaFactorEl = document.getElementById('settingsMlaFactor');
+    if (mlaFactorEl) mlaFactorEl.value = parseFloat(getStorage('setting_mla_factor')) || 1.5;
+
+    // Sync goal mode
+    const goalEnabled = getStorage('setting_goal_enabled') === true;
+    const goalModeSyncEl = document.getElementById('settingsGoalMode');
+    if (goalModeSyncEl) goalModeSyncEl.checked = goalEnabled;
+    const goalSubSyncEl = document.getElementById('goalSubSettings');
+    if (goalSubSyncEl) goalSubSyncEl.style.display = goalEnabled ? 'block' : 'none';
+    updateGoalTimeInput();
+    updateGoalAutoTargetDisplay();
+    const stEl = document.getElementById('settingsTarget');
+    if (stEl) stEl.disabled = goalEnabled;
 }
 
 // Settings → Timer sync: Event
@@ -1763,15 +2735,111 @@ document.getElementById('settingsModeTimer').addEventListener('click', () => {
 // Settings: Clear all
 document.getElementById('settingsClearAll').addEventListener('click', clearAllAverages);
 
+// Settings: Inspection toggle
+document.getElementById('settingsInspectionEnabled')?.addEventListener('change', (e) => {
+    setStorage('setting_inspection_enabled', e.target.checked);
+    const subEl = document.getElementById('inspectionSubSettings');
+    if (subEl) subEl.style.display = e.target.checked ? 'block' : 'none';
+    updateInspectionBadge();
+});
+
+// Also update badge when inspection events mode changes (affects shouldUseInspection)
+document
+    .getElementById('settingsInspectionEventsAll')
+    ?.addEventListener('click', updateInspectionBadge);
+document
+    .getElementById('settingsInspectionEventsNotBlind')
+    ?.addEventListener('click', updateInspectionBadge);
+
+// Cancel inspection button
+document.getElementById('cancelInspectionBtn')?.addEventListener('click', () => {
+    if (state.inspectionRunning) {
+        resetTimerDisplay();
+    }
+});
+
+// Settings: Inspection events mode
+document.getElementById('settingsInspectionEventsAll')?.addEventListener('click', () => {
+    setStorage('setting_inspection_events', 'all');
+    document.getElementById('settingsInspectionEventsAll').classList.add('active');
+    document.getElementById('settingsInspectionEventsNotBlind').classList.remove('active');
+});
+document.getElementById('settingsInspectionEventsNotBlind')?.addEventListener('click', () => {
+    setStorage('setting_inspection_events', 'notBlind');
+    document.getElementById('settingsInspectionEventsNotBlind').classList.add('active');
+    document.getElementById('settingsInspectionEventsAll').classList.remove('active');
+});
+
+// Settings: Inspection type
+document.getElementById('settingsInspectionNormal')?.addEventListener('click', () => {
+    setStorage('setting_inspection_type', 'normal');
+    document.getElementById('settingsInspectionNormal').classList.add('active');
+    document.getElementById('settingsInspectionInfinite').classList.remove('active');
+});
+document.getElementById('settingsInspectionInfinite')?.addEventListener('click', () => {
+    setStorage('setting_inspection_type', 'infinite');
+    document.getElementById('settingsInspectionInfinite').classList.add('active');
+    document.getElementById('settingsInspectionNormal').classList.remove('active');
+});
+
+// Settings → Stats Display card toggles
+for (const [elemId, settingKey] of DISPLAY_SETTINGS) {
+    document.getElementById(elemId)?.addEventListener('change', (e) => {
+        setStorage(settingKey, e.target.checked);
+        applyStatVisibility();
+    });
+}
+
+// Settings → PR pill toggle
+document.getElementById('settingsShowPrPills')?.addEventListener('change', (e) => {
+    setStorage('setting_show_pr_pills', e.target.checked);
+    calculateStats();
+});
+
+// Settings → Likelihood pill toggle
+document.getElementById('settingsShowProbPills')?.addEventListener('change', (e) => {
+    setStorage('setting_show_prob_pills', e.target.checked);
+    calculateStats();
+});
+
+// Settings → MLA target nudge factor
+document.getElementById('settingsMlaFactor')?.addEventListener('input', (e) => {
+    const val = parseFloat(e.target.value);
+    if (!isNaN(val) && val > 0) {
+        setStorage('setting_mla_factor', val);
+        calculateStats();
+    }
+});
+
 function resetTimerDisplay() {
     if (timerDisplay) {
         timerDisplay.textContent = '0.00';
-        timerDisplay.classList.remove('ready', 'running');
+        timerDisplay.classList.remove(
+            'ready',
+            'holding',
+            'running',
+            'inspecting',
+            'inspection-plus2',
+            'inspection-dnf',
+            'inspection-holding',
+            'inspection-ready',
+        );
     }
     state.timerRunning = false;
     state.timerReady = false;
     state.timerHolding = false;
     state.timerStart = null;
+    // Clean up any active inspection
+    state.inspectionRunning = false;
+    state.inspectionStart = null;
+    if (state.inspectionAnimFrame) {
+        cancelAnimationFrame(state.inspectionAnimFrame);
+        state.inspectionAnimFrame = null;
+    }
+    const hintEl = document.getElementById('inspectionHint');
+    if (hintEl) hintEl.hidden = true;
+    const cancelBtn = document.getElementById('cancelInspectionBtn');
+    if (cancelBtn) cancelBtn.hidden = true;
     document.querySelector('main').classList.remove('timer-running');
     if (state.timerAnimFrame) {
         cancelAnimationFrame(state.timerAnimFrame);
@@ -1781,6 +2849,86 @@ function resetTimerDisplay() {
         clearTimeout(holdTimeout);
         holdTimeout = null;
     }
+}
+
+// === INSPECTION HELPERS ===
+
+const BLIND_EVENTS = ['333bf', '444bf', '555bf'];
+
+function shouldUseInspection() {
+    if (getStorage('setting_inspection_enabled') !== true) return false;
+    const eventsMode = getStorage('setting_inspection_events') || 'notBlind';
+    if (eventsMode === 'notBlind' && BLIND_EVENTS.includes(state.eventType)) return false;
+    return true;
+}
+
+function updateInspectionBadge() {
+    const badge = document.getElementById('inspectionBadge');
+    if (!badge) return;
+    const enabled = getStorage('setting_inspection_enabled') === true;
+    badge.style.display = !(state.mode === 'timer' && enabled && shouldUseInspection())
+        ? 'none'
+        : 'inline-block';
+}
+
+function startInspection() {
+    state.inspectionRunning = true;
+    state.inspectionStart = performance.now();
+    timerDisplay.classList.remove('ready', 'holding', 'running');
+    timerDisplay.classList.add('inspecting');
+    document.querySelector('main').classList.add('timer-running');
+    const hintEl = document.getElementById('inspectionHint');
+    if (hintEl) hintEl.hidden = false;
+    const cancelBtn = document.getElementById('cancelInspectionBtn');
+    if (cancelBtn) cancelBtn.hidden = false;
+    updateInspectionDisplay();
+}
+
+function updateInspectionDisplay() {
+    if (!state.inspectionRunning || !state.inspectionStart) return;
+    const elapsed = (performance.now() - state.inspectionStart) / 1000;
+    const inspType = getStorage('setting_inspection_type') || 'normal';
+    if (inspType === 'normal') {
+        const remaining = 15 - elapsed;
+        if (remaining <= -2) {
+            timerDisplay.textContent = 'DNF';
+            timerDisplay.classList.add('inspection-dnf');
+            timerDisplay.classList.remove('inspection-plus2');
+        } else if (remaining <= 0) {
+            timerDisplay.textContent = `+2 (${Math.ceil(remaining)})`;
+            timerDisplay.classList.add('inspection-plus2');
+            timerDisplay.classList.remove('inspection-dnf');
+        } else {
+            timerDisplay.textContent = `${Math.ceil(remaining)}`;
+            timerDisplay.classList.remove('inspection-plus2', 'inspection-dnf');
+        }
+    } else {
+        timerDisplay.textContent = elapsed.toFixed(0);
+        timerDisplay.classList.remove('inspection-plus2', 'inspection-dnf');
+    }
+    state.inspectionAnimFrame = requestAnimationFrame(updateInspectionDisplay);
+}
+
+function stopInspection() {
+    if (!state.inspectionRunning) return;
+    const elapsed = (performance.now() - state.inspectionStart) / 1000;
+    state.inspectionTime = Math.round(elapsed * 100) / 100;
+    state.inspectionRunning = false;
+    if (state.inspectionAnimFrame) {
+        cancelAnimationFrame(state.inspectionAnimFrame);
+        state.inspectionAnimFrame = null;
+    }
+    timerDisplay.classList.remove(
+        'inspecting',
+        'inspection-plus2',
+        'inspection-dnf',
+        'inspection-holding',
+        'inspection-ready',
+    );
+    document.querySelector('main').classList.remove('timer-running');
+    const hintEl = document.getElementById('inspectionHint');
+    if (hintEl) hintEl.hidden = true;
+    document.getElementById('cancelInspectionBtn').hidden = true;
 }
 
 function updateTimerDisplay() {
@@ -1794,7 +2942,7 @@ function startTimer() {
     state.timerRunning = true;
     state.timerReady = false;
     state.timerStart = performance.now();
-    timerDisplay.classList.remove('ready');
+    timerDisplay.classList.remove('ready', 'holding');
     timerDisplay.classList.add('running');
     document.querySelector('main').classList.add('timer-running');
     state.timerAnimFrame = requestAnimationFrame(updateTimerDisplay);
@@ -1805,6 +2953,7 @@ function stopTimer(cancelled = false) {
 
     const elapsed = (performance.now() - state.timerStart) / 1000;
     state.timerRunning = false;
+    state.timerJustStopped = true;
     document.querySelector('main').classList.remove('timer-running');
 
     if (state.timerAnimFrame) {
@@ -1843,7 +2992,9 @@ function addTimerTime(time) {
         event: event,
         averageId: averageId,
         scramble: state.currentScramble,
+        inspectionTime: state.inspectionTime ?? null,
     });
+    state.inspectionTime = null; // reset after use
     state.userSolves.push(time);
 
     // Track session PR single
@@ -1855,61 +3006,10 @@ function addTimerTime(time) {
         };
     }
 
-    // If the time is a new PR single, have "🎉" explode out of the target display
+    // If the time is a new PR single, celebrate
     const isPr = getSingleRank(time) === 1;
     if (isPr && state.userSolves.length > 1) {
-        triggerPRAnimation();
-    }
-
-    function triggerPRAnimation() {
-        const targetEl = document.getElementById('timerDisplay');
-
-        const targetRect = targetEl.getBoundingClientRect();
-        const originX = targetRect.left + targetRect.width / 2;
-        const originY = targetRect.top;
-        const count = 10;
-
-        // pixels per metre - tune this to taste
-        const SCALE = 150;
-        const GRAVITY = 9.81 * SCALE; // px/s²
-
-        for (let i = 0; i < count; i++) {
-            const particle = document.createElement('div');
-            particle.textContent = '🎉';
-            particle.style.cssText = `
-                position: fixed;
-                left: ${originX}px;
-                top: ${originY}px;
-                font-size: ${14 + Math.random() * 18}px;
-                pointer-events: none;
-                z-index: 9999;
-            `;
-            document.body.appendChild(particle);
-
-            // Spread horizontally, always launch upward
-            const vx = (Math.random() * 2 - 1) * SCALE * 2; // ±150 px/s horizontal
-            const vy = -(2 + Math.random() * 3) * SCALE; // 2–5 m/s upward (negative = up)
-            const startTime = performance.now();
-
-            function animate(now) {
-                const t = (now - startTime) / 1000;
-                const x = originX + vx * t;
-                const y = originY + vy * t + 0.5 * GRAVITY * t * t;
-                const opacity = Math.max(0, 1 - t / 2);
-
-                particle.style.left = `${x}px`;
-                particle.style.top = `${y}px`;
-                particle.style.opacity = opacity;
-
-                if (y < window.innerHeight + 50 && opacity > 0) {
-                    requestAnimationFrame(animate);
-                } else {
-                    particle.remove();
-                }
-            }
-
-            requestAnimationFrame(animate);
-        }
+        triggerEmojiAnimation('🎉', 10, document.getElementById('timerDisplay'));
     }
 
     calculateStats();
@@ -1918,6 +3018,78 @@ function addTimerTime(time) {
     updateUndoButton();
     saveIncomplete();
     fetchScramble();
+    window._showMobileSolveResult?.();
+}
+
+// === EMOJI CELEBRATION ANIMATION ===
+
+function triggerEmojiAnimation(emoji, count, originEl) {
+    const rect = (originEl || document.getElementById('timerDisplay')).getBoundingClientRect();
+    const originX = rect.left + rect.width / 2;
+    const originY = rect.top + rect.height / 2;
+
+    const SCALE = 150;
+    const GRAVITY = 9.81 * SCALE;
+
+    for (let i = 0; i < count; i++) {
+        const particle = document.createElement('div');
+        particle.textContent = emoji;
+        particle.style.cssText = `
+            position: fixed;
+            left: ${originX}px;
+            top: ${originY}px;
+            font-size: ${14 + Math.random() * 18}px;
+            pointer-events: none;
+            z-index: 9999;
+        `;
+        document.body.appendChild(particle);
+
+        const vx = (Math.random() * 2 - 1) * SCALE * 2;
+        const vy = -(2 + Math.random() * 3) * SCALE;
+        const startTime = performance.now();
+
+        (function (vx, vy, startTime) {
+            function animate(now) {
+                const t = (now - startTime) / 1000;
+                const x = originX + vx * t;
+                const y = originY + vy * t + 0.5 * GRAVITY * t * t;
+                const opacity = Math.max(0, 1 - t / 2);
+                particle.style.left = `${x}px`;
+                particle.style.top = `${y}px`;
+                particle.style.opacity = opacity;
+                if (y < window.innerHeight + 50 && opacity > 0) {
+                    requestAnimationFrame(animate);
+                } else {
+                    particle.remove();
+                }
+            }
+            requestAnimationFrame(animate);
+        })(vx, vy, startTime);
+    }
+}
+
+// Celebration priority (most special = most emojis):
+//   under target  → 🎯  ×  5
+//   PR single     → 🎉  × 10  (triggered in addTimerTime)
+//   PR average    → 🏆  × 18
+//   under goal    → 🌟  × 25
+function celebrateAverage(avgVal, rank) {
+    if (typeof avgVal !== 'number' || !isFinite(avgVal)) return;
+    const originEl = document.getElementById('average');
+    const goalTime = typeof getGoalTime === 'function' ? getGoalTime() : null;
+    const isUnderGoal = goalTime !== null && avgVal <= goalTime;
+    const isPrAvg = state.userAverages.length > 1 && rank === 1;
+    const targetVal = parseFloat(document.getElementById('target').value);
+    const isUnderTarget =
+        !isNaN(targetVal) && isFinite(targetVal) && targetVal > 0 && avgVal < targetVal;
+
+    if (isUnderGoal) {
+        triggerEmojiAnimation('🌟', 25, originEl);
+    } else if (isPrAvg) {
+        triggerEmojiAnimation('🏆', 18, originEl);
+    } else if (isUnderTarget) {
+        triggerEmojiAnimation('🎯', 5, originEl);
+    }
 }
 
 // === KEYBOARD HANDLING FOR TIMER ===
@@ -1928,6 +3100,14 @@ document.addEventListener('keydown', (e) => {
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
+    // Escape cancels inspection
+    if (e.key === 'Escape' && state.inspectionRunning) {
+        stopInspection();
+        resetTimerDisplay();
+        timerDisplay.textContent = '0.00';
+        return;
+    }
+
     // If timer is running, allow ANY key to stop
     if (state.timerRunning) {
         stopTimer();
@@ -1935,20 +3115,42 @@ document.addEventListener('keydown', (e) => {
         return;
     }
 
-    // Only allow spacebar to start the timer
+    // Only allow spacebar to start the timer / inspection
     if (e.code !== 'Space') return;
     e.preventDefault();
 
     if (state.timerHolding) return; // already holding
 
     state.timerHolding = true;
-    timerDisplay.textContent = '0.00';
-    timerDisplay.classList.remove('running');
 
-    holdTimeout = setTimeout(() => {
-        state.timerReady = true;
-        timerDisplay.classList.add('ready');
-    }, currentHoldDuration);
+    if (state.inspectionRunning) {
+        // During inspection: show warning colour while holding, green when ready
+        timerDisplay.classList.add('inspection-holding');
+        holdTimeout = setTimeout(() => {
+            state.timerReady = true;
+            timerDisplay.classList.remove('inspection-holding');
+            timerDisplay.classList.add('inspection-ready');
+        }, currentHoldDuration);
+    } else if (shouldUseInspection()) {
+        // Color green immediately to indicate inspection mode, but only start timer on keyup (no hold needed)
+        timerDisplay.classList.add('inspecting');
+        if (!state.inspectionAnimFrame) updateInspectionDisplay();
+    } else {
+        // No inspection: normal hold-to-start-timer flow
+        timerDisplay.textContent = '0.00';
+        timerDisplay.classList.remove(
+            'running',
+            'inspecting',
+            'inspection-plus2',
+            'inspection-dnf',
+        );
+        timerDisplay.classList.add('holding');
+        holdTimeout = setTimeout(() => {
+            state.timerReady = true;
+            timerDisplay.classList.remove('holding');
+            timerDisplay.classList.add('ready');
+        }, currentHoldDuration);
+    }
 });
 
 document.addEventListener('keyup', (e) => {
@@ -1965,16 +3167,36 @@ document.addEventListener('keyup', (e) => {
 
     if (state.timerReady && !state.timerRunning && e.code === 'Space') {
         state.timerHolding = false;
-        startTimer();
+        timerDisplay.classList.remove('ready', 'holding', 'inspection-holding', 'inspection-ready');
+
+        if (state.inspectionRunning) {
+            // Held long enough during inspection → stop inspection and start solve
+            stopInspection();
+            startTimer();
+        } else {
+            // No inspection (or already handled above): start timer
+            startTimer();
+        }
         return;
     }
 
-    // If timer is running, any key stops it (handled in keydown)
-
-    // Released too early — not ready
+    // Released without completing the hold
     state.timerHolding = false;
     state.timerReady = false;
-    timerDisplay.classList.remove('ready');
+    timerDisplay.classList.remove('ready', 'holding', 'inspection-holding', 'inspection-ready');
+
+    if (e.code === 'Space' && !state.timerRunning) {
+        if (state.timerJustStopped) {
+            state.timerJustStopped = false;
+        } else if (!state.inspectionRunning && shouldUseInspection()) {
+            // Tap to start inspection — no hold needed
+            startInspection();
+        } else if (state.inspectionRunning) {
+            // Released too early during hold — inspection still running, just restore class
+            timerDisplay.classList.add('inspecting');
+            if (!state.inspectionAnimFrame) updateInspectionDisplay();
+        }
+    }
 });
 
 // === TOUCH TIMER ===
@@ -1993,11 +3215,18 @@ const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
         (e) => {
             if (state.mode !== 'timer') return;
 
-            // Don't intercept buttons or inputs
+            // Don't intercept buttons, inputs, or the scramble text
             const tag = e.target.tagName;
-            // Or progress-label class
             const isProgressLabel = e.target.classList.contains('progress-label');
-            if (tag === 'INPUT' || tag === 'BUTTON' || tag === 'SELECT' || isProgressLabel) return;
+            const isScramble = !!e.target.closest('.scramble-container');
+            if (
+                tag === 'INPUT' ||
+                tag === 'BUTTON' ||
+                tag === 'SELECT' ||
+                isProgressLabel ||
+                isScramble
+            )
+                return;
 
             e.preventDefault();
 
@@ -2009,13 +3238,33 @@ const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
             if (state.timerHolding) return;
 
             state.timerHolding = true;
-            timerDisplay.textContent = '0.00';
-            timerDisplay.classList.remove('running');
+            window._hideMobileSolveResult?.();
 
-            touchHoldTimeout = setTimeout(() => {
-                state.timerReady = true;
-                timerDisplay.classList.add('ready');
-            }, currentHoldDuration);
+            if (state.inspectionRunning) {
+                // During inspection: show warning colour while holding, green when ready
+                timerDisplay.classList.add('inspection-holding');
+                touchHoldTimeout = setTimeout(() => {
+                    state.timerReady = true;
+                    timerDisplay.classList.remove('inspection-holding');
+                    timerDisplay.classList.add('inspection-ready');
+                }, currentHoldDuration);
+            } else if (shouldUseInspection()) {
+                // Inspection enabled but not running: start on touchend (no hold needed)
+            } else {
+                timerDisplay.textContent = '0.00';
+                timerDisplay.classList.remove(
+                    'running',
+                    'inspecting',
+                    'inspection-plus2',
+                    'inspection-dnf',
+                );
+                timerDisplay.classList.add('holding');
+                touchHoldTimeout = setTimeout(() => {
+                    state.timerReady = true;
+                    timerDisplay.classList.remove('holding');
+                    timerDisplay.classList.add('ready');
+                }, currentHoldDuration);
+            }
         },
         { passive: false },
     );
@@ -2025,7 +3274,15 @@ const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
 
         const tag = e.target.tagName;
         const isProgressLabel = e.target.classList.contains('progress-label');
-        if (tag === 'INPUT' || tag === 'BUTTON' || tag === 'SELECT' || isProgressLabel) return;
+        const isScramble = !!e.target.closest('.scramble-container');
+        if (
+            tag === 'INPUT' ||
+            tag === 'BUTTON' ||
+            tag === 'SELECT' ||
+            isProgressLabel ||
+            isScramble
+        )
+            return;
 
         if (touchHoldTimeout) {
             clearTimeout(touchHoldTimeout);
@@ -2034,27 +3291,49 @@ const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
 
         if (state.timerReady && !state.timerRunning) {
             state.timerHolding = false;
-            startTimer();
+            timerDisplay.classList.remove(
+                'ready',
+                'holding',
+                'inspection-holding',
+                'inspection-ready',
+            );
+
+            if (state.inspectionRunning) {
+                stopInspection();
+                startTimer();
+            } else {
+                startTimer();
+            }
             return;
         }
 
         state.timerHolding = false;
         state.timerReady = false;
-        timerDisplay.classList.remove('ready');
+        timerDisplay.classList.remove('ready', 'holding', 'inspection-holding', 'inspection-ready');
+
+        if (!state.timerRunning) {
+            if (state.timerJustStopped) {
+                state.timerJustStopped = false;
+            } else if (!state.inspectionRunning && shouldUseInspection()) {
+                startInspection();
+            } else if (state.inspectionRunning) {
+                timerDisplay.classList.add('inspecting');
+                if (!state.inspectionAnimFrame) updateInspectionDisplay();
+            }
+        }
     });
 })();
 
 // === MOBILE SWIPE-DOWN PENALTY SHEET ===
 
-(function initMobilePenaltySheet() {
-    const sheet = document.getElementById('mobilePenaltySheet');
-    if (!sheet) return;
+(function initMobileSolveResult() {
+    const bar = document.getElementById('mobilePenaltySheet');
+    if (!bar) return;
 
-    let swipeStartY = 0;
     let lastSolveIndex = -1;
-    const SWIPE_THRESHOLD = 50;
+    let autoHideTimer = null;
 
-    function showSheet() {
+    function showBar() {
         if (!isMobile()) return;
         const lastIdx = state.times.length - 1;
         if (lastIdx < 0) return;
@@ -2071,100 +3350,54 @@ const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
             timeText.textContent = formatTime(solve.raw);
         }
 
-        sheet.hidden = false;
-        requestAnimationFrame(() => {
-            sheet.classList.add('visible');
-        });
+        bar.hidden = false;
+        requestAnimationFrame(() => bar.classList.add('visible'));
+
+        // Auto-hide after 8 seconds
+        clearTimeout(autoHideTimer);
+        autoHideTimer = setTimeout(hideBar, 8000);
     }
 
-    function hideSheet() {
-        sheet.classList.remove('visible');
-        sheet.addEventListener(
+    function hideBar() {
+        clearTimeout(autoHideTimer);
+        bar.classList.remove('visible');
+        bar.addEventListener(
             'transitionend',
             () => {
-                if (!sheet.classList.contains('visible')) {
-                    sheet.hidden = true;
-                }
+                if (!bar.classList.contains('visible')) bar.hidden = true;
             },
             { once: true },
         );
     }
 
-    // Swipe down on timer area to open sheet
-    const timerArea = document.querySelector('.timer-area');
-    if (timerArea) {
-        timerArea.addEventListener(
-            'touchstart',
-            (e) => {
-                if (!isMobile()) return;
-                if (state.timerRunning || state.timerHolding) return;
-                swipeStartY = e.touches[0].clientY;
-            },
-            { passive: true },
-        );
-
-        timerArea.addEventListener(
-            'touchend',
-            (e) => {
-                if (!isMobile()) return;
-                if (state.timerRunning || state.timerHolding) return;
-                const required = getRequiredSolves();
-                if (state.times.length === required + 1) return;
-
-                const dy = e.changedTouches[0].clientY - swipeStartY;
-                if (dy > SWIPE_THRESHOLD) {
-                    showSheet();
-                }
-            },
-            { passive: true },
-        );
-    }
-
-    // Tap handle or swipe up to dismiss
-    sheet.querySelector('.penalty-sheet-handle').addEventListener('click', hideSheet);
-
-    let sheetSwipeStartY = 0;
-    sheet.addEventListener(
-        'touchstart',
-        (e) => {
-            sheetSwipeStartY = e.touches[0].clientY;
-        },
-        { passive: true },
-    );
-
-    sheet.addEventListener(
-        'touchend',
-        (e) => {
-            const dy = e.changedTouches[0].clientY - sheetSwipeStartY;
-            if (dy > 40) hideSheet();
-        },
-        { passive: true },
-    );
+    // Expose for use in addTimerTime(), addTime(), and timer hold start
+    window._showMobileSolveResult = showBar;
+    window._hideMobileSolveResult = hideBar;
 
     // Penalty button handlers
     document.getElementById('penaltyOk').addEventListener('click', () => {
         if (lastSolveIndex >= 0) removePenalty(lastSolveIndex);
-        hideSheet();
+        hideBar();
     });
 
     document.getElementById('penaltyPlus2').addEventListener('click', () => {
         if (lastSolveIndex >= 0) applyPenalty(lastSolveIndex, 'plus2');
-        hideSheet();
+        hideBar();
     });
 
     document.getElementById('penaltyDnf').addEventListener('click', () => {
         if (lastSolveIndex >= 0) applyPenalty(lastSolveIndex, 'dnf');
-        hideSheet();
+        hideBar();
     });
 
     document.getElementById('penaltyEdit').addEventListener('click', () => {
         if (lastSolveIndex >= 0) openEditModal(lastSolveIndex);
-        hideSheet();
+        hideBar();
     });
 
     document.getElementById('penaltyDelete').addEventListener('click', () => {
         if (lastSolveIndex >= 0) deleteTime(lastSolveIndex);
-        hideSheet();
+        hideBar();
     });
 })();
 
@@ -2793,4 +4026,652 @@ document.getElementById('avgDetailDeleteBtn').addEventListener('click', () => {
     if (!_avgDetailTag) return;
     deleteAverage(_avgDetailTag.averageId);
     closeAverageDetail();
+});
+
+// ── Toolbar: solve dots & label ──────────────────────────────
+function updateToolbar() {
+    const required = getRequiredSolves();
+    const current = state.times.length;
+    const dotsEl = document.getElementById('toolbarSolveDots');
+    const labelEl = document.getElementById('toolbarSolveLabel');
+    const targetPill = document.getElementById('toolbarTargetPill');
+    const targetVal = document.getElementById('toolbarTargetValue');
+    const iconEl = document.getElementById('toolbarEventIcon');
+
+    // Dots
+    if (dotsEl) {
+        dotsEl.innerHTML = '';
+        for (let i = 0; i < required; i++) {
+            const dot = document.createElement('span');
+            dot.className = 'solve-dot' + (i < current ? ' filled' : '');
+            dotsEl.appendChild(dot);
+        }
+    }
+
+    // Label: "SOLVE N" where N = next solve number (capped at required)
+    if (labelEl) {
+        const next = Math.min(current + 1, required);
+        labelEl.textContent = `SOLVE ${next}`;
+    }
+
+    // Event icon: first digit/letter of event
+    if (iconEl) {
+        const ev = state.eventType || '333';
+        const icons = {
+            '333': '<span class="cubing-icon event-333 unofficial-333"></span>',
+            '222': '<span class="cubing-icon event-222 unofficial-222"></span>',
+            '444': '<span class="cubing-icon event-444 unofficial-444"></span>',
+            '555': '<span class="cubing-icon event-555 unofficial-555"></span>',
+            '666': '<span class="cubing-icon event-666 unofficial-666"></span>',
+            '777': '<span class="cubing-icon event-777 unofficial-777"></span>',
+            '333bf': '<span class="cubing-icon event-333bf unofficial-333bf"></span>',
+            '333oh': '<span class="cubing-icon event-333oh unofficial-333oh"></span>',
+            'clock': '<span class="cubing-icon event-clock unofficial-clock"></span>',
+            'fto': '<span class="cubing-icon event-fto unofficial-fto"></span>',
+            'minx': '<span class="cubing-icon event-minx unofficial-minx"></span>',
+            'pyram': '<span class="cubing-icon event-pyram unofficial-pyram"></span>',
+            'skewb': '<span class="cubing-icon event-skewb unofficial-skewb"></span>',
+            'sq1': '<span class="cubing-icon event-sq1 unofficial-sq1"></span>',
+            '444bf': '<span class="cubing-icon event-444bf unofficial-444bf"></span>',
+            '555bf': '<span class="cubing-icon event-555bf unofficial-555bf"></span>',
+            '333mbf': '<span class="cubing-icon event-333mbf unofficial-333mbf"></span>',
+            '333fm': '<span class="cubing-icon event-333fm unofficial-333fm"></span>',
+        };
+        iconEl.innerHTML = icons[ev] || ev[0].toUpperCase();
+    }
+
+    // Target pill
+    const targetRaw = document.getElementById('target')?.value;
+    if (targetPill && targetVal) {
+        if (targetRaw && parseFloat(targetRaw) > 0) {
+            targetVal.textContent = formatTime(parseFloat(targetRaw));
+            targetPill.style.display = 'flex';
+        } else {
+            targetPill.style.display = 'none';
+        }
+    }
+}
+
+// Hook into target input changes
+document.getElementById('target')?.addEventListener('input', updateToolbar);
+document.getElementById('settingsTarget')?.addEventListener('input', updateToolbar);
+
+// Call once on load — and after every solve via MutationObserver on the times list
+document.addEventListener('DOMContentLoaded', () => {
+    updateToolbar();
+    updateInspectionBadge();
+
+    // Watch the solve list for DOM changes (each addTime/deleteTime re-renders it)
+    const solveList = document.getElementById('currentTimes');
+    if (solveList) {
+        new MutationObserver(updateToolbar).observe(solveList, { childList: true, subtree: true });
+    }
+
+    // Also watch the progress label text, which changes on every updateProgress() call
+    const progressLabel = document.getElementById('progressLabel');
+    if (progressLabel) {
+        new MutationObserver(updateToolbar).observe(progressLabel, {
+            childList: true,
+            characterData: true,
+            subtree: true,
+        });
+    }
+});
+
+// ── Zen Mode ─────────────────────────────────────────────────
+(function initZenMode() {
+    const btn = document.getElementById('zenModeBtn');
+    const main = document.querySelector('main');
+    if (!btn || !main) return;
+
+    let zenActive = false;
+
+    btn.addEventListener('click', () => {
+        zenActive = !zenActive;
+        main.classList.toggle('zen-mode', zenActive);
+        btn.classList.toggle('zen-active', zenActive);
+        btn.title = zenActive ? 'Exit Zen mode' : 'Zen mode';
+        // Swap icon
+    });
+})();
+
+// ═══════════════════════════════════════════════════════════════
+// === COMPETITION PAGE ===
+// ═══════════════════════════════════════════════════════════════
+
+const compState = {
+    // [{raw, penalty, value}] — length always equals required solves for current event
+    times: [],
+    wcaSolves: [], // WCA-only single times in seconds (no session data)
+    wcaAverages: [], // WCA-only averages in seconds
+};
+
+function getCompRequiredSolves() {
+    return meanEvents.includes(state.eventType) ? 3 : 5;
+}
+
+// Initialize (or reinit on event change) — resets times if count changes
+function initCompSolves() {
+    const n = getCompRequiredSolves();
+    if (compState.times.length !== n) {
+        compState.times = Array.from({ length: n }, () => ({
+            raw: null,
+            penalty: null,
+            value: null,
+        }));
+    }
+    renderCompSolves();
+    calculateCompStats();
+}
+
+function renderCompSolves() {
+    const container = document.getElementById('compSolvesList');
+    if (!container) return;
+    const n = getCompRequiredSolves();
+    container.innerHTML = '';
+
+    for (let i = 0; i < n; i++) {
+        const solve = compState.times[i] || { raw: null, penalty: null, value: null };
+
+        const row = document.createElement('div');
+        row.className = 'comp-solve-row';
+        row.dataset.index = i;
+        row.dataset.penalty = solve.penalty || '';
+
+        // Solve number label
+        const label = document.createElement('span');
+        label.className = 'comp-solve-label';
+        label.textContent = i + 1;
+
+        // Time input
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'comp-solve-input';
+        input.placeholder = '–';
+        input.autocomplete = 'off';
+        input.dataset.index = i;
+        input.setAttribute('inputmode', 'decimal');
+
+        if (solve.penalty === 'dnf') {
+            input.value = 'DNF';
+        } else if (solve.raw !== null && isFinite(solve.raw)) {
+            input.value = formatTime(solve.raw);
+        }
+
+        input.addEventListener('input', (e) => {
+            formatInputField(e.target);
+            parseAndSaveCompTime(i, input.value);
+        });
+
+        input.addEventListener('blur', (e) => parseAndSaveCompTime(i, input.value));
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                parseAndSaveCompTime(i, input.value);
+                const allInputs = container.querySelectorAll('.comp-solve-input');
+                const next = allInputs[i + 1];
+                if (next) next.focus();
+                else input.blur();
+            }
+            if (e.key === 'Escape') input.blur();
+        });
+
+        // Penalty buttons
+        const penaltyBtns = document.createElement('div');
+        penaltyBtns.className = 'penalty-buttons';
+
+        penaltyBtns.appendChild(
+            createButton({
+                icon: 'fas fa-check',
+                type: 'confirm',
+                onClick: () => {
+                    const t = compState.times[i];
+                    t.penalty = null;
+                    if (t.raw !== null && isFinite(t.raw)) {
+                        t.value = t.raw;
+                        input.value = formatTime(t.raw);
+                    }
+                    row.dataset.penalty = '';
+                    renderCompSolveHighlights();
+                    calculateCompStats();
+                },
+            }),
+        );
+
+        penaltyBtns.appendChild(
+            createButton({
+                text: '+',
+                type: 'plus2',
+                onClick: () => {
+                    const t = compState.times[i];
+                    if (t.raw !== null && isFinite(t.raw) && t.penalty !== 'dnf') {
+                        t.penalty = 'plus2';
+                        t.value = t.raw + 2;
+                        row.dataset.penalty = 'plus2';
+                        renderCompSolveHighlights();
+                        calculateCompStats();
+                    }
+                },
+            }),
+        );
+
+        penaltyBtns.appendChild(
+            createButton({
+                text: 'x',
+                type: 'dnf',
+                onClick: () => {
+                    const t = compState.times[i];
+                    t.penalty = 'dnf';
+                    t.value = Infinity;
+                    if (t.raw === null) t.raw = 0;
+                    input.value = 'DNF';
+                    row.dataset.penalty = 'dnf';
+                    renderCompSolveHighlights();
+                    calculateCompStats();
+                },
+            }),
+        );
+
+        const singlePr = document.createElement('span');
+        singlePr.className = 'comp-single-pr';
+
+        row.appendChild(label);
+        row.appendChild(input);
+        row.appendChild(singlePr);
+        row.appendChild(penaltyBtns);
+        container.appendChild(row);
+    }
+
+    renderCompSolveHighlights();
+}
+
+// Parse a typed time string and save to compState, then refresh UI
+function parseAndSaveCompTime(index, value) {
+    const container = document.getElementById('compSolvesList');
+    const row = container?.querySelector(`.comp-solve-row[data-index="${index}"]`);
+    const input = row?.querySelector('.comp-solve-input');
+
+    value = (value || '').trim();
+
+    if (!value) {
+        compState.times[index] = { raw: null, penalty: null, value: null };
+        if (row) row.dataset.penalty = '';
+        renderCompSolveHighlights();
+        calculateCompStats();
+        return;
+    }
+
+    let raw,
+        penalty = null;
+    const upper = value.toUpperCase();
+
+    if (upper === 'DNF') {
+        raw = 0;
+        penalty = 'dnf';
+    } else if (value.includes(':')) {
+        const parts = value.split(':');
+        const mins = parseInt(parts[0], 10);
+        const secs = parseFloat(parts[1]);
+        raw = !isNaN(mins) && !isNaN(secs) ? mins * 60 + secs : null;
+    } else {
+        raw = parseFloat(value);
+        if (isNaN(raw)) raw = null;
+    }
+
+    const prev = compState.times[index];
+    // Preserve explicit +2 penalty unless overridden by DNF or clear
+    const effectivePenalty = penalty ?? (prev.penalty === 'plus2' ? 'plus2' : null);
+    const effectiveValue =
+        effectivePenalty === 'dnf'
+            ? Infinity
+            : effectivePenalty === 'plus2' && raw !== null
+              ? raw + 2
+              : raw;
+
+    compState.times[index] = { raw, penalty: effectivePenalty, value: effectiveValue };
+    if (row) row.dataset.penalty = effectivePenalty || '';
+
+    if (input && raw !== null) {
+        input.value = effectivePenalty === 'dnf' ? 'DNF' : formatTime(raw);
+    }
+
+    renderCompSolveHighlights();
+    calculateCompStats();
+}
+
+// Highlight best (green) and worst (red) solves once all times are filled (Ao5 only)
+function renderCompSolveHighlights() {
+    const n = getCompRequiredSolves();
+    const rows = document.querySelectorAll('#compSolvesList .comp-solve-row');
+    rows.forEach((row) => row.classList.remove('best-solve', 'worst-solve'));
+
+    const filled = compState.times.filter((t) => t.value !== null);
+    if (filled.length < n || meanEvents.includes(state.eventType)) return;
+
+    const vals = compState.times.map((t) => t.value);
+    const finiteVals = vals.filter((v) => isFinite(v));
+    const hasDnf = vals.some((v) => !isFinite(v));
+    const bestVal = finiteVals.length > 0 ? Math.min(...finiteVals) : null;
+    const worstVal = hasDnf ? Infinity : finiteVals.length > 0 ? Math.max(...finiteVals) : null;
+
+    let bestMarked = false,
+        worstMarked = false;
+    rows.forEach((row, i) => {
+        const val = compState.times[i]?.value;
+        if (!bestMarked && val === bestVal && isFinite(val)) {
+            row.classList.add('best-solve');
+            bestMarked = true;
+        } else if (!worstMarked && (!isFinite(val) || val === worstVal)) {
+            row.classList.add('worst-solve');
+            worstMarked = true;
+        }
+    });
+}
+
+// Calculate and display all stats for the competition page
+function calculateCompStats() {
+    const n = getCompRequiredSolves();
+    const filledTimes = compState.times.filter((t) => t.value !== null);
+    const filled = filledTimes.length;
+
+    const meanEl = document.getElementById('comp-mean');
+    const bpaEl = document.getElementById('comp-bpa');
+    const wpaEl = document.getElementById('comp-wpa');
+    const mlaEl = document.getElementById('comp-mla');
+    const mlaSolveEl = document.getElementById('comp-mla-solve');
+    const tftEl = document.getElementById('comp-tft');
+    const avgEl = document.getElementById('comp-average');
+    const duringCards = document.querySelectorAll('.comp-during-average');
+    const afterCards = document.querySelectorAll('.comp-after-average');
+
+    // Reset to dashes
+    [meanEl, bpaEl, wpaEl, tftEl].forEach((el) => {
+        if (el) el.textContent = '–';
+    });
+    if (mlaEl) {
+        mlaEl.textContent = '–';
+        mlaEl.innerHTML = '–';
+    }
+    if (mlaSolveEl) mlaSolveEl.textContent = '';
+    if (avgEl) {
+        avgEl.innerHTML = '';
+        avgEl.textContent = '–';
+    }
+
+    if (filled === 0) {
+        duringCards.forEach((el) => (el.style.display = 'flex'));
+        afterCards.forEach((el) => (el.style.display = 'none'));
+        return;
+    }
+
+    // Running mean of filled times
+    const dnfInFilled = filledTimes.filter((t) => !isFinite(t.value)).length;
+    const finiteFilledVals = filledTimes.filter((t) => isFinite(t.value)).map((t) => t.value);
+    if (meanEl) {
+        if (dnfInFilled > 0) {
+            meanEl.textContent = 'DNF';
+        } else if (finiteFilledVals.length > 0) {
+            meanEl.textContent = formatTime(
+                finiteFilledVals.reduce((a, b) => a + b, 0) / finiteFilledVals.length,
+            );
+        }
+    }
+
+    if (filled >= n) {
+        // All solves entered — show final average
+        duringCards.forEach((el) => (el.style.display = 'none'));
+        afterCards.forEach((el) => (el.style.display = 'flex'));
+
+        let average;
+        const isMean = meanEvents.includes(state.eventType);
+
+        if (isMean) {
+            // Mean of 3
+            const dnfCount = compState.times.slice(0, n).filter((t) => !isFinite(t.value)).length;
+            if (dnfCount > 0) {
+                average = 'DNF';
+            } else {
+                average = (
+                    compState.times.slice(0, n).reduce((a, b) => a + b.value, 0) / n
+                ).toFixed(2);
+            }
+        } else {
+            // Average of 5 (drop best and worst)
+            const vals = compState.times
+                .slice(0, n)
+                .map((t) => t.value)
+                .sort((a, b) => a - b);
+            const totalDnf = vals.filter((v) => !isFinite(v)).length;
+            if (totalDnf > 1) {
+                average = 'DNF';
+            } else {
+                const middle3 = vals.slice(1, 4);
+                average = middle3.some((v) => !isFinite(v))
+                    ? 'DNF'
+                    : (middle3.reduce((a, b) => a + b, 0) / 3).toFixed(2);
+            }
+        }
+
+        if (avgEl) {
+            avgEl.innerHTML = '';
+            avgEl.style.position = 'relative';
+            if (average === 'DNF') {
+                avgEl.textContent = 'DNF';
+            } else {
+                const avgVal = parseFloat(average);
+                const valDiv = document.createElement('div');
+                valDiv.textContent = formatTime(avgVal);
+                valDiv.style.position = 'relative';
+                valDiv.style.zIndex = '1';
+                avgEl.appendChild(valDiv);
+                const rank = getCompAverageRank(avgVal);
+                if (rank) {
+                    const prDiv = document.createElement('div');
+                    prDiv.className = 'pr-rank-pill';
+                    prDiv.textContent = `PR #${rank}`;
+                    prDiv.style.background = getPrPillColor(rank, 'average');
+                    avgEl.appendChild(prDiv);
+                }
+            }
+        }
+    } else {
+        // During average — show BPA / WPA / TFT when n−1 times are filled
+        duringCards.forEach((el) => (el.style.display = 'flex'));
+        afterCards.forEach((el) => (el.style.display = 'none'));
+
+        const target = parseFloat(document.getElementById('target').value) || Infinity;
+        const isMean = meanEvents.includes(state.eventType);
+
+        if ((!isMean && filled === 4) || (isMean && filled === 2)) {
+            const { bpa, wpa, tft } = calculateBpaWpaTft(filledTimes, target);
+
+            if (bpaEl) {
+                bpaEl.innerHTML = '';
+                bpaEl.style.position = 'relative';
+                if (bpa === 'DNF') {
+                    bpaEl.textContent = 'DNF';
+                } else if (typeof bpa === 'number' && !isNaN(bpa) && isFinite(bpa)) {
+                    const valDiv = document.createElement('div');
+                    valDiv.textContent = formatTime(bpa);
+                    valDiv.style.position = 'relative';
+                    valDiv.style.zIndex = '1';
+                    bpaEl.appendChild(valDiv);
+                    const rank = getCompAverageRank(bpa);
+                    if (rank) {
+                        const pill = document.createElement('div');
+                        pill.className = 'pr-rank-pill';
+                        pill.textContent = `PR #${rank}`;
+                        pill.style.background = getPrPillColor(rank, 'average');
+                        bpaEl.appendChild(pill);
+                    }
+                } else {
+                    bpaEl.textContent = '–';
+                }
+            }
+            if (wpaEl) {
+                wpaEl.innerHTML = '';
+                wpaEl.style.position = 'relative';
+                if (wpa === 'DNF') {
+                    wpaEl.textContent = 'DNF';
+                } else if (typeof wpa === 'number' && !isNaN(wpa) && isFinite(wpa)) {
+                    const valDiv = document.createElement('div');
+                    valDiv.textContent = formatTime(wpa);
+                    valDiv.style.position = 'relative';
+                    valDiv.style.zIndex = '1';
+                    wpaEl.appendChild(valDiv);
+                    const rank = getCompAverageRank(wpa);
+                    if (rank) {
+                        const pill = document.createElement('div');
+                        pill.className = 'pr-rank-pill';
+                        pill.textContent = `PR #${rank}`;
+                        pill.style.background = getPrPillColor(rank, 'average');
+                        wpaEl.appendChild(pill);
+                    }
+                } else {
+                    wpaEl.textContent = '–';
+                }
+            }
+            if (tftEl) {
+                tftEl.innerHTML = '';
+                if (tft === 'Not Possible') {
+                    tftEl.textContent = '0%';
+                } else if (tft === 'Guaranteed') {
+                    tftEl.textContent = '100%';
+                } else if (typeof tft === 'number' && !isNaN(tft) && tft > 0) {
+                    const timeDiv = document.createElement('div');
+                    timeDiv.textContent = formatTime(tft);
+                    tftEl.appendChild(timeDiv);
+                    const prob = getCompTftProbability(tft);
+                    if (prob !== null) {
+                        const probDiv = document.createElement('div');
+                        probDiv.className = 'stat-prob';
+                        probDiv.textContent = `${prob}%`;
+                        tftEl.appendChild(probDiv);
+                    }
+                } else {
+                    tftEl.textContent = '–';
+                }
+            }
+
+            // Most Likely Average (Ao5 only, requires WCA solve history)
+            if (!isMean && filled === 4 && compState.wcaSolves.length >= 5) {
+                const currentValues = filledTimes.map((t) =>
+                    t.penalty === 'dnf' || !isFinite(t.value) ? Infinity : t.value,
+                );
+                const sortedHistory = [...compState.wcaSolves]
+                    .filter((s) => isFinite(s))
+                    .sort((a, b) => a - b);
+                const medianSolve = sortedHistory[Math.floor(sortedHistory.length / 2)];
+
+                if (mlaSolveEl) mlaSolveEl.textContent = `if ${formatTime(medianSolve)}`;
+
+                const all5 = [...currentValues, medianSolve].sort((a, b) => a - b);
+                const dnfCount5 = all5.filter((v) => !isFinite(v)).length;
+
+                if (mlaEl) {
+                    mlaEl.innerHTML = '';
+                    mlaEl.style.position = 'relative';
+                    if (dnfCount5 > 1) {
+                        mlaEl.textContent = 'DNF';
+                    } else {
+                        const middle3 = all5.slice(1, 4);
+                        if (middle3.some((v) => !isFinite(v))) {
+                            mlaEl.textContent = 'DNF';
+                        } else {
+                            const mlaVal = (middle3[0] + middle3[1] + middle3[2]) / 3;
+                            const mlaValDiv = document.createElement('div');
+                            mlaValDiv.textContent = formatTime(mlaVal);
+                            mlaValDiv.style.position = 'relative';
+                            mlaValDiv.style.zIndex = '1';
+                            mlaEl.appendChild(mlaValDiv);
+                            const rank = getCompAverageRank(mlaVal);
+                            if (rank) {
+                                const prDiv = document.createElement('div');
+                                prDiv.className = 'pr-rank-pill';
+                                prDiv.textContent = `PR #${rank}`;
+                                prDiv.style.background = getPrPillColor(rank, 'average');
+                                mlaEl.appendChild(prDiv);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    updateCompSolvePrPills();
+}
+
+// === Comp page: WCA-only rank + probability helpers ===
+function getCompSingleRank(time) {
+    if (!isFinite(time) || compState.wcaSolves.length === 0) return null;
+    const finite = compState.wcaSolves.filter((s) => isFinite(s));
+    if (finite.length === 0) return null;
+    const sorted = [...finite, time].sort((a, b) => a - b);
+    return sorted.indexOf(time) + 1;
+}
+
+function getCompAverageRank(time) {
+    if (!isFinite(time) || compState.wcaAverages.length === 0) return null;
+    const finite = compState.wcaAverages.filter((a) => isFinite(a));
+    if (finite.length === 0) return null;
+    const sorted = [...finite, time].sort((a, b) => a - b);
+    return sorted.indexOf(time) + 1;
+}
+
+function getCompTftProbability(tft) {
+    if (!isFinite(tft) || tft <= 0) return null;
+    const finite = compState.wcaSolves.filter((s) => isFinite(s));
+    if (finite.length === 0) return null;
+    const below = finite.filter((s) => s <= tft).length;
+    return Math.round((below / finite.length) * 100);
+}
+
+function updateCompSolvePrPills() {
+    const rows = document.querySelectorAll('#compSolvesList .comp-solve-row');
+    rows.forEach((row, i) => {
+        const prEl = row.querySelector('.comp-single-pr');
+        if (!prEl) return;
+        prEl.innerHTML = '';
+        const t = compState.times[i];
+        if (!t || t.value === null || !isFinite(t.value)) return;
+        const rank = getCompSingleRank(t.value);
+        if (!rank) return;
+        const pill = document.createElement('span');
+        pill.className = 'pr-rank-pill comp-single-pr-pill';
+        pill.textContent = `#${rank}`;
+        pill.style.background = getPrPillColor(rank, 'single');
+        prEl.appendChild(pill);
+    });
+}
+
+// Comp WCA ID input — sync with shared wca input and load ranking data
+document.getElementById('compWcaInput')?.addEventListener('input', async (e) => {
+    const wcaId = e.target.value.trim().toUpperCase();
+    document.getElementById('wca').value = wcaId;
+    setStorage('setting_wca', wcaId);
+    document.getElementById('settingsWca').value = wcaId;
+
+    if (!wcaId || !/\d{4}[a-zA-Z]{4}\d{2}/.test(wcaId) || wcaId.length !== 10) {
+        compState.wcaSolves = [];
+        compState.wcaAverages = [];
+        calculateCompStats();
+        return;
+    }
+
+    try {
+        await fetchUserData(wcaId);
+        calculateCompStats();
+        updatePrTarget();
+    } catch (err) {
+        console.error('Comp WCA fetch error:', err);
+    }
+});
+
+// Clear all comp times
+document.getElementById('compClearBtn')?.addEventListener('click', () => {
+    const n = getCompRequiredSolves();
+    compState.times = Array.from({ length: n }, () => ({ raw: null, penalty: null, value: null }));
+    renderCompSolves();
+    calculateCompStats();
 });

@@ -696,3 +696,101 @@
     color: var(--success);
     cursor: default;
 }
+
+/* ---------- WCA Export section ---------- */
+.admin-wca-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    margin-top: var(--space-md);
+    padding: var(--space-md) var(--space-lg);
+    background: var(--secondary-background);
+    border: 1px solid var(--card-border);
+    border-radius: var(--main-radius);
+    box-shadow: var(--shadow-sm);
+}
+
+.admin-wca-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+}
+
+.admin-wca-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--secondary-text);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+}
+
+.admin-wca-btn {
+    padding: 6px 14px;
+    border-radius: var(--main-radius);
+    border: 1px solid var(--card-border);
+    background: var(--button-background);
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.14s ease, transform 0.12s ease;
+    white-space: nowrap;
+}
+
+.admin-wca-btn:hover:not(:disabled) {
+    background: var(--button-hover);
+    transform: translateY(-1px);
+}
+
+.admin-wca-btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.admin-wca-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm) var(--space-lg);
+    margin: 0;
+}
+
+.admin-wca-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.admin-wca-stat dt {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--secondary-text);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.admin-wca-stat dd {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--main-text);
+    font-variant-numeric: tabular-nums;
+    margin: 0;
+}
+
+.admin-wca-status {
+    font-size: 0.8rem;
+    margin: 0;
+}
+
+.admin-wca-status--info {
+    color: var(--secondary-text);
+}
+
+.admin-wca-status--success {
+    color: var(--success);
+}
+
+.admin-wca-status--error {
+    color: var(--error);
+}

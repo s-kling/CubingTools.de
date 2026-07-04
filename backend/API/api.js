@@ -5,6 +5,8 @@ import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
 
+import { randomScrambleForEvent } from 'cubing/scramble';
+
 const router = express.Router();
 
 import { db } from '../firebase.js';
@@ -24,14 +26,21 @@ dotenv.config({ path: path.join(path.dirname(new URL(import.meta.url).pathname),
 
 // Shared helper to create endpoint-specific rate limiters with a consistent payload shape.
 function createRateLimiter(windowMs, max, message, options = {}) {
-    return rateLimit({
-        windowMs,
-        max,
-        standardHeaders: true,
-        legacyHeaders: false,
-        message: { error: message },
-        ...options,
-    });
+    // If not on beta.cubingtools.de or cubingtools.de, disable rate limiting
+    return (req, res, next) => {
+        const host = req.headers.host || '';
+        if (!host.includes('cubingtools.de')) {
+            return next();
+        }
+        return rateLimit({
+            windowMs,
+            max,
+            standardHeaders: true,
+            legacyHeaders: false,
+            message: { error: message },
+            ...options,
+        })(req, res, next);
+    };
 }
 
 /*
@@ -187,36 +196,53 @@ router.get('/api/scramble/:event', scrambleLimiter, async (req, res) => {
 
     const count = Math.min(Math.max(parseInt(req.query.count, 10) || 1, 1), 50);
 
-    try {
-        // For single-scramble requests, use the prefetch cache.
-        if (count === 1) {
-            const cached = scrambleCache[puzzleKey];
+    if (event === 'fto') {
+        try {
+            // For FTO, generate scrambles using the cubing.net library
+            const scrambles = await Promise.all(
+                Array.from({ length: count }, () => randomScrambleForEvent(event)),
+            );
 
-            if (cached?.pending && cached.promise) {
-                await cached.promise;
-            }
+            return res.json({
+                event,
+                scrambles: scrambles.map((s) => s.toString()),
+            });
+        } catch (err) {
+            console.error('Scramble generation error:', err.message);
+            res.status(500).json({ error: 'Failed to generate scramble.' });
+        }
+    } else {
+        try {
+            // For single-scramble requests, use the prefetch cache.
+            if (count === 1) {
+                const cached = scrambleCache[puzzleKey];
 
-            const ready = scrambleCache[puzzleKey];
+                if (cached?.pending && cached.promise) {
+                    await cached.promise;
+                }
 
-            if (ready?.scrambles?.length > 0) {
-                const scrambles = ready.scrambles;
-                delete scrambleCache[puzzleKey];
+                const ready = scrambleCache[puzzleKey];
+
+                if (ready?.scrambles?.length > 0) {
+                    const scrambles = ready.scrambles;
+                    delete scrambleCache[puzzleKey];
+                    prefetchScramble(puzzleKey);
+                    return res.json({ event, scrambles });
+                }
+
+                // No cached scramble available — fetch directly, then prefetch next.
+                const scrambles = await fetchScramblesFromTnoodle(puzzleKey, 1);
                 prefetchScramble(puzzleKey);
                 return res.json({ event, scrambles });
             }
 
-            // No cached scramble available — fetch directly, then prefetch next.
-            const scrambles = await fetchScramblesFromTnoodle(puzzleKey, 1);
-            prefetchScramble(puzzleKey);
-            return res.json({ event, scrambles });
+            // Multi-scramble requests bypass the cache.
+            const scrambles = await fetchScramblesFromTnoodle(puzzleKey, count);
+            res.json({ event, scrambles });
+        } catch (err) {
+            console.error('Scramble generation error:', err.message);
+            res.status(500).json({ error: 'Failed to generate scramble.' });
         }
-
-        // Multi-scramble requests bypass the cache.
-        const scrambles = await fetchScramblesFromTnoodle(puzzleKey, count);
-        res.json({ event, scrambles });
-    } catch (err) {
-        console.error('Scramble generation error:', err.message);
-        res.status(500).json({ error: 'Failed to generate scramble.' });
     }
 });
 
@@ -274,6 +300,14 @@ router.post(
     adminVerifyLimiter,
     (req, res, next) => adminSessionApi.requireAdmin(req, res, next),
     (req, res) => wcaApi.handleForceRefreshRequest(req, res),
+);
+
+// WCA export metadata (any authenticated admin user)
+router.get(
+    '/api/admin/wca-metadata',
+    adminVerifyLimiter,
+    adminSessionApi.requireAuth.bind(adminSessionApi),
+    (req, res) => wcaApi.handleMetadataRequest(req, res),
 );
 
 // =========================
@@ -542,6 +576,7 @@ const EVENT_TO_TNOODLE_PUZZLE = {
     '333bf': '333ni',
     '333oh': '333',
     'clock': 'clock',
+    'fto': 'fto',
     'minx': 'minx',
     'pyram': 'pyram',
     'skewb': 'skewb',

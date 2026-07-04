@@ -14,6 +14,10 @@ import { DatabaseSync } from 'node:sqlite';
 // populated on first run from the official WCA TSV export and refreshed when the
 // WCA publishes a newer export (checked at most once per week).
 //
+// Competition data is also stored locally in SQLite. Future/upcoming competitions
+// are synced from the network API on initialization and periodically refreshed,
+// then all competition queries use only the local database.
+//
 // Benefits over pure in-memory indexes:
 //   • Zero startup cost after first import — the DB file survives restarts.
 //   • ~90 % lower RAM — only the rows for the requested WCA ID are loaded.
@@ -22,8 +26,8 @@ import { DatabaseSync } from 'node:sqlite';
 //   • Crash-safe — the import runs inside a single transaction; a partial import
 //     leaves the old data intact.
 //
-// Upcoming-competition listing, WCIF, and WCA Live data still use the network
-// APIs because those cover events not yet in the export.
+// WCA Live data still uses the network API because it covers events not yet in
+// the export and live scoring.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default class WcaApi {
@@ -41,6 +45,9 @@ export default class WcaApi {
         // How old the stored export_date may be before we re-check with the WCA.
         this.exportMaxAgeMs = 7 * 24 * 60 * 60 * 1000; // 1 week
 
+        // How old the stored competitions_sync_date may be before we re-sync
+        this.competitionsSyncMaxAgeMs = 1 * 60 * 60 * 1000; // 1 hour
+
         // ── SQLite handle ─────────────────────────────────────────────────────
         // Opened lazily on first use; kept open for the lifetime of the instance.
         this._db = null;
@@ -53,9 +60,9 @@ export default class WcaApi {
         // Promise guard so concurrent callers share a single initialisation.
         this._initPromise = null;
 
-        // ── Network response caches (competitions / WCIF / live) ──────────────
+        // ── Network response caches (WCIF / live) ──────────────────────────────
+        // Competitions are now stored in DB, so no cache needed for them
         this.cacheTtlMs = 5 * 60 * 1000;
-        this.competitionsCacheTtlMs = 24 * 60 * 60 * 1000;
         this.wcifCacheTtlMs = 2 * 60 * 1000;
         this.responseCache = new Map();
 
@@ -122,17 +129,27 @@ export default class WcaApi {
                 PRIMARY KEY (person_id, event_id)
             );
 
+            -- Competitions from both export and network API
             CREATE TABLE IF NOT EXISTS competitions (
                 competition_id TEXT PRIMARY KEY,
+                name           TEXT NOT NULL,
+                country_id     TEXT NOT NULL,
                 year           INTEGER NOT NULL,
                 month          INTEGER NOT NULL,
-                day            INTEGER NOT NULL
+                day            INTEGER NOT NULL,
+                end_year       INTEGER NOT NULL,
+                end_month      INTEGER NOT NULL,
+                end_day        INTEGER NOT NULL,
+                source         TEXT DEFAULT 'export'
             );
         `);
 
         db.exec(`
             CREATE INDEX IF NOT EXISTS idx_results_person_event
                 ON results (person_id, event_id);
+            
+            CREATE INDEX IF NOT EXISTS idx_competitions_dates
+                ON competitions (year, month, day);
         `);
 
         return db;
@@ -154,6 +171,117 @@ export default class WcaApi {
         const out = [];
         for (let i = 0; i < b.length; i += 4) out.push(b.readInt32LE(i));
         return out;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Competition syncing from network API to local DB
+    // ═══════════════════════════════════════════════════════════════════════
+
+    _storedCompetitionsSyncDate() {
+        if (!this._db) return null;
+        try {
+            const row = this._db
+                .prepare("SELECT value FROM meta WHERE key = 'competitions_sync_date'")
+                .get();
+            return row ? row.value : null;
+        } catch {
+            return null;
+        }
+    }
+
+    _saveCompetitionsSyncDate(dateStr) {
+        this._db
+            .prepare("INSERT OR REPLACE INTO meta VALUES ('competitions_sync_date', ?)")
+            .run(dateStr);
+    }
+
+    async _syncCompetitionsFromNetwork() {
+        const stored = this._storedCompetitionsSyncDate();
+
+        // Check if we need to sync (check every hour)
+        if (stored) {
+            const storedMs = new Date(stored).getTime();
+            if (Date.now() - storedMs < this.competitionsSyncMaxAgeMs) {
+                return; // Recently synced, skip
+            }
+        }
+
+        try {
+            console.log('[WcaApi] Syncing upcoming competitions from network...');
+
+            const today = new Date().toISOString().slice(0, 10);
+            const ninetyDaysOut = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
+                .toISOString()
+                .slice(0, 10);
+
+            const allComps = [];
+            let page = 1;
+            let hasMore = true;
+
+            while (hasMore) {
+                const params = new URLSearchParams({
+                    start: today,
+                    end: ninetyDaysOut,
+                    page,
+                });
+
+                const { data } = await axios.get(`${this.competitionsUrl}?${params}`, {
+                    timeout: 30_000,
+                });
+
+                if (!Array.isArray(data) || data.length === 0) {
+                    hasMore = false;
+                } else {
+                    allComps.push(...data);
+                    hasMore = data.length === 25; // WCA API returns max 25 per page
+                    page++;
+                }
+            }
+
+            // Save to database
+            this._saveCompetitionsToDb(allComps);
+            this._saveCompetitionsSyncDate(new Date().toISOString());
+
+            console.log(`[WcaApi] Synced ${allComps.length} competitions from network.`);
+        } catch (err) {
+            console.warn('[WcaApi] Failed to sync competitions from network:', err.message);
+            // Don't throw — DB may have stale data but it's better than failing
+        }
+    }
+
+    _saveCompetitionsToDb(networkComps) {
+        const insComp = this._db.prepare(`
+            INSERT OR REPLACE INTO competitions
+                (competition_id, name, country_id, year, month, day, end_year, end_month, end_day, source)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
+        `);
+
+        const updateStmt = this._db.prepare('BEGIN');
+        updateStmt.run();
+
+        try {
+            for (const comp of networkComps) {
+                const start = comp.start_date.split('-').map(Number);
+                const end = comp.end_date.split('-').map(Number);
+
+                insComp.run(
+                    comp.id, // competition_id
+                    comp.name, // name
+                    comp.country_iso2, // country_id
+                    start[0], // year
+                    start[1], // month
+                    start[2], // day
+                    end[0], // end_year
+                    end[1], // end_month
+                    end[2], // end_day
+                    'api', // source
+                );
+            }
+            this._db.prepare('COMMIT').run();
+        } catch (err) {
+            this._db.prepare('ROLLBACK').run();
+            throw err;
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -403,14 +531,28 @@ export default class WcaApi {
         try {
             // 0. competitions
             const insComp = db.prepare(
-                'INSERT OR REPLACE INTO competitions (competition_id, year, month, day) VALUES (?,?,?,?)',
+                `INSERT OR REPLACE INTO competitions
+                    (competition_id, name, country_id, year, month, day, end_year, end_month, end_day, source)
+                 VALUES (?,?,?,?,?,?,?,?,?,?)`,
             );
             let compRows = 0;
             await this._parseTsv(
                 this._exportPath('WCA_export_competitions.tsv'),
                 (f) => {
-                    // id(0) year(14) month(15) day(16)
-                    insComp.run(f[0], Number(f[14]), Number(f[15]), Number(f[16]));
+                    // id(0) name(1) country_id(6) year(14) month(15) day(16)
+                    // end_year(17) end_month(18) end_day(19)
+                    insComp.run(
+                        f[0], // competition_id
+                        f[1], // name
+                        f[6], // country_id
+                        Number(f[14]), // year
+                        Number(f[15]), // month
+                        Number(f[16]), // day
+                        Number(f[17]), // end_year
+                        Number(f[18]), // end_month
+                        Number(f[19]), // end_day
+                        'export', // source
+                    );
                     compRows++;
                 },
                 (n) => renderBar('competitions', n, APPROX_ROWS.competitions),
@@ -609,6 +751,9 @@ export default class WcaApi {
                     // else: DB is populated and export is current — nothing to do
                 }
 
+                // Sync upcoming competitions from network API
+                await this._syncCompetitionsFromNetwork();
+
                 this._ready = true;
             } catch (err) {
                 this._initPromise = null;
@@ -655,17 +800,20 @@ export default class WcaApi {
                 await this._downloadAndExtract();
 
                 // Wipe existing DB tables so stale rows from removed competitors
-                // don't linger — faster than DELETE on 38M rows
-                this._db.exec(`
-                    DROP TABLE IF EXISTS persons;
-                    DROP TABLE IF EXISTS results;
-                    DROP TABLE IF EXISTS ranks_single;
-                    DROP TABLE IF EXISTS ranks_average;
-                    DROP TABLE IF EXISTS competitions;
-                    DROP TABLE IF EXISTS meta;
-                `);
+                // don't linger — faster than DELETE on 38M rows.
+                // Guard against _db being null (refresh triggered before first init).
+                if (this._db) {
+                    this._db.exec(`
+                        DROP TABLE IF EXISTS persons;
+                        DROP TABLE IF EXISTS results;
+                        DROP TABLE IF EXISTS ranks_single;
+                        DROP TABLE IF EXISTS ranks_average;
+                        DROP TABLE IF EXISTS competitions;
+                        DROP TABLE IF EXISTS meta;
+                    `);
+                }
 
-                // Recreate schema
+                // Recreate schema (or create from scratch if _db was null)
                 this._db = this._openDb();
 
                 await this._importExport();
@@ -673,6 +821,9 @@ export default class WcaApi {
 
                 const { latestExportDate } = await this._checkForNewerExport();
                 if (latestExportDate) this._saveExportDate(latestExportDate);
+
+                // Re-sync competitions after export refresh
+                await this._syncCompetitionsFromNetwork();
 
                 this._ready = true;
                 console.log('[WcaApi] Force refresh complete.');
@@ -885,7 +1036,7 @@ export default class WcaApi {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // Competition listing  (network)
+    // Competition listing  (now local database only)
     // ═══════════════════════════════════════════════════════════════════════
 
     async fetchUpcomingCompetitions(options = {}) {
@@ -895,114 +1046,62 @@ export default class WcaApi {
             .slice(0, 10);
         const { start = today, end = ninetyDaysOut, countryIso2 = null, query = null } = options;
 
-        return this._cachedFetch(
-            `competitions:${start}:${end}:${countryIso2}:${query}`,
-            async () => {
-                await this._ensureReady();
+        await this._ensureReady();
 
-                const [startYear, startMonth, startDay] = start.split('-').map(Number);
-                const [endYear, endMonth, endDay] = end.split('-').map(Number);
+        const [startYear, startMonth, startDay] = start.split('-').map(Number);
+        const [endYear, endMonth, endDay] = end.split('-').map(Number);
 
-                // ── 1. DB fetch ───────────────────────────────────────────────
-                let dbComps = [];
-                try {
-                    // Convert start/end dates to integer YYYYMMDD for simple comparison
-                    const startInt = startYear * 10000 + startMonth * 100 + startDay;
-                    const endInt = endYear * 10000 + endMonth * 100 + endDay;
+        // Convert start/end dates to integer YYYYMMDD for simple comparison
+        const startInt = startYear * 10000 + startMonth * 100 + startDay;
+        const endInt = endYear * 10000 + endMonth * 100 + endDay;
 
-                    let sql = `
-                        SELECT competition_id, name, country_id,
-                               year, month, day
-                        FROM   competitions
-                        WHERE
-                            -- competition starts on or before the window end
-                            (year * 10000 + month * 100 + day) <= :endInt
-                            AND
-                            -- competition starts on or after the window start
-                            -- (we only store start date, so use that as proxy for end)
-                            (year * 10000 + month * 100 + day) >= :startInt
-                    `;
-                    const params = { startInt, endInt };
+        let sql = `
+            SELECT competition_id, name, country_id,
+                   year, month, day, end_year, end_month, end_day
+            FROM   competitions
+            WHERE
+                -- competition starts on or before the window end
+                (year * 10000 + month * 100 + day) <= :endInt
+                AND
+                -- competition starts on or after the window start
+                (year * 10000 + month * 100 + day) >= :startInt
+        `;
+        const params = { startInt, endInt };
 
-                    if (countryIso2) {
-                        sql += ' AND country_id = :countryIso2';
-                        params.countryIso2 = countryIso2;
-                    }
-                    if (query) {
-                        sql += ' AND name LIKE :query';
-                        params.query = `%${query}%`;
-                    }
+        if (countryIso2) {
+            sql += ' AND country_id = :countryIso2';
+            params.countryIso2 = countryIso2;
+        }
+        if (query) {
+            sql += ' AND name LIKE :query';
+            params.query = `%${query}%`;
+        }
 
-                    sql += ' ORDER BY year, month, day';
+        sql += ' ORDER BY year, month, day';
 
-                    dbComps = this._db.prepare(sql).all(params);
-                } catch (err) {
-                    console.warn('[WcaApi] DB competitions fetch failed:', err.message);
-                }
+        const dbComps = this._db.prepare(sql).all(params);
 
-                // ── 2. Network fetch for upcoming/ongoing (richer data) ───────
-                let networkComps = [];
-                try {
-                    const all = [];
-                    let page = 1,
-                        hasMore = true;
-                    while (hasMore) {
-                        const params = new URLSearchParams({ start, end, page });
-                        if (countryIso2) params.set('country_iso2', countryIso2);
-                        if (query) params.set('q', query);
-                        const { data } = await axios.get(`${this.competitionsUrl}?${params}`);
-                        if (!Array.isArray(data) || data.length === 0) {
-                            hasMore = false;
-                        } else {
-                            all.push(...data);
-                            hasMore = data.length === 25;
-                            page++;
-                        }
-                    }
-                    networkComps = all;
-                } catch (err) {
-                    console.warn('[WcaApi] Network competitions fetch failed:', err.message);
-                }
+        // Transform DB rows to include start_date and end_date fields
+        const allComps = dbComps.map((r) => ({
+            id: r.competition_id,
+            name: r.name,
+            country_iso2: r.country_id,
+            start_date: `${r.year}-${String(r.month).padStart(2, '0')}-${String(r.day).padStart(2, '0')}`,
+            end_date: `${r.end_year}-${String(r.end_month).padStart(2, '0')}-${String(r.end_day).padStart(2, '0')}`,
+            source: 'database',
+        }));
 
-                // ── 3. Merge — network wins on conflict (richer fields) ───────
-                const networkById = new Map(networkComps.map((c) => [c.id, c]));
-
-                const dbMapped = dbComps
-                    .filter((r) => !networkById.has(r.competition_id))
-                    .map((r) => ({
-                        id: r.competition_id,
-                        name: r.name,
-                        country_iso2: r.country_id,
-                        start_date: `${r.year}-${String(r.month).padStart(2, '0')}-${String(r.day).padStart(2, '0')}`,
-                        // We only store start date in the DB — use it as end_date too
-                        // so isOngoing/isFuture don't crash on a missing field
-                        end_date: `${r.year}-${String(r.month).padStart(2, '0')}-${String(r.day).padStart(2, '0')}`,
-                        source: 'export',
-                    }));
-
-                const allComps = [
-                    ...networkComps.map((c) => ({ ...c, source: 'api' })),
-                    ...dbMapped,
-                ];
-
-                // ── 4. Annotate status and sort ───────────────────────────────
-                return allComps
-                    .map((c) => ({
-                        ...c,
-                        status: this.isOngoing(c)
-                            ? 'ongoing'
-                            : this.isFuture(c)
-                              ? 'upcoming'
-                              : 'past',
-                    }))
-                    .sort((a, b) => {
-                        if (a.status === 'ongoing' && b.status !== 'ongoing') return -1;
-                        if (b.status === 'ongoing' && a.status !== 'ongoing') return 1;
-                        return a.start_date.localeCompare(b.start_date);
-                    });
-            },
-            this.competitionsCacheTtlMs,
-        );
+        // Annotate status and sort
+        return allComps
+            .map((c) => ({
+                ...c,
+                status: this.isOngoing(c) ? 'ongoing' : this.isFuture(c) ? 'upcoming' : 'past',
+            }))
+            .sort((a, b) => {
+                if (a.status === 'ongoing' && b.status !== 'ongoing') return -1;
+                if (b.status === 'ongoing' && a.status !== 'ongoing') return 1;
+                return a.start_date.localeCompare(b.start_date);
+            });
     }
 
     async searchCompetitions(query, options = {}) {
@@ -1438,6 +1537,61 @@ export default class WcaApi {
         } catch (err) {
             return res.status(500).json({ error: err.message });
         }
+    }
+
+    // Open the existing DB file without triggering a full _ensureReady() / download.
+    // Safe to call even if _db is already set (no-op in that case).
+    _tryOpenExistingDb() {
+        if (this._db) return;
+        if (!fs.existsSync(this.dbPath)) return;
+        try {
+            this._db = this._openDb();
+        } catch {
+            // leave _db as null — caller checks before using
+        }
+    }
+
+    async handleMetadataRequest(req, res) {
+        // Ensure the DB is open if it already exists on disk (e.g. after a server
+        // restart before any WCA query has been served).
+        this._tryOpenExistingDb();
+
+        const isRefreshing = !this._ready && this._initPromise != null;
+
+        let exportDate = null;
+        let personCount = null;
+        let resultCount = null;
+        let competitionCount = null;
+        let nextScheduledCheck = null;
+
+        if (this._db) {
+            try {
+                exportDate = this._storedExportDate();
+                personCount =
+                    this._db.prepare('SELECT COUNT(*) AS n FROM persons').get()?.n ?? null;
+                resultCount =
+                    this._db.prepare('SELECT COUNT(*) AS n FROM results').get()?.n ?? null;
+                competitionCount =
+                    this._db.prepare('SELECT COUNT(*) AS n FROM competitions').get()?.n ?? null;
+
+                if (exportDate) {
+                    nextScheduledCheck = new Date(
+                        new Date(exportDate).getTime() + this.exportMaxAgeMs,
+                    ).toISOString();
+                }
+            } catch {
+                // DB may be mid-refresh; return what we have
+            }
+        }
+
+        return res.json({
+            exportDate,
+            nextScheduledCheck,
+            isRefreshing,
+            personCount,
+            resultCount,
+            competitionCount,
+        });
     }
 
     async handleRequest(req, res) {

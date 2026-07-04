@@ -51,6 +51,7 @@
     <!-- JS Files -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FDCB5928P" defer></script>
     <script src="https://cdn.cubing.net/v0/js/cubing/twisty" type="module"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     <script src="../../js/setupPage.js" defer></script>
     <script src="/js/average" defer></script>
 </head>
@@ -64,12 +65,59 @@
         </div>
 
         <main>
+            <div class="compsim-toolbar">
+ 
+                <!-- Event picker pill (left) -->
+                <div class="toolbar-event-pill">
+                  <div class="toolbar-event-icon" id="toolbarEventIcon">3</div>
+                  <select class="toolbar-event-select" id="timerEventSelect">
+                    <option value="333">3x3x3</option>
+                    <option value="222">2x2x2</option>
+                    <option value="444">4x4x4</option>
+                    <option value="555">5x5x5</option>
+                    <option value="666">6x6x6</option>
+                    <option value="777">7x7x7</option>
+                    <option value="333bf">3x3 BLD</option>
+                    <option value="333oh">3x3 OH</option>
+                    <option value="clock">Clock</option>
+                    <option value="fto">FTO</option>
+                    <option value="minx">Megaminx</option>
+                    <option value="pyram">Pyraminx</option>
+                    <option value="skewb">Skewb</option>
+                    <option value="sq1">Square-1</option>
+                    <option value="444bf">4x4 BLD</option>
+                    <option value="555bf">5x5 BLD</option>
+                  </select>
+                </div>
+               
+                <!-- Solve dots counter -->
+                <div class="toolbar-solve-counter" id="toolbarSolveCounter">
+                  <div class="solve-dots" id="toolbarSolveDots">
+                    <!-- dots injected by JS -->
+                  </div>
+                  <span id="toolbarSolveLabel">SOLVE 1</span>
+                </div>
+               
+                <div class="toolbar-spacer"></div>
+               
+                <!-- Target pill -->
+                <div class="toolbar-target-pill" id="toolbarTargetPill" style="display:none">
+                  <span class="toolbar-target-icon"><i class="fas fa-bullseye"></i></span>
+                  <span id="toolbarTargetValue">10.000</span>
+                </div>
+               
+                <!-- Zen mode button -->
+                <button class="toolbar-zen-btn" id="zenModeBtn" title="Zen mode"><i class="fas fa-yin-yang"></i></button>
+               
+              </div>
+
             <!-- Sub-navbar -->
             <div class="sub-navbar">
                 <div class="sub-navbar-track">
                     <div class="sub-navbar-indicator" id="subNavIndicator"></div>
                     <button class="sub-navbar-tab active" data-tab="timer">Timer</button>
                     <button class="sub-navbar-tab" data-tab="stats">Stats</button>
+                    <button class="sub-navbar-tab" data-tab="comp">Comp</button>
                     <button class="sub-navbar-tab" data-tab="settings">Settings</button>
                 </div>
             </div>
@@ -89,6 +137,7 @@
                     <option value="333bf">3x3 BLD</option>
                     <option value="333oh">3x3 OH</option>
                     <option value="clock">Clock</option>
+                    <option value="fto">FTO</option>
                     <option value="minx">Megaminx</option>
                     <option value="pyram">Pyraminx</option>
                     <option value="skewb">Skewb</option>
@@ -107,27 +156,6 @@
             <div class="layout">
                 <!-- Main area -->
                 <section class="timer-area">
-                    <!-- Event picker + target -->
-                    <div class="timer-toolbar">
-                        <select class="timer-event-select" id="timerEventSelect">
-                            <option value="333">3x3x3</option>
-                            <option value="222">2x2x2</option>
-                            <option value="444">4x4x4</option>
-                            <option value="555">5x5x5</option>
-                            <option value="666">6x6x6</option>
-                            <option value="777">7x7x7</option>
-                            <option value="333bf">3x3 BLD</option>
-                            <option value="333oh">3x3 OH</option>
-                            <option value="clock">Clock</option>
-                            <option value="minx">Megaminx</option>
-                            <option value="pyram">Pyraminx</option>
-                            <option value="skewb">Skewb</option>
-                            <option value="sq1">Square-1</option>
-                            <option value="444bf">4x4 BLD</option>
-                            <option value="555bf">5x5 BLD</option>
-                        </select>
-                        <span class="timer-target" id="timerTarget" title="Target time"></span>
-                    </div>
                     <!-- Scramble display -->
                     <div class="scramble-container">
                         <p class="scramble-text" id="scrambleText">Loading scramble...</p>
@@ -147,7 +175,25 @@
 
                     <!-- Timer mode (hidden by default) -->
                     <div id="timerMode" hidden>
+                        <div class="inspection-badge" id="inspectionBadge" hidden>
+                            <i class="fas fa-clock"></i>
+                        </div>
                         <div class="timer-display" id="timerDisplay">0.00</div>
+                        <div class="inspection-hint" id="inspectionHint" hidden>Hold to start solve</div>
+                        <button class="cancel-inspection-btn" id="cancelInspectionBtn" hidden>✕ Cancel</button>
+                    </div>
+
+                    <!-- Mobile inline solve result (auto-shows after each solve) -->
+                    <div class="mobile-penalty-sheet" id="mobilePenaltySheet" hidden>
+                        <span class="penalty-sheet-label">Last solve</span>
+                        <div class="penalty-sheet-time" id="penaltySheetTime">0.00</div>
+                        <div class="penalty-sheet-buttons" id="penaltySheetButtons">
+                            <button class="penalty-btn confirm" id="penaltyOk" title="No penalty"><i class="fas fa-check"></i></button>
+                            <button class="penalty-btn plus2" id="penaltyPlus2" title="+2">+</button>
+                            <button class="penalty-btn dnf" id="penaltyDnf" title="DNF">x</button>
+                            <button class="penalty-btn edit" id="penaltyEdit" title="Edit"><i class="fas fa-pen"></i></button>
+                            <button class="penalty-btn delete" id="penaltyDelete" title="Delete"><i class="fas fa-times-circle"></i></button>
+                        </div>
                     </div>
                 </section>
             </div>
@@ -173,19 +219,26 @@
                 </aside>
                 <div class="stats-box">
                     <div class="stats">
-                        <div class="stat-card during-average">
+                        <div class="stat-card during-average" id="card-mean">
                             <span class="stat-label">Mean</span>
                             <span class="stat-value" id="mean">0.00</span>
                         </div>
-                        <div class="stat-card during-average">
+                        <div class="stat-card during-average" id="card-bpa">
                             <span class="stat-label" title="Best Possible Average">BPA</span>
                             <span class="stat-value" id="bpa">-</span>
+                            <span class="stat-prob" id="bpa-prob"></span>
                         </div>
-                        <div class="stat-card during-average">
+                        <div class="stat-card during-average" id="card-wpa">
                             <span class="stat-label" title="Worst Possible Average">WPA</span>
                             <span class="stat-value" id="wpa">-</span>
+                            <span class="stat-prob" id="wpa-prob"></span>
                         </div>
-                        <div class="stat-card during-average">
+                        <div class="stat-card during-average" id="card-mla">
+                            <span class="stat-label" title="Most Likely Average">Most Likely</span>
+                            <span class="stat-value" id="mla">-</span>
+                            <span class="stat-prob" id="mla-solve"></span>
+                        </div>
+                        <div class="stat-card during-average" id="card-tft">
                             <span class="stat-label" title="Time For Target">For Target</span>
                             <span class="stat-value" id="tft">–</span>
                         </div>
@@ -198,19 +251,6 @@
             </div>
 
             </div><!-- /page-timer -->
-
-            <!-- Mobile penalty sheet (swipe down to reveal) -->
-            <div class="mobile-penalty-sheet" id="mobilePenaltySheet" hidden>
-                <div class="penalty-sheet-handle"></div>
-                <div class="penalty-sheet-time" id="penaltySheetTime">0.00</div>
-                <div class="penalty-sheet-buttons" id="penaltySheetButtons">
-                    <button class="penalty-btn confirm" id="penaltyOk" title="No penalty"><i class="fas fa-check"></i></button>
-                    <button class="penalty-btn plus2" id="penaltyPlus2" title="+2">+</button>
-                    <button class="penalty-btn dnf" id="penaltyDnf" title="DNF">x</button>
-                    <button class="penalty-btn edit" id="penaltyEdit" title="Edit"><i class="fas fa-pen"></i></button>
-                    <button class="penalty-btn delete" id="penaltyDelete" title="Delete"><i class="fas fa-times-circle"></i></button>
-                </div>
-            </div>
 
             <!-- Stats Page -->
             <div class="page-view" id="page-stats">
@@ -236,9 +276,32 @@
                     <div class="analyze-row">
                         <a id="analyzeBtn" class="modal-btn confirm" href="/tools/globalCalc?source=average&event=333">Analyze in Global Calculator</a>
                     </div>
+                    <div class="stats-charts-section" id="statsChartsSection">
+                        <div class="stats-chart-controls">
+                            <div class="stats-chart-labels">
+                                <span class="stats-chart-legend-dot avg-dot"></span>
+                                <span class="stats-chart-legend-label" id="statsLegendAvgLabel">Averages</span>
+                                <span class="stats-chart-legend-dot insp-dot" id="statsLegendInspDot" hidden></span>
+                                <span class="stats-chart-legend-label" id="statsLegendInspLabel" hidden>Inspection</span>
+                            </div>
+                            <div class="stats-slider-row">
+                                <span class="stats-slider-label">Last <strong id="statsSliderVal">30</strong></span>
+                                <input type="range" class="stats-slider" id="statsHistorySlider" min="5" max="200" value="30">
+                            </div>
+                        </div>
+                        <div class="stats-chart-wrap" id="statsAvgChartWrap">
+                            <canvas id="statsAvgChart"></canvas>
+                        </div>
+                        <div class="stats-chart-wrap" id="statsInspChartWrap" hidden>
+                            <canvas id="statsInspChart"></canvas>
+                        </div>
+                    </div>
                     <div class="averages-section">
                         <div class="averages-header">
-                            <h3>Averages</h3>
+                            <div class="mode-toggle stats-view-toggle">
+                                <button class="mode-btn active" id="statsViewAverages">Averages</button>
+                                <button class="mode-btn" id="statsViewSolves">Solves</button>
+                            </div>
                             <div class="averages-actions">
                                 <button class="icon-btn" id="clearAllBtn" title="Clear all averages"><i class="fas fa-trash-alt"></i></button>
                             </div>
@@ -248,9 +311,66 @@
                             <p class="hint">Complete <span id="solveCountHint">5</span> solves to record an average.</p>
                         </div>
                         <ul id="tagContainer"></ul>
+                        <ul id="solvesContainer" style="display:none"></ul>
                     </div>
                 </div>
             </div>
+
+            <!-- Competition Page -->
+            <div class="page-view" id="page-comp">
+                <div class="comp-page-content">
+
+                    <!-- WCA ID + Clear -->
+                    <div class="comp-header-row">
+                        <div class="comp-wca-field">
+                            <label class="comp-field-label" for="compWcaInput">WCA ID</label>
+                            <input type="text" id="compWcaInput" class="settings-input comp-wca-input"
+                                maxlength="10" placeholder="e.g. 2023KLIN02"
+                                autocomplete="off" spellcheck="false" />
+                        </div>
+                        <button class="settings-btn danger" id="compClearBtn">Clear</button>
+                    </div>
+
+                    <!-- Solve input rows (rendered by JS) -->
+                    <div class="comp-solves-section">
+                        <div id="compSolvesList" class="comp-solves-list">
+                            <!-- dynamically rendered -->
+                        </div>
+                    </div>
+
+                    <!-- Stats -->
+                    <div class="comp-stats-section">
+                        <div class="stats">
+                            <div class="stat-card comp-during-average" id="comp-card-mean">
+                                <span class="stat-label">Mean</span>
+                                <span class="stat-value" id="comp-mean">–</span>
+                            </div>
+                            <div class="stat-card comp-during-average" id="comp-card-bpa">
+                                <span class="stat-label" title="Best Possible Average">BPA</span>
+                                <span class="stat-value" id="comp-bpa">–</span>
+                            </div>
+                            <div class="stat-card comp-during-average" id="comp-card-wpa">
+                                <span class="stat-label" title="Worst Possible Average">WPA</span>
+                                <span class="stat-value" id="comp-wpa">–</span>
+                            </div>
+                            <div class="stat-card comp-during-average" id="comp-card-mla">
+                                <span class="stat-label" title="Most Likely Average">Most Likely</span>
+                                <span class="stat-value" id="comp-mla">–</span>
+                                <span class="stat-prob" id="comp-mla-solve"></span>
+                            </div>
+                            <div class="stat-card comp-during-average" id="comp-card-tft">
+                                <span class="stat-label" title="Time For Target">For Target</span>
+                                <span class="stat-value" id="comp-tft">–</span>
+                            </div>
+                            <div class="stat-card comp-after-average" id="comp-card-average">
+                                <span class="stat-label">Average</span>
+                                <span class="stat-value" id="comp-average">–</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div><!-- /page-comp -->
 
             <!-- Settings Page -->
             <div class="page-view" id="page-settings">
@@ -277,8 +397,43 @@
                     </div>
 
                     <div class="settings-section">
-                        <h3 class="settings-section-title">Event &amp; Target</h3>
+                        <h3 class="settings-section-title">Inspection</h3>
                         <div class="settings-row">
+                            <div class="settings-row-label">
+                                <span class="settings-label">Enable Inspection</span>
+                                <span class="settings-desc">Show an inspection countdown before each solve (timer mode only)</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="settingsInspectionEnabled" />
+                                <span class="settings-toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div id="inspectionSubSettings" style="display:none">
+                            <div class="settings-row">
+                                <div class="settings-row-label">
+                                    <span class="settings-label">Events</span>
+                                    <span class="settings-desc">Which events use inspection</span>
+                                </div>
+                                <div class="mode-toggle settings-mode-toggle">
+                                    <button class="mode-btn active" id="settingsInspectionEventsAll">All events</button>
+                                    <button class="mode-btn" id="settingsInspectionEventsNotBlind">Not blind</button>
+                                </div>
+                            </div>
+                            <div class="settings-row">
+                                <div class="settings-row-label">
+                                    <span class="settings-label">Inspection Type</span>
+                                    <span class="settings-desc">Normal WCA inspection (15s) or unlimited time</span>
+                                </div>
+                                <div class="mode-toggle settings-mode-toggle">
+                                    <button class="mode-btn active" id="settingsInspectionNormal">Normal (15s)</button>
+                                    <button class="mode-btn" id="settingsInspectionInfinite">Infinite</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3 class="settings-section-title">Event &amp; Target</h3>                        <div class="settings-row">
                             <div class="settings-row-label">
                                 <span class="settings-label">Event</span>
                                 <span class="settings-desc">Puzzle type for scrambles and averages</span>
@@ -293,6 +448,7 @@
                                 <option value="333bf">3x3 BLD</option>
                                 <option value="333oh">3x3 OH</option>
                                 <option value="clock">Clock</option>
+                                <option value="fto">FTO</option>
                                 <option value="minx">Megaminx</option>
                                 <option value="pyram">Pyraminx</option>
                                 <option value="skewb">Skewb</option>
@@ -322,6 +478,113 @@
                             </div>
                             <label class="settings-toggle">
                                 <input type="checkbox" id="settingsUsePr" />
+                                <span class="settings-toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-label">
+                                <span class="settings-label">Goal Mode</span>
+                                <span class="settings-desc">Auto-calculate a gradual target toward your long-term goal</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="settingsGoalMode" />
+                                <span class="settings-toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div id="goalSubSettings" style="display:none">
+                            <div class="settings-row settings-sub-row">
+                                <div class="settings-row-label">
+                                    <span class="settings-label">Long-Term Goal</span>
+                                    <span class="settings-desc">The ultimate time you're working toward</span>
+                                </div>
+                                <input type="text" class="settings-input" id="settingsGoalTime" placeholder="0.00" />
+                            </div>
+                            <div class="settings-row settings-sub-row">
+                                <div class="settings-row-label">
+                                    <span class="settings-label">Auto Target</span>
+                                    <span class="settings-desc">Calculated step toward your goal based on recent performance</span>
+                                </div>
+                                <span class="goal-auto-target-value" id="goalAutoTargetDisplay">–</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3 class="settings-section-title">Stats Display</h3>
+                        <div class="settings-row">
+                            <div class="settings-row-label">
+                                <span class="settings-label">Show Mean</span>
+                                <span class="settings-desc">Display the mean of current solves</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="settingsShowMean" checked />
+                                <span class="settings-toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-label">
+                                <span class="settings-label">Show BPA</span>
+                                <span class="settings-desc">Best Possible Average</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="settingsShowBpa" checked />
+                                <span class="settings-toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-label">
+                                <span class="settings-label">Show WPA</span>
+                                <span class="settings-desc">Worst Possible Average</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="settingsShowWpa" checked />
+                                <span class="settings-toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-label">
+                                <span class="settings-label">Show Most Likely</span>
+                                <span class="settings-desc">Predicted average based on your solve history</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="settingsShowMla" checked />
+                                <span class="settings-toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-label">
+                                <span class="settings-label">Target Nudge Factor</span>
+                                <span class="settings-desc">When Most Likely is within 1σ of target, use this many σ faster as the hypothetical solve</span>
+                            </div>
+                            <input type="number" class="settings-input" id="settingsMlaFactor" min="0.1" max="5" step="0.1" value="1.5" />
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-label">
+                                <span class="settings-label">Show For Target</span>
+                                <span class="settings-desc">Time needed on the last solve to hit your target</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="settingsShowTft" checked />
+                                <span class="settings-toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-label">
+                                <span class="settings-label">Show PR Pills</span>
+                                <span class="settings-desc">PR rank badges on BPA, WPA and Most Likely</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="settingsShowPrPills" checked />
+                                <span class="settings-toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-label">
+                                <span class="settings-label">Show Likelihood Pills</span>
+                                <span class="settings-desc">Probability badges on BPA and WPA</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="settingsShowProbPills" checked />
                                 <span class="settings-toggle-slider"></span>
                             </label>
                         </div>
