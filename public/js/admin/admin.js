@@ -657,45 +657,53 @@ async function loadWcaExportSection(role) {
             meta?.competitionCount != null ? meta.competitionCount.toLocaleString() : '—';
 
         section.innerHTML = `
-            <div class="admin-wca-header">
-                <h3 class="admin-wca-title">WCA Export</h3>
-                ${
-                    isAdmin
-                        ? `<button type="button" id="wca-refresh-btn" class="admin-wca-btn" ${meta?.isRefreshing ? 'disabled' : ''}>
-                    ${meta?.isRefreshing ? 'Refreshing…' : 'Refresh Export'}
-                </button>`
-                        : ''
-                }
-            </div>
-            <dl class="admin-wca-stats">
-                <div class="admin-wca-stat">
-                    <dt>Export date</dt>
-                    <dd>${fmtDate(meta?.exportDate)}</dd>
-                </div>
-                <div class="admin-wca-stat">
-                    <dt>Next check</dt>
-                    <dd>${fmtDate(meta?.nextScheduledCheck)}</dd>
-                </div>
-                <div class="admin-wca-stat">
-                    <dt>Persons</dt>
-                    <dd>${persons}</dd>
-                </div>
-                <div class="admin-wca-stat">
-                    <dt>Results</dt>
-                    <dd>${results}</dd>
-                </div>
-                <div class="admin-wca-stat">
-                    <dt>Competitions</dt>
-                    <dd>${competitions}</dd>
-                </div>
-            </dl>
-            ${statusText ? `<p class="admin-wca-status ${statusClass}">${statusText}</p>` : ''}
-        `;
+                            <div class="admin-wca-header">
+                                <h3 class="admin-wca-title">WCA Export</h3>
+                                ${
+                                    isAdmin
+                                        ? `<div class="admin-wca-actions">
+                                    <button type="button" id="wca-refresh-btn" class="admin-wca-btn" ${meta?.isRefreshing ? 'disabled' : ''}>
+                                        ${meta?.isRefreshing ? 'Refreshing…' : 'Refresh Export'}
+                                    </button>
+                                    <button type="button" id="wca-cancel-btn" class="admin-wca-btn admin-wca-btn--secondary" ${meta?.isRefreshing ? '' : 'disabled'}>
+                                        Cancel Refresh
+                                    </button>
+                                </div>`
+                                        : ''
+                                }
+                            </div>
+                            <dl class="admin-wca-stats">
+                                <div class="admin-wca-stat">
+                                    <dt>Export date</dt>
+                                    <dd>${fmtDate(meta?.exportDate)}</dd>
+                                </div>
+                                <div class="admin-wca-stat">
+                                    <dt>Next check</dt>
+                                    <dd>${fmtDate(meta?.nextScheduledCheck)}</dd>
+                                </div>
+                                <div class="admin-wca-stat">
+                                    <dt>Persons</dt>
+                                    <dd>${persons}</dd>
+                                </div>
+                                <div class="admin-wca-stat">
+                                    <dt>Results</dt>
+                                    <dd>${results}</dd>
+                                </div>
+                                <div class="admin-wca-stat">
+                                    <dt>Competitions</dt>
+                                    <dd>${competitions}</dd>
+                                </div>
+                            </dl>
+                            ${statusText ? `<p class="admin-wca-status ${statusClass}">${statusText}</p>` : ''}
+                        `;
 
         if (isAdmin) {
             document
                 .getElementById('wca-refresh-btn')
                 ?.addEventListener('click', () => triggerRefresh());
+            document
+                .getElementById('wca-cancel-btn')
+                ?.addEventListener('click', () => triggerCancel());
         }
     }
 
@@ -753,6 +761,26 @@ async function loadWcaExportSection(role) {
             startPolling();
         } catch {
             render(lastMeta, 'Failed to start refresh.', 'admin-wca-status--error');
+        }
+    }
+
+    async function triggerCancel() {
+        try {
+            const res = await fetch('/api/admin/update/cancel', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.status === 409) {
+                render(lastMeta, 'No refresh is currently running.', 'admin-wca-status--info');
+                return;
+            }
+            if (!res.ok) throw new Error('Failed to cancel refresh');
+            const meta = await fetchMeta();
+            lastMeta = meta;
+            render(meta, 'Refresh cancellation requested.', 'admin-wca-status--info');
+            return;
+        } catch {
+            render(lastMeta, 'Failed to cancel refresh.', 'admin-wca-status--error');
         }
     }
 

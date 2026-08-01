@@ -229,10 +229,26 @@ import apiRouter from './API/api.js';
 import adminRoutesRouter from './API/admin-routes.js';
 import routesRouter from './API/routes.js';
 
+import { db } from './firebase.js';
+import NewsletterApi from './API/API/newsletter.api.js';
+import WcaApi from './API/API/wca.api.js';
+import { startNewsletterJobs } from './newsletter-jobs.js';
+
+const wcaApi = new WcaApi();
+
 app.use(toolsRouter);
 app.use(apiRouter);
 app.use(adminRoutesRouter);
 app.use(routesRouter);
+
+/* =========================
+   Newsletter Background Jobs
+========================= */
+
+const _newsletterApi = new NewsletterApi(db);
+const _newsletterHostname = betaTest ? 'beta.cubingtools.de' : 'cubingtools.de';
+wcaApi.startBackgroundRefreshLoop();
+startNewsletterJobs(db, _newsletterApi, _newsletterHostname);
 
 /* =========================
    Server

@@ -26,20 +26,22 @@ dotenv.config({ path: path.join(path.dirname(new URL(import.meta.url).pathname),
 
 // Shared helper to create endpoint-specific rate limiters with a consistent payload shape.
 function createRateLimiter(windowMs, max, message, options = {}) {
+    // Create the limiter instance at initialization time (required by express-rate-limit)
+    const limiter = rateLimit({
+        windowMs,
+        max,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { error: message },
+        ...options,
+    });
     // If not on beta.cubingtools.de or cubingtools.de, disable rate limiting
     return (req, res, next) => {
         const host = req.headers.host || '';
         if (!host.includes('cubingtools.de')) {
             return next();
         }
-        return rateLimit({
-            windowMs,
-            max,
-            standardHeaders: true,
-            legacyHeaders: false,
-            message: { error: message },
-            ...options,
-        })(req, res, next);
+        return limiter(req, res, next);
     };
 }
 
@@ -149,6 +151,12 @@ const competitionsLimiter = createRateLimiter(
     'Too many competition requests, please try again later.',
 );
 
+const newsletterSubscribeLimiter = createRateLimiter(
+    60 * 60 * 1000,
+    5,
+    'Too many subscription requests, please try again later.',
+);
+
 const analysisLimiter = createRateLimiter(
     15 * 60 * 1000,
     30,
@@ -167,14 +175,23 @@ import AdminSessionApi from './API/admin.api.js';
 // Handles contact submissions, confirmation flow, and moderation storage.
 import ContactApi from './API/contact.api.js';
 
+// Handles newsletter subscriptions, confirmations, and unsubscribes.
+import NewsletterApi from './API/newsletter.api.js';
+
 const wcaApi = new WcaApi();
 const statusApi = new StatusApi();
 const contactApi = new ContactApi(db);
 const adminSessionApi = new AdminSessionApi(contactApi, db);
+const newsletterApi = new NewsletterApi(db);
 
 // =========================
 // Public Endpoints
 // =========================
+
+// Newsletter subscription
+router.post('/api/newsletter/subscribe', newsletterSubscribeLimiter, (req, res) =>
+    newsletterApi.handleSubscribe(req, res),
+);
 
 // Contact form submission
 router.post('/api/contact', contactLimiter, (req, res) => contactApi.handleRequest(req, res));
@@ -300,6 +317,14 @@ router.post(
     adminVerifyLimiter,
     (req, res, next) => adminSessionApi.requireAdmin(req, res, next),
     (req, res) => wcaApi.handleForceRefreshRequest(req, res),
+);
+
+// Cancel an in-progress export refresh
+router.post(
+    '/api/admin/update/cancel',
+    adminVerifyLimiter,
+    (req, res, next) => adminSessionApi.requireAdmin(req, res, next),
+    (req, res) => wcaApi.handleCancelRefreshRequest(req, res),
 );
 
 // WCA export metadata (any authenticated admin user)

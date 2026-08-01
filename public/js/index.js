@@ -324,3 +324,369 @@ if (carouselElement) {
         }
     })();
 }
+
+// ── Newsletter signup ──────────────────────────────────────────
+
+const NEWSLETTER_COUNTRIES = [
+    ['AF', 'Afghanistan'],
+    ['AL', 'Albania'],
+    ['DZ', 'Algeria'],
+    ['AD', 'Andorra'],
+    ['AO', 'Angola'],
+    ['AG', 'Antigua and Barbuda'],
+    ['AR', 'Argentina'],
+    ['AM', 'Armenia'],
+    ['AU', 'Australia'],
+    ['AT', 'Austria'],
+    ['AZ', 'Azerbaijan'],
+    ['BS', 'Bahamas'],
+    ['BH', 'Bahrain'],
+    ['BD', 'Bangladesh'],
+    ['BB', 'Barbados'],
+    ['BY', 'Belarus'],
+    ['BE', 'Belgium'],
+    ['BZ', 'Belize'],
+    ['BJ', 'Benin'],
+    ['BT', 'Bhutan'],
+    ['BO', 'Bolivia'],
+    ['BA', 'Bosnia and Herzegovina'],
+    ['BW', 'Botswana'],
+    ['BR', 'Brazil'],
+    ['BN', 'Brunei'],
+    ['BG', 'Bulgaria'],
+    ['BF', 'Burkina Faso'],
+    ['BI', 'Burundi'],
+    ['CV', 'Cabo Verde'],
+    ['KH', 'Cambodia'],
+    ['CM', 'Cameroon'],
+    ['CA', 'Canada'],
+    ['CF', 'Central African Republic'],
+    ['TD', 'Chad'],
+    ['CL', 'Chile'],
+    ['CN', 'China'],
+    ['TW', 'Chinese Taipei'],
+    ['CO', 'Colombia'],
+    ['KM', 'Comoros'],
+    ['CG', 'Congo'],
+    ['CR', 'Costa Rica'],
+    ['HR', 'Croatia'],
+    ['CU', 'Cuba'],
+    ['CY', 'Cyprus'],
+    ['CZ', 'Czech Republic'],
+    ['CI', "Côte d'Ivoire"],
+    ['KP', "Democratic People's Republic of Korea"],
+    ['CD', 'Democratic Republic of the Congo'],
+    ['DK', 'Denmark'],
+    ['DJ', 'Djibouti'],
+    ['DM', 'Dominica'],
+    ['DO', 'Dominican Republic'],
+    ['EC', 'Ecuador'],
+    ['EG', 'Egypt'],
+    ['SV', 'El Salvador'],
+    ['GQ', 'Equatorial Guinea'],
+    ['ER', 'Eritrea'],
+    ['EE', 'Estonia'],
+    ['SZ', 'Eswatini'],
+    ['ET', 'Ethiopia'],
+    ['FM', 'Federated States of Micronesia'],
+    ['FJ', 'Fiji'],
+    ['FI', 'Finland'],
+    ['FR', 'France'],
+    ['GA', 'Gabon'],
+    ['GM', 'Gambia'],
+    ['GE', 'Georgia'],
+    ['DE', 'Germany'],
+    ['GH', 'Ghana'],
+    ['GR', 'Greece'],
+    ['GD', 'Grenada'],
+    ['GT', 'Guatemala'],
+    ['GW', 'Guinea Bissau'],
+    ['GN', 'Guinea'],
+    ['GY', 'Guyana'],
+    ['HT', 'Haiti'],
+    ['HN', 'Honduras'],
+    ['HK', 'Hong Kong, China'],
+    ['HU', 'Hungary'],
+    ['IS', 'Iceland'],
+    ['IN', 'India'],
+    ['ID', 'Indonesia'],
+    ['IR', 'Iran'],
+    ['IQ', 'Iraq'],
+    ['IE', 'Ireland'],
+    ['IL', 'Israel'],
+    ['IT', 'Italy'],
+    ['JM', 'Jamaica'],
+    ['JP', 'Japan'],
+    ['JO', 'Jordan'],
+    ['KZ', 'Kazakhstan'],
+    ['KE', 'Kenya'],
+    ['KI', 'Kiribati'],
+    ['XK', 'Kosovo'],
+    ['KW', 'Kuwait'],
+    ['KG', 'Kyrgyzstan'],
+    ['LA', 'Laos'],
+    ['LV', 'Latvia'],
+    ['LB', 'Lebanon'],
+    ['LS', 'Lesotho'],
+    ['LR', 'Liberia'],
+    ['LY', 'Libya'],
+    ['LI', 'Liechtenstein'],
+    ['LT', 'Lithuania'],
+    ['LU', 'Luxembourg'],
+    ['MO', 'Macau, China'],
+    ['MG', 'Madagascar'],
+    ['MW', 'Malawi'],
+    ['MY', 'Malaysia'],
+    ['MV', 'Maldives'],
+    ['ML', 'Mali'],
+    ['MT', 'Malta'],
+    ['MH', 'Marshall Islands'],
+    ['MR', 'Mauritania'],
+    ['MU', 'Mauritius'],
+    ['MX', 'Mexico'],
+    ['MD', 'Moldova'],
+    ['MC', 'Monaco'],
+    ['MN', 'Mongolia'],
+    ['ME', 'Montenegro'],
+    ['MA', 'Morocco'],
+    ['MZ', 'Mozambique'],
+    ['MM', 'Myanmar'],
+    ['NA', 'Namibia'],
+    ['NR', 'Nauru'],
+    ['NP', 'Nepal'],
+    ['NL', 'Netherlands'],
+    ['NZ', 'New Zealand'],
+    ['NI', 'Nicaragua'],
+    ['NE', 'Niger'],
+    ['NG', 'Nigeria'],
+    ['MK', 'North Macedonia'],
+    ['NO', 'Norway'],
+    ['OM', 'Oman'],
+    ['PK', 'Pakistan'],
+    ['PW', 'Palau'],
+    ['PS', 'Palestine'],
+    ['PA', 'Panama'],
+    ['PG', 'Papua New Guinea'],
+    ['PY', 'Paraguay'],
+    ['PE', 'Peru'],
+    ['PH', 'Philippines'],
+    ['PL', 'Poland'],
+    ['PT', 'Portugal'],
+    ['QA', 'Qatar'],
+    ['KR', 'Republic of Korea'],
+    ['RO', 'Romania'],
+    ['RU', 'Russia'],
+    ['RW', 'Rwanda'],
+    ['KN', 'Saint Kitts and Nevis'],
+    ['LC', 'Saint Lucia'],
+    ['VC', 'Saint Vincent and the Grenadines'],
+    ['WS', 'Samoa'],
+    ['SM', 'San Marino'],
+    ['ST', 'São Tomé and Príncipe'],
+    ['SA', 'Saudi Arabia'],
+    ['SN', 'Senegal'],
+    ['RS', 'Serbia'],
+    ['SC', 'Seychelles'],
+    ['SL', 'Sierra Leone'],
+    ['SG', 'Singapore'],
+    ['SK', 'Slovakia'],
+    ['SI', 'Slovenia'],
+    ['SB', 'Solomon Islands'],
+    ['SO', 'Somalia'],
+    ['ZA', 'South Africa'],
+    ['SS', 'South Sudan'],
+    ['ES', 'Spain'],
+    ['LK', 'Sri Lanka'],
+    ['SD', 'Sudan'],
+    ['SR', 'Suriname'],
+    ['SE', 'Sweden'],
+    ['CH', 'Switzerland'],
+    ['SY', 'Syria'],
+    ['TJ', 'Tajikistan'],
+    ['TZ', 'Tanzania'],
+    ['TH', 'Thailand'],
+    ['TL', 'Timor-Leste'],
+    ['TG', 'Togo'],
+    ['TO', 'Tonga'],
+    ['TT', 'Trinidad and Tobago'],
+    ['TN', 'Tunisia'],
+    ['TR', 'Turkey'],
+    ['TM', 'Turkmenistan'],
+    ['TV', 'Tuvalu'],
+    ['UG', 'Uganda'],
+    ['UA', 'Ukraine'],
+    ['AE', 'United Arab Emirates'],
+    ['GB', 'United Kingdom'],
+    ['US', 'United States'],
+    ['UY', 'Uruguay'],
+    ['UZ', 'Uzbekistan'],
+    ['VA', 'Vatican City'],
+    ['VU', 'Vanuatu'],
+    ['VE', 'Venezuela'],
+    ['VN', 'Vietnam'],
+    ['YE', 'Yemen'],
+    ['ZM', 'Zambia'],
+    ['ZW', 'Zimbabwe'],
+];
+
+(function initNewsletterSection() {
+    const form = document.getElementById('newsletter-form');
+    const countrySelect = document.getElementById('newsletter-country');
+    const emailInput = document.getElementById('newsletter-email');
+    const submitBtn = document.getElementById('newsletter-submit');
+    const statusEl = document.getElementById('newsletter-status');
+
+    if (!form || !countrySelect) {
+        return;
+    }
+
+    // Populate country dropdown
+    NEWSLETTER_COUNTRIES.forEach(([code, name]) => {
+        const option = document.createElement('option');
+        option.value = code;
+        option.textContent = name;
+        countrySelect.appendChild(option);
+    });
+
+    // Handle URL query params for feedback after redirect
+    function handleNewsletterQueryParams() {
+        const params = new URLSearchParams(window.location.search);
+        const newsletterStatus = params.get('newsletter');
+        const reminderStatus = params.get('reminder');
+
+        const messages = {
+            newsletter: {
+                'confirmed': {
+                    type: 'success',
+                    text: 'Your subscription is confirmed. You will receive emails when new competitions are announced in your country.',
+                },
+                'already-confirmed': {
+                    type: 'info',
+                    text: 'This email address is already subscribed.',
+                },
+                'unsubscribed': {
+                    type: 'success',
+                    text: 'You have been unsubscribed and will no longer receive competition emails.',
+                },
+                'not-found': {
+                    type: 'error',
+                    text: 'Subscription not found. It may have already been removed.',
+                },
+                'invalid': { type: 'error', text: 'The link is invalid or has expired.' },
+                'error': { type: 'error', text: 'Something went wrong. Please try again later.' },
+            },
+            reminder: {
+                'set': {
+                    type: 'success',
+                    text: 'You will be reminded when registration opens for that competition.',
+                },
+                'already-set': {
+                    type: 'info',
+                    text: 'You already have a reminder set for this competition.',
+                },
+                'cancelled': {
+                    type: 'success',
+                    text: 'Your registration reminder has been cancelled.',
+                },
+                'not-found': {
+                    type: 'error',
+                    text: 'Reminder not found. It may have already been removed.',
+                },
+                'invalid': { type: 'error', text: 'The reminder link is invalid or has expired.' },
+                'error': { type: 'error', text: 'Something went wrong. Please try again later.' },
+            },
+        };
+
+        let msg = null;
+        if (newsletterStatus && messages.newsletter[newsletterStatus]) {
+            msg = messages.newsletter[newsletterStatus];
+        } else if (reminderStatus && messages.reminder[reminderStatus]) {
+            msg = messages.reminder[reminderStatus];
+        }
+
+        if (msg && statusEl) {
+            showStatus(msg.text, msg.type);
+
+            // Scroll to and briefly highlight the newsletter section
+            const section = document.getElementById('newsletter');
+            if (section) {
+                section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            // Clean query params from URL without reloading
+            const cleanUrl = window.location.pathname;
+            window.history.replaceState(null, '', cleanUrl);
+        }
+    }
+
+    function showStatus(text, type = 'info') {
+        if (!statusEl) {
+            return;
+        }
+        statusEl.textContent = text;
+        statusEl.className = `newsletter-notice newsletter-notice--${type}`;
+        statusEl.hidden = false;
+    }
+
+    function hideStatus() {
+        if (!statusEl) {
+            return;
+        }
+        statusEl.hidden = true;
+        statusEl.textContent = '';
+        statusEl.className = 'newsletter-notice';
+    }
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        hideStatus();
+
+        const email = emailInput ? emailInput.value.trim() : '';
+        const country = countrySelect.value;
+
+        if (!country) {
+            showStatus('Please select a country.', 'error');
+            countrySelect.focus();
+            return;
+        }
+
+        if (!email) {
+            showStatus('Please enter your email address.', 'error');
+            emailInput && emailInput.focus();
+            return;
+        }
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Subscribing…';
+        }
+
+        try {
+            await window.fetchJsonOrThrow('/api/newsletter/subscribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, country }),
+                errorContext: 'Newsletter subscription failed',
+            });
+
+            showStatus(
+                'Almost done! Check your inbox and click the confirmation link to activate your subscription.',
+                'success',
+            );
+            form.reset();
+        } catch (error) {
+            const msg =
+                error?.payload?.error ||
+                error?.message ||
+                'Subscription failed. Please try again later.';
+            showStatus(msg, 'error');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Subscribe';
+            }
+        }
+    });
+
+    handleNewsletterQueryParams();
+})();

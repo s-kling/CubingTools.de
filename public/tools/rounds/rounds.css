@@ -789,6 +789,40 @@
     font-weight: 500;
 }
 
+/* Actual (live) result — shown in success green */
+.scout-time.live {
+    color: var(--success);
+    font-weight: 600;
+}
+
+/* Row that contains a real competition result */
+.scout-ranked-row.has-real-result {
+    background: color-mix(in srgb, var(--success) 4%, transparent);
+}
+
+/* ── Advancement indicators ──────────────────────────────── */
+
+/* Ranks 4+ that are expected to (or did) advance */
+.scout-rank.advancing {
+    background: color-mix(in srgb, var(--success) 18%, transparent);
+    color: var(--success);
+}
+
+/* Competitor who didn't participate when others in the round did */
+.scout-rank.inactive {
+    background: var(--main-lighter);
+    color: var(--secondary-text);
+    opacity: 0.55;
+}
+.scout-ranked-row.inactive-row {
+    opacity: 0.6;
+}
+
+/* Dashed cutoff line after the last advancing row */
+.scout-ranked-row.last-advancing td {
+    border-bottom: 2px dashed color-mix(in srgb, var(--success) 55%, transparent);
+}
+
 /* ── Probability bar ───────────────────────────────────────── */
 .scout-prob-wrap {
     display: flex;

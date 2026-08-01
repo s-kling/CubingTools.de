@@ -2,9 +2,13 @@ import express from 'express';
 import path from 'path';
 const router = express.Router();
 import events from '../events.js';
+import { db } from '../firebase.js';
+import NewsletterApi from './API/newsletter.api.js';
 
 // Import logging from ../server.js
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
+
+const newsletterApi = new NewsletterApi(db);
 
 // Allowlist: tool/asset names may only contain alphanumeric chars, hyphens, and underscores.
 const SAFE_NAME_RE = /^[a-zA-Z0-9_-]+$/;
@@ -50,6 +54,18 @@ router.get('/events', (req, res) => {
 router.get('/contact', (req, res) => {
     res.sendFile(path.join(__dirname, '..', '../public/html', 'contact.html'));
 });
+
+// Newsletter confirmation
+router.get('/newsletter/confirm', (req, res) => newsletterApi.handleConfirm(req, res));
+
+// Newsletter unsubscribe
+router.get('/newsletter/unsubscribe', (req, res) => newsletterApi.handleUnsubscribe(req, res));
+
+// Newsletter registration reminder opt-in
+router.get('/newsletter/remind', (req, res) => newsletterApi.handleSetReminder(req, res));
+
+// Newsletter reminder cancel
+router.get('/newsletter/remind/cancel', (req, res) => newsletterApi.handleCancelReminder(req, res));
 
 // Serve the ban appeal page
 router.get('/contact/appeal', (req, res) => {

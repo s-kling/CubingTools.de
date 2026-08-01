@@ -260,29 +260,30 @@
                                 1: 'Best of 1',
                                 2: 'Best of 2',
                                 3: 'Best of 3',
+                                5: 'Best of 5',
                             }[r.format] || r.format;
                         const resultCount = r.results?.length;
                         return `
-          <button class="scout-round-btn"
-            data-comp="${esc(ov.id)}"
-            data-event="${esc(ev.id)}"
-            data-round="${esc(r.id)}"
-            data-label="${esc(name)} — ${esc(lbl)}">
-            <span class="scout-round-label">${lbl}</span>
-            <span class="scout-round-meta">${fmt}${resultCount ? ` · ${resultCount} results` : ''}</span>
-            <span style="color:var(--secondary-text)">›</span>
-          </button>`;
+                            <button class="scout-round-btn"
+                                data-comp="${esc(ov.id)}"
+                                data-event="${esc(ev.id)}"
+                                data-round="${esc(r.id)}"
+                                data-label="${esc(name)} — ${esc(lbl)}">
+                                <span class="scout-round-label">${lbl}</span>
+                                <span class="scout-round-meta">${fmt}${resultCount ? ` · ${resultCount} results` : ''}</span>
+                                <span style="color:var(--secondary-text)">›</span>
+                            </button>`;
                     })
                     .join('');
 
                 return `
-        <div class="scout-event-block">
-          <div class="scout-event-header">
-            <span class="scout-event-icon">${icon}</span>
-            <span>${name}</span>
-          </div>
-          <div class="scout-rounds-list">${rounds}</div>
-        </div>`;
+                            <div class="scout-event-block">
+                            <div class="scout-event-header">
+                                <span class="scout-event-icon">${icon}</span>
+                                <span>${name}</span>
+                            </div>
+                            <div class="scout-rounds-list">${rounds}</div>
+                            </div>`;
             })
             .join('')}</div>`;
 
@@ -401,23 +402,24 @@
                 currentAnalysis.meta = msg;
 
                 let html = `
-                <div class="scout-analysis-pills" id="scoutAnalysisPills">
-                    <span class="scout-pill">Registered<strong>${msg.totalRegistered}</strong></span>
-                    <span class="scout-pill">Ranked <strong id="scoutRankedCount">0</strong> / <strong>${msg.totalRegistered - msg.unranked.length}</strong></span>
-                </div>
-                ${isLive ? `<div class="scout-update-note" id="scoutUpdateNote">Live — fetching histories…</div>` : ''}
-                <div class="scout-table-wrap">
-                    <table class="scout-table" id="scoutRankTable">
-                        <thead><tr>
-                            <th style="width:36px">#</th>
-                            <th id="scoutCompetitorHeaderSearch">Competitor</th>
-                            <th class="r">Exp. time</th>
-                            <th class="r">Podium %</th>
-                            <th style="width:28px"></th>
-                        </tr></thead>
-                        <tbody id="scoutRankBody"></tbody>
-                    </table>
-                </div>`;
+                    <div class="scout-analysis-pills" id="scoutAnalysisPills">
+                        <span class="scout-pill">Registered<strong>${msg.totalRegistered}</strong></span>
+                        <span class="scout-pill">Ranked <strong id="scoutRankedCount">0</strong> / <strong>${msg.totalRegistered - msg.unranked.length}</strong></span>
+                        <span class="scout-pill" id="scoutNoDataPill" style="display:none">No data <strong>0</strong></span>
+                    </div>
+                    ${isLive ? `<div class="scout-update-note" id="scoutUpdateNote">Live — fetching histories…</div>` : ''}
+                    <div class="scout-table-wrap">
+                        <table class="scout-table" id="scoutRankTable">
+                            <thead><tr>
+                                <th style="width:36px">#</th>
+                                <th id="scoutCompetitorHeaderSearch">Competitor</th>
+                                <th class="r" id="scoutTimeHeader">Exp. time</th>
+                                <th class="r">Podium %</th>
+                                <th style="width:28px"></th>
+                            </tr></thead>
+                            <tbody id="scoutRankBody"></tbody>
+                        </table>
+                    </div>`;
 
                 // Append unranked rows at the bottom right away
                 if (msg.unranked?.length) {
@@ -425,13 +427,13 @@
                         ${msg.unranked
                             .map(
                                 (u) => `
-                            <div class="scout-unranked-row">
-                                <span class="scout-rank">—</span>
-                                <span style="font-size:0.8rem;color:var(--secondary-text)">${esc(u.name)} <span style="opacity:0.6">(no history)</span></span>
-                            </div>`,
+                                    <div class="scout-unranked-row">
+                                        <span class="scout-rank">—</span>
+                                        <span style="font-size:0.8rem;color:var(--secondary-text)">${esc(u.name)} <span style="opacity:0.6">(no history)</span></span>
+                                    </div>`,
                             )
                             .join('')}
-                        </div>`;
+                            </div>`;
                 }
 
                 $overlayBody.innerHTML = html;
@@ -502,13 +504,14 @@
                 // All profiles done — replace pending rows with final ranked rows
                 currentAnalysis.data = {
                     rankings: msg.rankings,
+                    noProfile: msg.noProfile || [],
                     unranked: currentAnalysis.meta?.unranked || [],
                     totalRegistered: currentAnalysis.meta?.totalRegistered || 0,
                 };
                 lastRefresh = new Date();
 
                 // Swap in final sorted rows with real probabilities
-                renderFinalRankings(msg.rankings);
+                renderFinalRankings(msg.rankings, msg.noProfile || []);
 
                 // Update status line
                 const note = document.getElementById('scoutUpdateNote');
@@ -517,9 +520,23 @@
                     note.textContent = `Updated ${lastRefresh.toLocaleTimeString()}${isLive ? ' · auto-refresh in 60 s' : ''}`;
                 }
 
-                // Update pill counter
+                // Update pill counter — show ranked count and, if any have no data, a sub-note
                 const rankedCount = document.getElementById('scoutRankedCount');
-                if (rankedCount) rankedCount.textContent = msg.rankings.length;
+                if (rankedCount) {
+                    rankedCount.textContent = msg.rankings.length;
+                    if (msg.noProfile?.length) {
+                        rankedCount.title = `${msg.noProfile.length} competitor${msg.noProfile.length !== 1 ? 's' : ''} shown below with no event history`;
+                    }
+                }
+                const noDataPill = document.getElementById('scoutNoDataPill');
+                if (noDataPill) {
+                    if (msg.noProfile?.length) {
+                        noDataPill.style.display = '';
+                        noDataPill.querySelector('strong').textContent = msg.noProfile.length;
+                    } else {
+                        noDataPill.style.display = 'none';
+                    }
+                }
                 break;
             }
 
@@ -560,36 +577,115 @@
         }
 
         row.innerHTML = `
-        <td><span class="scout-rank">…</span></td>
-        <td>
-            ${flag(profileMsg.country || '')}
-            ${esc(profileMsg.name)}
-            ${profileMsg.profile?.type === 'live' ? '<span class="scout-live-dot" title="Live result"></span>' : ''}
-            ${profileMsg.error ? '<span style="font-size:0.7rem;color:var(--color-warning-text);margin-left:4px">no data</span>' : ''}
-        </td>
-        <td class="r">
-            <span class="scout-time">${
-                expCs !== null && expCs !== undefined
-                    ? currentAnalysis?.eventId === '333fm'
-                        ? expCs
-                        : fmtTime(expCs)
-                    : '—'
-            }</span>
-        </td>
-        <td class="r" colspan="2">
-            <span style="font-size:0.72rem;color:var(--secondary-text);font-style:italic">computing…</span>
-        </td>`;
+                <td><span class="scout-rank">…</span></td>
+                <td>
+                    ${flag(profileMsg.country || '')}
+                    ${esc(profileMsg.name)}
+                    ${profileMsg.profile?.type === 'live' ? '<span class="scout-live-dot" title="Live result"></span>' : ''}
+                    ${profileMsg.error ? '<span style="font-size:0.7rem;color:var(--color-warning-text);margin-left:4px">no data</span>' : ''}
+                </td>
+                <td class="r">
+                    <span class="scout-time">${
+                        expCs !== null && expCs !== undefined
+                            ? currentAnalysis?.eventId === '333fm'
+                                ? expCs
+                                : fmtTime(expCs)
+                            : '—'
+                    }</span>
+                </td>
+                <td class="r" colspan="2">
+                    <span style="font-size:0.72rem;color:var(--secondary-text);font-style:italic">computing…</span>
+                </td>`;
     }
 
-    function renderFinalRankings(rankings) {
+    // ── Advancing-set computation ────────────────────────────────────────
+    // Returns a Set<wcaId> of competitors who are expected to (or did) advance.
+    function computeAdvancingSet(rankings, advCond, hasRealResults) {
+        const set = new Set();
+        if (!advCond) return set;
+
+        function cutoffCount(list, cond) {
+            if (cond.type === 'percent') return Math.ceil((list.length * cond.level) / 100);
+            if (cond.type === 'ranking') return Math.min(cond.level, list.length);
+            if (cond.type === 'attemptResult') {
+                const limitSec = cond.level / 100;
+                return list.filter((r) => r.profile?.mean && r.profile.mean <= limitSec).length;
+            }
+            return 0;
+        }
+
+        if (hasRealResults) {
+            // Only those who actually competed can advance; sort by actual mean (asc)
+            const withReal = rankings
+                .filter((r) => r.profile?.type === 'live')
+                .sort((a, b) => (a.profile.mean || Infinity) - (b.profile.mean || Infinity));
+            const n = cutoffCount(withReal, advCond);
+            withReal.slice(0, n).forEach((r) => set.add(r.wcaId));
+        } else {
+            const n = cutoffCount(rankings, advCond);
+            rankings.slice(0, n).forEach((r) => set.add(r.wcaId));
+        }
+        return set;
+    }
+
+    function renderFinalRankings(rankings, noProfile = []) {
         const tbody = document.getElementById('scoutRankBody');
         if (!tbody) return;
+
+        const hasRealResults = rankings.some((r) => r.profile?.type === 'live');
+        const advCond = currentAnalysis.meta?.advancementCondition || null;
+
+        // Update the column header to reflect whether any real results are shown
+        const timeHeader = document.getElementById('scoutTimeHeader');
+        if (timeHeader) timeHeader.textContent = hasRealResults ? 'Time' : 'Exp. time';
+
+        // Compute which competitors are advancing (or expected to)
+        const advancingSet = computeAdvancingSet(rankings, advCond, hasRealResults);
+
+        // Find the last index in the display order that is advancing
+        // (used to draw a divider line at the qualifying cutoff)
+        let lastAdvancingIdx = -1;
+        if (advancingSet.size > 0) {
+            for (let i = rankings.length - 1; i >= 0; i--) {
+                if (advancingSet.has(rankings[i].wcaId)) {
+                    lastAdvancingIdx = i;
+                    break;
+                }
+            }
+        }
 
         tbody.innerHTML = rankings
             .map((r, i) => {
                 const rank = i + 1;
-                const rankCls =
-                    rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+                const isActual = r.profile?.type === 'live';
+                // A competitor without a real result in a round that has real results
+                // means they didn't participate (DNS / withdrew / no-show)
+                const isInactive = hasRealResults && !isActual;
+                const isAdvancing = advancingSet.has(r.wcaId);
+
+                // Rank badge class: inactive overrides everything; otherwise
+                // gold/silver/bronze take precedence over the advancing green.
+                const rankCls = isInactive
+                    ? 'inactive'
+                    : rank === 1
+                      ? 'gold'
+                      : rank === 2
+                        ? 'silver'
+                        : rank === 3
+                          ? 'bronze'
+                          : isAdvancing
+                            ? 'advancing'
+                            : '';
+
+                const rowClasses = [
+                    'scout-ranked-row',
+                    isActual ? 'has-real-result' : '',
+                    isInactive ? 'inactive-row' : '',
+                    i === lastAdvancingIdx ? 'last-advancing' : '',
+                ]
+                    .filter(Boolean)
+                    .join(' ');
+
                 let expCs = null;
                 if (r.profile?.mean) {
                     if (currentAnalysis?.eventId === '333fm') {
@@ -600,20 +696,22 @@
                 }
                 const pod = r.podiumProbability || 0;
 
-                return `<tr data-idx="${i}" class="scout-ranked-row">
+                const timeDisplay =
+                    expCs !== null && expCs !== undefined
+                        ? currentAnalysis?.eventId === '333fm'
+                            ? expCs.toFixed(2)
+                            : fmtTime(expCs)
+                        : '—';
+
+                return `<tr data-idx="${i}" class="${rowClasses}">
             <td><span class="scout-rank ${rankCls}">${rank}</span></td>
             <td>
                 ${flag(r.countryIso2 || '')}
                 ${esc(r.name)}
-                ${r.profile?.type === 'live' ? '<span class="scout-live-dot" title="Live result"></span>' : ''}
             </td>
-            <td class="r"><span class="scout-time">${
-                expCs !== null && expCs !== undefined
-                    ? currentAnalysis?.eventId === '333fm'
-                        ? expCs.toFixed(2)
-                        : fmtTime(expCs)
-                    : '—'
-            }</span></td>
+            <td class="r">
+                <span class="scout-time${isActual ? ' live' : ''}">${timeDisplay}</span>${isActual ? ' <span class="scout-live-dot" title="Actual result"></span>' : ''}
+            </td>
             <td class="r">
                 <div class="scout-prob-wrap">
                     <div class="scout-prob-bar">
@@ -626,6 +724,21 @@
         </tr>`;
             })
             .join('');
+
+        // Append competitors with WCA IDs but no event history at the bottom
+        if (noProfile.length > 0) {
+            tbody.innerHTML += noProfile
+                .map(
+                    (u) => `
+                <tr class="scout-ranked-row inactive-row">
+                    <td><span class="scout-rank inactive">—</span></td>
+                    <td>${flag(u.countryIso2 || '')} ${esc(u.name)} <span style="font-size:0.7rem;color:var(--secondary-text);margin-left:4px">no data</span></td>
+                    <td class="r" style="color:var(--secondary-text)">—</td>
+                    <td class="r" colspan="2"></td>
+                </tr>`,
+                )
+                .join('');
+        }
 
         // Re-wire inspect buttons on the new rows
         tbody.querySelectorAll('.scout-inspect-btn').forEach((btn) => {

@@ -20,11 +20,11 @@
     bottom: 0;
     z-index: 2;
 }
+
 main {
     display: flex;
     flex-direction: column;
     background: var(--main-background);
-    padding-bottom: 0;
 }
 
 ul li::before {
@@ -1985,10 +1985,6 @@ main.timer-running .compsim-toolbar {
 @media (max-width: 650px) {
     main.timer-running ~ footer {
         display: none;
-    }
-
-    main {
-        padding-bottom: calc(var(--mobile-bottom-bar) + var(--space-md) + env(safe-area-inset-bottom, 0px));
     }
 
     /* ── Modals: cap height so they don't extend under the bottom nav ── */

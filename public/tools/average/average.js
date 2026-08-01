@@ -23,7 +23,8 @@ const state = {
     inspectionTime: null, // seconds used in the last inspection
 };
 
-const meanEvents = ['666', '777', '444bf', '555bf', '333bf'];
+// Events that use Mean of 3 rather than Average of 5
+const meanEvents = ['666', '777', '444bf', '555bf'];
 
 // === Format input field on input ===
 document.getElementById('timeInput').addEventListener('input', (e) => {
@@ -244,25 +245,6 @@ function updateAveragesEmptyState() {
 
 let statsAvgChart = null;
 let statsInspChart = null;
-
-// === Normal distribution helpers (used by bell-curve MLA calculation) ===
-function normalPdf(z) {
-    return Math.exp(-0.5 * z * z) / Math.sqrt(2 * Math.PI);
-}
-
-function normalCdf(z) {
-    // Abramowitz & Stegun erf approximation, max error < 1.5e-7
-    const sign = z >= 0 ? 1 : -1;
-    const a = Math.abs(z) / Math.SQRT2;
-    const t = 1 / (1 + 0.3275911 * a);
-    const erf =
-        sign *
-        (1 -
-            (0.254829592 * t +
-                t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429)))) *
-                Math.exp(-a * a));
-    return 0.5 * (1 + erf);
-}
 
 function calcStatsTrend(data) {
     const n = data.length;
@@ -665,12 +647,12 @@ function addTime() {
     state.times.push({
         raw: time,
         penalty: penalty,
-        value: time,
+        value: penalty === 'dnf' ? Infinity : time,
         event: event,
         averageId: averageId,
         scramble: state.currentScramble,
     });
-    state.userSolves.push(time); // add to user solves for ranking
+    if (penalty !== 'dnf') state.userSolves.push(time); // add to user solves for ranking
 
     // Track session PR single
     if (
@@ -715,8 +697,10 @@ function calculateStats() {
     const duringAverageElem = document.querySelectorAll('.during-average');
     const afterAverageElem = document.querySelectorAll('.after-average');
 
-    const mean = (state.times.reduce((a, b) => a + b.value, 0) / n).toFixed(2);
-    if (meanElem) meanElem.textContent = isFinite(mean) ? formatTime(parseFloat(mean)) : 'DNF';
+    const mean = n > 0 ? (state.times.reduce((a, b) => a + b.value, 0) / n).toFixed(2) : null;
+    if (meanElem)
+        meanElem.textContent =
+            mean === null ? '-' : isFinite(mean) ? formatTime(parseFloat(mean)) : 'DNF';
 
     if (n !== required && n !== required - 1) {
         if (bpaElem) bpaElem.textContent = '-';
@@ -834,6 +818,11 @@ function calculateStats() {
         isFinite(wpa) &&
         state.userSolves.length >= 5;
 
+    // Mo3 MLA: expected mean with a 3rd solve sampled from historical distribution
+    const finiteSolvesForMla = state.userSolves.filter((s) => isFinite(s));
+    const canShowMlaMo3 =
+        n === 2 && meanEvents.includes(state.eventType) && finiteSolvesForMla.length >= 3;
+
     if (canShowProb) {
         const currentValues = state.times.map((t) =>
             t.penalty === 'dnf' || t.value === Infinity ? Infinity : t.value,
@@ -884,7 +873,8 @@ function calculateStats() {
                 mlaElem.textContent = '-';
                 if (mlaSolveElem) mlaSolveElem.textContent = '';
             } else {
-                // Sample 5th solve from historical distribution and compute expected ao5
+                // Monte Carlo MLA: sample the 5th solve 5 000 times from historical distribution,
+                // compute the resulting Ao5 each time, and average the finite results.
                 const iterations = 5000;
                 const results = [];
                 for (let i = 0; i < iterations; i++) {
@@ -928,10 +918,39 @@ function calculateStats() {
             probWpaElem.style.background = '';
             probWpaElem.style.color = '';
         }
-        const mlaElemReset = document.getElementById('mla');
-        const mlaSolveElemReset = document.getElementById('mla-solve');
-        if (mlaElemReset) mlaElemReset.textContent = '-';
-        if (mlaSolveElemReset) mlaSolveElemReset.textContent = '';
+        const mlaElem = document.getElementById('mla');
+        const mlaSolveElem = document.getElementById('mla-solve');
+        if (canShowMlaMo3) {
+            // Sample the 3rd solve from history and compute the expected Mo3
+            const currentMo3Values = state.times.map((t) =>
+                t.penalty === 'dnf' || !isFinite(t.value) ? Infinity : t.value,
+            );
+            const iterations = 2000;
+            const results = [];
+            for (let i = 0; i < iterations; i++) {
+                const x3 =
+                    finiteSolvesForMla[Math.floor(Math.random() * finiteSolvesForMla.length)];
+                const mean3 = (currentMo3Values[0] + currentMo3Values[1] + x3) / 3;
+                results.push(isFinite(mean3) ? mean3 : Infinity);
+            }
+            const finiteResults = results.filter((r) => isFinite(r));
+            const expectedMla = finiteResults.length
+                ? finiteResults.reduce((a, b) => a + b, 0) / finiteResults.length
+                : null;
+            const sortedMo3Solves = [...finiteSolvesForMla].sort((a, b) => a - b);
+            const medianSolve = sortedMo3Solves[Math.floor(sortedMo3Solves.length / 2)];
+            if (mlaSolveElem) mlaSolveElem.textContent = `if ${formatTime(medianSolve)}`;
+            if (mlaElem) {
+                if (expectedMla === null) {
+                    mlaElem.textContent = 'DNF';
+                } else {
+                    setStatWithPr(mlaElem, formatTime(expectedMla), getAverageRank(expectedMla));
+                }
+            }
+        } else {
+            if (mlaElem) mlaElem.textContent = '-';
+            if (mlaSolveElem) mlaSolveElem.textContent = '';
+        }
     }
 
     const event = document.getElementById('event-type').value;
@@ -1014,6 +1033,9 @@ function calculateStats() {
 }
 
 // === BPA / WPA / TFT calculation ===
+// BPA (Best Possible Average): best Ao5 still achievable with any next solve
+// WPA (Worst Possible Average): worst Ao5 if the next solve is maximally bad (DNF)
+// TFT (Time For Target): exact next-solve time needed to hit the target average
 function calculateBpaWpaTft(times, target) {
     // For mean events (6x6, 7x7, BLD)
     if (times.length === 2 && meanEvents.includes(state.eventType)) {
@@ -1030,16 +1052,19 @@ function calculateBpaWpaTft(times, target) {
 
         const sum = mappedTimes.reduce((a, b) => a + b, 0);
 
+        // BPA: theoretical floor — best mean achievable if the 3rd solve were near zero
+        // WPA: any DNF on solve 3 makes the entire Mo3 a DNF
+        const bpa = sum / 3;
+        const wpa = 'DNF';
+
+        // TFT: (s1 + s2 + x) / 3 = target  →  x = 3·target − sum
         let tft = null;
-        if (target !== Infinity) {
-            const needed = target * 2 - sum;
-            tft = needed;
+        if (target !== Infinity && target > 0) {
+            tft = target * 3 - sum;
         }
+        // If the floor itself exceeds target, no 3rd solve can help
+        if (tft !== null && bpa > target) tft = 'Not Possible';
 
-        if (target <= 0 || dnfCount > 0) tft = 'Not Possible';
-
-        let bpa = '-';
-        let wpa = '-';
         return { bpa, wpa, tft };
     } else if (times.length === 4) {
         // Get last 4 times as numbers (handle DNF)
@@ -1143,7 +1168,8 @@ function displayCurrentTimes() {
             displayText = `(${displayText})`;
         }
 
-        const rank = getSingleRank(solve.value);
+        const rank =
+            solve.penalty !== 'dnf' && isFinite(solve.value) ? getSingleRank(solve.value) : null;
 
         // Add PR pill if rank exists
         textSpan.textContent = displayText;
@@ -1266,9 +1292,12 @@ function createButton({ text, icon, color, type = 'confirm', onClick }) {
     return btn;
 }
 
-// === Apply penalty to a solve ===
+// === Apply or remove a penalty on a solve ===
+// type: 'plus2' | 'dnf' | null  (null clears any existing penalty)
 function applyPenalty(index, type) {
     const solve = state.times[index];
+    if (!solve) return;
+    if (type === null && !solve.penalty) return; // nothing to clear
 
     if (type === 'plus2') {
         solve.penalty = 'plus2';
@@ -1276,14 +1305,15 @@ function applyPenalty(index, type) {
     } else if (type === 'dnf') {
         solve.penalty = 'dnf';
         solve.value = Infinity;
+    } else {
+        // type === null — clear penalty
+        solve.penalty = null;
+        solve.value = solve.raw;
     }
 
-    // Use average ID to remove the average from the list, then re-add it with the penalty applied
-    const avgId = solve.averageId;
-    // Remove from list
-    state.averageTags = state.averageTags.filter((tag) => tag.averageId !== avgId);
+    // Invalidate the parent average so it is recalculated with the updated penalty
+    state.averageTags = state.averageTags.filter((tag) => tag.averageId !== solve.averageId);
     saveAverages();
-    // Remove from averages
     state.userAverages.shift();
 
     calculateStats();
@@ -1291,25 +1321,9 @@ function applyPenalty(index, type) {
     saveIncomplete();
 }
 
-// === Remove penalty from a solve ===
+// Convenience wrapper — removes any penalty from a solve
 function removePenalty(index) {
-    const solve = state.times[index];
-    if (!solve || !solve.penalty) return; // no penalty to remove
-
-    solve.penalty = null;
-    solve.value = solve.raw;
-
-    // Use average ID to remove the average from the list, then re-add it with the penalty applied
-    const avgId = solve.averageId;
-    // Remove from list
-    state.averageTags = state.averageTags.filter((tag) => tag.averageId !== avgId);
-    saveAverages();
-    // Remove from averages
-    state.userAverages.shift();
-
-    calculateStats();
-    displayCurrentTimes();
-    saveIncomplete();
+    applyPenalty(index, null);
 }
 
 // === Edit modal ===
@@ -1638,16 +1652,18 @@ async function fetchUserData(wcaId) {
 }
 
 // === Rank helpers ===
+// Returns the 1-based rank of `time` within `list` (lowest value = rank 1)
+function rankIn(time, list) {
+    return [...list, time].sort((a, b) => a - b).indexOf(time) + 1;
+}
+
 function getSingleRank(time) {
-    const sorted = [...state.userSolves, time].sort((a, b) => a - b);
-    return sorted.indexOf(time) + 1;
+    return rankIn(time, state.userSolves);
 }
 
 function getAverageRank(time) {
-    if (time === 'DNF') return state.userAverages.length;
-    time = parseFloat(time);
-    const sorted = [...state.userAverages, time].sort((a, b) => a - b);
-    return sorted.indexOf(time) + 1;
+    if (time === 'DNF' || !isFinite(parseFloat(time))) return null;
+    return rankIn(parseFloat(time), state.userAverages);
 }
 
 // === Handle PR target checkbox ===
@@ -1694,11 +1710,15 @@ usePrCheckbox.addEventListener('change', () => {
 });
 
 // === GOAL MODE ===
+// Automatically adjusts the session target based on recent performance.
+// After each completed average the target steps 10 % of the gap toward the goal time.
+// Performance is smoothed with an asymmetric EMA: quick to register improvement (α=0.3),
+// slow to penalise regression (α=0.05), so a bad round barely hurts you.
 
-// Asymmetric EMA: respond quickly to improvement, slowly to regression
+// Asymmetric EMA weights
 const GOAL_ALPHA_IMPROVE = 0.3;
 const GOAL_ALPHA_REGRESS = 0.05;
-// Step toward goal per completed average (10% of the remaining gap)
+// Gradient step: fraction of the gap between smoothed performance and the goal
 const GOAL_GRADIENT = 0.1;
 
 function getGoalEventKey() {
@@ -1945,7 +1965,9 @@ function flushSave() {
     }
 }
 
-// Migrate legacy cookies to localStorage on first load
+// === STORAGE MIGRATION ===
+// One-time migration: moves old per-event cookie data (averages_*, incomplete_*)
+// into unified localStorage keys (ct_averages, ct_incomplete_*) on first load.
 (function migrateCookies() {
     const cookies = document.cookie.split('; ').filter(Boolean);
     for (const cookie of cookies) {
@@ -2346,37 +2368,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // Restore inspection settings
-    const inspEnabled = getStorage('setting_inspection_enabled') === true;
-    const inspEnabledEl = document.getElementById('settingsInspectionEnabled');
-    if (inspEnabledEl) {
-        inspEnabledEl.checked = inspEnabled;
-        const subEl = document.getElementById('inspectionSubSettings');
-        if (subEl) subEl.style.display = inspEnabled ? 'block' : 'none';
-    }
-    const inspEvents = getStorage('setting_inspection_events') || 'notBlind';
-    const inspAllBtn = document.getElementById('settingsInspectionEventsAll');
-    const inspNotBlindBtn = document.getElementById('settingsInspectionEventsNotBlind');
-    if (inspAllBtn && inspNotBlindBtn) {
-        if (inspEvents === 'all') {
-            inspAllBtn.classList.add('active');
-            inspNotBlindBtn.classList.remove('active');
-        } else {
-            inspNotBlindBtn.classList.add('active');
-            inspAllBtn.classList.remove('active');
-        }
-    }
-    const inspType = getStorage('setting_inspection_type') || 'normal';
-    const inspNormalBtn = document.getElementById('settingsInspectionNormal');
-    const inspInfiniteBtn = document.getElementById('settingsInspectionInfinite');
-    if (inspNormalBtn && inspInfiniteBtn) {
-        if (inspType === 'infinite') {
-            inspInfiniteBtn.classList.add('active');
-            inspNormalBtn.classList.remove('active');
-        } else {
-            inspNormalBtn.classList.add('active');
-            inspInfiniteBtn.classList.remove('active');
-        }
-    }
+    applyInspectionSettings();
 
     // Restore display settings
     for (const [elemId, settingKey] of DISPLAY_SETTINGS) {
@@ -2461,6 +2453,9 @@ function updateScrambleDrawing(scramble) {
     const puzzle = PUZZLE_MAP[state.eventType] || '3x3x3';
     viewer.puzzle = puzzle;
 
+    // remove <br> from scramble before drawing
+    scramble = scramble ? scramble.replace(/<br>/g, ' ') : '';
+
     if (scramble) {
         viewer.alg = '';
         viewer.experimentalSetupAlg = scramble;
@@ -2482,7 +2477,11 @@ async function fetchScramble() {
         const data = await res.json();
         if (data.scrambles && data.scrambles.length > 0) {
             state.currentScramble = data.scrambles[0];
-            scrambleText.textContent = state.currentScramble;
+            // for Megaminx add <br> after every "U", "'" or "2"
+            if (state.eventType === 'minx') {
+                state.currentScramble = state.currentScramble.replace(/(U'|U)/g, '$1<br>');
+            }
+            scrambleText.innerHTML = state.currentScramble;
             updateScrambleDrawing(state.currentScramble);
         } else {
             scrambleText.textContent = 'No scramble available';
@@ -2502,7 +2501,7 @@ document.getElementById('newScrambleBtn').addEventListener('click', fetchScrambl
 document.getElementById('scrambleText').addEventListener('click', () => {
     if (!state.currentScramble) return;
     const popup = document.getElementById('scrambleFullscreen');
-    document.getElementById('scrambleFullscreenText').textContent = state.currentScramble;
+    document.getElementById('scrambleFullscreenText').innerHTML = state.currentScramble;
     popup.hidden = false;
 });
 
@@ -2602,6 +2601,33 @@ subNavTabs.forEach((tab) => {
     });
 });
 
+// === INSPECTION SETTINGS HELPER ===
+// Reads inspection preferences from storage and syncs them to the settings UI.
+// Called on page load and whenever the settings panel is opened.
+function applyInspectionSettings() {
+    const enabled = getStorage('setting_inspection_enabled') === true;
+    const inspEnabledEl = document.getElementById('settingsInspectionEnabled');
+    if (inspEnabledEl) {
+        inspEnabledEl.checked = enabled;
+        const subEl = document.getElementById('inspectionSubSettings');
+        if (subEl) subEl.style.display = enabled ? 'block' : 'none';
+    }
+    const inspEvents = getStorage('setting_inspection_events') || 'notBlind';
+    const inspAllBtn = document.getElementById('settingsInspectionEventsAll');
+    const inspNotBlindBtn = document.getElementById('settingsInspectionEventsNotBlind');
+    if (inspAllBtn && inspNotBlindBtn) {
+        inspAllBtn.classList.toggle('active', inspEvents === 'all');
+        inspNotBlindBtn.classList.toggle('active', inspEvents !== 'all');
+    }
+    const inspType = getStorage('setting_inspection_type') || 'normal';
+    const inspNormalBtn = document.getElementById('settingsInspectionNormal');
+    const inspInfiniteBtn = document.getElementById('settingsInspectionInfinite');
+    if (inspNormalBtn && inspInfiniteBtn) {
+        inspNormalBtn.classList.toggle('active', inspType !== 'infinite');
+        inspInfiniteBtn.classList.toggle('active', inspType === 'infinite');
+    }
+}
+
 // === SETTINGS SYNC ===
 
 function syncToSettings() {
@@ -2613,37 +2639,7 @@ function syncToSettings() {
     document.getElementById('settingsHoldDuration').value = currentHoldDuration;
 
     // Sync inspection settings
-    const inspEnabledEl = document.getElementById('settingsInspectionEnabled');
-    if (inspEnabledEl) {
-        const enabled = getStorage('setting_inspection_enabled') === true;
-        inspEnabledEl.checked = enabled;
-        const subEl = document.getElementById('inspectionSubSettings');
-        if (subEl) subEl.style.display = enabled ? 'block' : 'none';
-    }
-    const inspEvents = getStorage('setting_inspection_events') || 'notBlind';
-    const inspAllBtn = document.getElementById('settingsInspectionEventsAll');
-    const inspNotBlindBtn = document.getElementById('settingsInspectionEventsNotBlind');
-    if (inspAllBtn && inspNotBlindBtn) {
-        if (inspEvents === 'all') {
-            inspAllBtn.classList.add('active');
-            inspNotBlindBtn.classList.remove('active');
-        } else {
-            inspNotBlindBtn.classList.add('active');
-            inspAllBtn.classList.remove('active');
-        }
-    }
-    const inspType = getStorage('setting_inspection_type') || 'normal';
-    const inspNormalBtn = document.getElementById('settingsInspectionNormal');
-    const inspInfiniteBtn = document.getElementById('settingsInspectionInfinite');
-    if (inspNormalBtn && inspInfiniteBtn) {
-        if (inspType === 'infinite') {
-            inspInfiniteBtn.classList.add('active');
-            inspNormalBtn.classList.remove('active');
-        } else {
-            inspNormalBtn.classList.add('active');
-            inspInfiniteBtn.classList.remove('active');
-        }
-    }
+    applyInspectionSettings();
 
     // Sync mode toggle
     const settingsModeInput = document.getElementById('settingsModeInput');
@@ -3250,6 +3246,7 @@ const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
                 }, currentHoldDuration);
             } else if (shouldUseInspection()) {
                 // Inspection enabled but not running: start on touchend (no hold needed)
+                timerDisplay.classList.add('inspecting');
             } else {
                 timerDisplay.textContent = '0.00';
                 timerDisplay.classList.remove(
@@ -3456,7 +3453,7 @@ function undoLastSolve() {
     state.currentScramble = undo.scramble;
 
     const scrambleText = document.getElementById('scrambleText');
-    if (scrambleText) scrambleText.textContent = undo.scramble || 'No scramble';
+    if (scrambleText) scrambleText.innerHTML = undo.scramble || 'No scramble';
     updateScrambleDrawing(undo.scramble);
 
     state.userSolves.length = undo.userSolvesLength;
@@ -4606,17 +4603,13 @@ function calculateCompStats() {
 function getCompSingleRank(time) {
     if (!isFinite(time) || compState.wcaSolves.length === 0) return null;
     const finite = compState.wcaSolves.filter((s) => isFinite(s));
-    if (finite.length === 0) return null;
-    const sorted = [...finite, time].sort((a, b) => a - b);
-    return sorted.indexOf(time) + 1;
+    return finite.length ? rankIn(time, finite) : null;
 }
 
 function getCompAverageRank(time) {
     if (!isFinite(time) || compState.wcaAverages.length === 0) return null;
     const finite = compState.wcaAverages.filter((a) => isFinite(a));
-    if (finite.length === 0) return null;
-    const sorted = [...finite, time].sort((a, b) => a - b);
-    return sorted.indexOf(time) + 1;
+    return finite.length ? rankIn(time, finite) : null;
 }
 
 function getCompTftProbability(tft) {

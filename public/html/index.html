@@ -113,6 +113,48 @@
                     </article>
                 </section>
 
+                <section class="newsletter-signup" aria-label="Competition newsletter signup" id="newsletter">
+                    <div class="newsletter-signup-header">
+                        <h2>Competition Newsletter</h2>
+                        <p>Get notified when new WCA competitions are announced in your country. You can also ask to be reminded the day registration opens.</p>
+                    </div>
+
+                    <form class="newsletter-form" id="newsletter-form" novalidate>
+                        <div class="newsletter-form-fields">
+                            <div class="newsletter-field">
+                                <label for="newsletter-country">Country</label>
+                                <select id="newsletter-country" name="country" required aria-required="true">
+                                    <option value="" disabled selected>Select your country</option>
+                                </select>
+                            </div>
+
+                            <div class="newsletter-field">
+                                <label for="newsletter-email">Email address</label>
+                                <input
+                                    type="email"
+                                    id="newsletter-email"
+                                    name="email"
+                                    placeholder="you@example.com"
+                                    required
+                                    aria-required="true"
+                                    autocomplete="email"
+                                    maxlength="320"
+                                >
+                            </div>
+                        </div>
+
+                        <button type="submit" class="newsletter-submit" id="newsletter-submit">
+                            Subscribe
+                        </button>
+                    </form>
+
+                    <p class="newsletter-notice" id="newsletter-status" aria-live="polite" hidden></p>
+
+                    <p class="newsletter-legal">
+                        By subscribing you agree to receive competition emails for your selected country. You can unsubscribe at any time via the link in every email. We will never share your address with third parties. See our <a href="/privacy-policy">privacy policy</a>.
+                    </p>
+                </section>
+
                 <section class="admin-notice" aria-label="Administration">
                     <h2>Admin</h2>
                     <p>For administrative tasks, use the <a href="/admin">admin page</a> to monitor status, review activity, and manage operations.</p>

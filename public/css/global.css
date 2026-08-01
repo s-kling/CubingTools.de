@@ -939,7 +939,8 @@ main input[type="checkbox"] + label::before {
 
     /* ── Main: fill all space above bottom bar ── */
     main {
-        padding-bottom: calc(var(--mobile-bottom-bar) + var(--space-md));
+        padding-bottom: var(--mobile-bottom-bar) !important;
+        margin-bottom: calc(var(--mobile-bottom-bar) + var(--space-sm));
         grid-area: main;
         overflow-y: scroll;
         -webkit-overflow-scrolling: touch;

@@ -68,15 +68,32 @@ export default class WcaApi {
 
         // ── Concurrency cap for bulk profile builds ───────────────────────────
         this.maxConcurrentPersonFetches = 20;
+
+        // ── Per-competition analysis cache ────────────────────────────────────
+        // Keyed by competitionId → Map<"${wcaId}:${eventId}", profile|null>.
+        // Profiles survive for the lifetime of the server process so repeated
+        // calls to different rounds of the same competition never re-fetch
+        // competitor histories.
+        this.compProfileCache = new Map();
+
+        // Controller used to cancel a manual export refresh.
+        this._refreshAbortController = null;
+
+        // Background refresh loop for periodic WCA export checks/imports.
+        this._backgroundRefreshStarted = false;
+        this._backgroundRefreshTimer = null;
+        this._backgroundRefreshInterval = null;
+        this._backgroundRefreshInitialDelayMs = 2 * 60 * 1000; // 2 minutes
+        this._backgroundRefreshIntervalMs = 24 * 60 * 60 * 1000; // 24 hours
     }
 
     // ═══════════════════════════════════════════════════════════════════════
     // SQLite schema & helpers
     // ═══════════════════════════════════════════════════════════════════════
 
-    _openDb() {
+    _openDbPath(dbPath) {
         fs.mkdirSync(this.exportDir, { recursive: true });
-        const db = new DatabaseSync(this.dbPath);
+        const db = new DatabaseSync(dbPath);
 
         db.exec('PRAGMA journal_mode = WAL');
         db.exec('PRAGMA synchronous  = NORMAL'); // safe with WAL
@@ -155,6 +172,32 @@ export default class WcaApi {
         return db;
     }
 
+    _openDb() {
+        return this._openDbPath(this.dbPath);
+    }
+
+    _closeDb() {
+        if (!this._db) return;
+        try {
+            this._db.close();
+        } catch {
+            // best effort
+        }
+        this._db = null;
+        this._ready = false;
+    }
+
+    _isCorruptError(err) {
+        if (!err) return false;
+        const msg = String(err.message || '').toLowerCase();
+        return (
+            msg.includes('malformed') ||
+            msg.includes('database disk image is malformed') ||
+            err.code === 'SQLITE_CORRUPT' ||
+            err.errcode === 11
+        );
+    }
+
     // Pack an array of attempt integers into a compact little-endian Buffer.
     _packAttempts(arr) {
         const buf = Buffer.alloc(arr.length * 4);
@@ -195,7 +238,7 @@ export default class WcaApi {
             .run(dateStr);
     }
 
-    async _syncCompetitionsFromNetwork() {
+    async _syncCompetitionsFromNetwork(signal = null) {
         const stored = this._storedCompetitionsSyncDate();
 
         // Check if we need to sync (check every hour)
@@ -219,6 +262,7 @@ export default class WcaApi {
             let hasMore = true;
 
             while (hasMore) {
+                if (signal?.aborted) throw new Error('Refresh cancelled');
                 const params = new URLSearchParams({
                     start: today,
                     end: ninetyDaysOut,
@@ -227,6 +271,7 @@ export default class WcaApi {
 
                 const { data } = await axios.get(`${this.competitionsUrl}?${params}`, {
                     timeout: 30_000,
+                    signal,
                 });
 
                 if (!Array.isArray(data) || data.length === 0) {
@@ -238,12 +283,14 @@ export default class WcaApi {
                 }
             }
 
+            if (signal?.aborted) throw new Error('Refresh cancelled');
             // Save to database
             this._saveCompetitionsToDb(allComps);
             this._saveCompetitionsSyncDate(new Date().toISOString());
 
             console.log(`[WcaApi] Synced ${allComps.length} competitions from network.`);
         } catch (err) {
+            if (signal?.aborted) throw err;
             console.warn('[WcaApi] Failed to sync competitions from network:', err.message);
             // Don't throw — DB may have stale data but it's better than failing
         }
@@ -306,7 +353,7 @@ export default class WcaApi {
         this._db.prepare("INSERT OR REPLACE INTO meta VALUES ('export_date', ?)").run(dateStr);
     }
 
-    async _checkForNewerExport() {
+    async _checkForNewerExport(signal = null) {
         const stored = this._storedExportDate();
 
         if (stored) {
@@ -317,7 +364,10 @@ export default class WcaApi {
         }
 
         try {
-            const { data } = await axios.get(this.exportMetaUrl, { timeout: 10_000 });
+            const { data } = await axios.get(this.exportMetaUrl, {
+                timeout: 10_000,
+                signal,
+            });
             const latestExportDate = data.export_date;
 
             if (!stored || latestExportDate !== stored) {
@@ -327,6 +377,7 @@ export default class WcaApi {
             this._saveExportDate(latestExportDate);
             return { needsDownload: false, latestExportDate };
         } catch (err) {
+            if (signal?.aborted) throw new Error('Refresh cancelled');
             console.warn('[WcaApi] Could not reach export metadata endpoint:', err.message);
             return { needsDownload: false, latestExportDate: stored };
         }
@@ -351,26 +402,51 @@ export default class WcaApi {
         }
     }
 
-    async _downloadAndExtract() {
+    async _downloadAndExtract(signal = null) {
         fs.mkdirSync(this.exportDir, { recursive: true });
         await this._checkDiskSpace();
+        if (signal?.aborted) throw new Error('Refresh cancelled');
+
         const zipPath = this._exportPath('wca_export.tsv.zip');
 
         console.log('[WcaApi] Downloading WCA TSV export...');
         const response = await axios.get(this.exportTsvUrl, {
             responseType: 'stream',
             timeout: 10 * 60 * 1000,
+            signal,
         });
-        await pipeline(response.data, createWriteStream(zipPath));
+
+        const abortHandler = () => {
+            response.data.destroy(new Error('Refresh cancelled'));
+        };
+        signal?.addEventListener('abort', abortHandler, { once: true });
+        try {
+            await pipeline(response.data, createWriteStream(zipPath), { signal });
+        } finally {
+            signal?.removeEventListener('abort', abortHandler);
+        }
+
+        if (signal?.aborted) throw new Error('Refresh cancelled');
         console.log('[WcaApi] Download complete. Extracting...');
 
         await new Promise((resolve, reject) => {
+            const extractor = Extract({ path: this.exportDir });
+            const abortHandler2 = () => extractor.destroy(new Error('Refresh cancelled'));
+            signal?.addEventListener('abort', abortHandler2, { once: true });
+
             createReadStream(zipPath)
-                .pipe(Extract({ path: this.exportDir }))
-                .on('close', resolve)
-                .on('error', reject);
+                .pipe(extractor)
+                .on('close', () => {
+                    signal?.removeEventListener('abort', abortHandler2);
+                    resolve();
+                })
+                .on('error', (err) => {
+                    signal?.removeEventListener('abort', abortHandler2);
+                    reject(err);
+                });
         });
 
+        if (signal?.aborted) throw new Error('Refresh cancelled');
         fs.unlinkSync(zipPath);
         console.log('[WcaApi] Extraction complete.');
     }
@@ -404,8 +480,8 @@ export default class WcaApi {
     // which fires only after _flush() completes — it cannot silently truncate.
     //
     // onProgress(rowsProcessed) is called every PROGRESS_INTERVAL rows.
-    _parseTsv(filePath, rowFn, onProgress = null) {
-        const PROGRESS_INTERVAL = 50_000;
+    _parseTsv(filePath, rowFn, onProgress = null, signal = null) {
+        const PROGRESS_INTERVAL = 10_000;
 
         // Only result_attempts.tsv has no header, all others do
         const skipHeader = !/WCA_export_result_attempts.tsv$/.test(filePath);
@@ -421,6 +497,9 @@ export default class WcaApi {
                 writableObjectMode: false,
 
                 transform(chunk, _enc, cb) {
+                    if (signal?.aborted) {
+                        return cb(new Error('Refresh cancelled'));
+                    }
                     remainder += decoder.decode(chunk, { stream: true });
                     let start = 0;
                     let nl;
@@ -449,6 +528,9 @@ export default class WcaApi {
                 },
 
                 flush(cb) {
+                    if (signal?.aborted) {
+                        return cb(new Error('Refresh cancelled'));
+                    }
                     const line = remainder.endsWith('\r') ? remainder.slice(0, -1) : remainder;
                     if (line) {
                         const fields = line.split('\t');
@@ -468,10 +550,23 @@ export default class WcaApi {
                 },
             });
 
-            transform.on('finish', () => resolve(rowCount));
-            transform.on('error', reject);
+            const abortHandler = () => transform.destroy(new Error('Refresh cancelled'));
+            signal?.addEventListener('abort', abortHandler, { once: true });
+            const cleanup = () => signal?.removeEventListener('abort', abortHandler);
+
+            transform.on('finish', () => {
+                cleanup();
+                resolve(rowCount);
+            });
+            transform.on('error', (err) => {
+                cleanup();
+                reject(err);
+            });
             const src = createReadStream(filePath);
-            src.on('error', reject);
+            src.on('error', (err) => {
+                cleanup();
+                reject(err);
+            });
             src.pipe(transform);
         });
     }
@@ -488,11 +583,11 @@ export default class WcaApi {
     // cost is mostly I/O-bound TSV parsing — not full index rebuilding.
     // ═══════════════════════════════════════════════════════════════════════
 
-    async _importExport() {
-        const db = this._db;
+    async _importExport(signal = null, db = this._db) {
+        const effectiveDb = db;
 
         // Use disk for temp tables during import to avoid memory pressure
-        db.exec('PRAGMA temp_store = FILE');
+        effectiveDb.exec('PRAGMA temp_store = FILE');
 
         // ── Progress bar helpers ──────────────────────────────────────────────
         const BAR_WIDTH = 40;
@@ -556,6 +651,7 @@ export default class WcaApi {
                     compRows++;
                 },
                 (n) => renderBar('competitions', n, APPROX_ROWS.competitions),
+                signal,
             );
             finishStep('competitions', compRows);
 
@@ -572,6 +668,7 @@ export default class WcaApi {
                     personRows++;
                 },
                 (n) => renderBar('persons', n, APPROX_ROWS.persons),
+                signal,
             );
             finishStep('persons', personRows);
 
@@ -604,6 +701,7 @@ export default class WcaApi {
                     attemptRows++;
                 },
                 (n) => renderBar('result_attempts', n, APPROX_ROWS.result_attempts),
+                signal,
             );
             finishStep('result_attempts', attemptRows);
 
@@ -674,6 +772,7 @@ export default class WcaApi {
                     resultRows++;
                 },
                 (n) => renderBar('results', n, APPROX_ROWS.results),
+                signal,
             );
             finishStep('results', resultRows);
 
@@ -695,6 +794,7 @@ export default class WcaApi {
                         rankRows++;
                     },
                     (n) => renderBar(table, n, approx),
+                    signal,
                 );
                 finishStep(table, rankRows);
             }
@@ -728,7 +828,25 @@ export default class WcaApi {
 
         this._initPromise = (async () => {
             try {
-                this._db = this._openDb();
+                try {
+                    this._db = this._openDb();
+                } catch (err) {
+                    if (this._isCorruptError(err)) {
+                        console.warn(
+                            '[WcaApi] Corrupt DB detected, rebuilding from scratch:',
+                            err.message,
+                        );
+                        this._closeDb();
+                        try {
+                            fs.unlinkSync(this.dbPath);
+                        } catch {
+                            // ignore
+                        }
+                        this._db = this._openDb();
+                    } else {
+                        throw err;
+                    }
+                }
 
                 const { needsDownload, latestExportDate } = await this._checkForNewerExport();
 
@@ -765,6 +883,49 @@ export default class WcaApi {
         this._initPromise = null;
     }
 
+    startBackgroundRefreshLoop() {
+        if (this._backgroundRefreshStarted) return;
+
+        this._backgroundRefreshStarted = true;
+
+        this._backgroundRefreshTimer = setTimeout(() => {
+            this._runBackgroundRefresh().catch((err) => {
+                console.error('[WcaApi] Background refresh failed:', err.message);
+            });
+        }, this._backgroundRefreshInitialDelayMs);
+
+        this._backgroundRefreshInterval = setInterval(() => {
+            this._runBackgroundRefresh().catch((err) => {
+                console.error('[WcaApi] Background refresh failed:', err.message);
+            });
+        }, this._backgroundRefreshIntervalMs);
+    }
+
+    async _runBackgroundRefresh() {
+        if (this._initPromise || this._refreshAbortController) {
+            return;
+        }
+
+        try {
+            console.log('[WcaApi] Running scheduled background refresh...');
+            await this.forceRefreshExport();
+        } catch (err) {
+            console.error('[WcaApi] Background refresh failed during initialization:', err.message);
+        }
+    }
+
+    stopBackgroundRefreshLoop() {
+        if (this._backgroundRefreshTimer) {
+            clearTimeout(this._backgroundRefreshTimer);
+            this._backgroundRefreshTimer = null;
+        }
+        if (this._backgroundRefreshInterval) {
+            clearInterval(this._backgroundRefreshInterval);
+            this._backgroundRefreshInterval = null;
+        }
+        this._backgroundRefreshStarted = false;
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // Cache helpers  (for network-backed endpoints)
     // ═══════════════════════════════════════════════════════════════════════
@@ -789,6 +950,9 @@ export default class WcaApi {
     async forceRefreshExport() {
         console.log('[WcaApi] Force refresh requested — re-downloading WCA export...');
 
+        const controller = new AbortController();
+        this._refreshAbortController = controller;
+
         // Pause any new queries during refresh
         this._ready = false;
         this._initPromise = (async () => {
@@ -797,33 +961,59 @@ export default class WcaApi {
                 this._cleanupTsvFiles();
 
                 await this._checkDiskSpace();
-                await this._downloadAndExtract();
+                await this._downloadAndExtract(controller.signal);
 
-                // Wipe existing DB tables so stale rows from removed competitors
-                // don't linger — faster than DELETE on 38M rows.
-                // Guard against _db being null (refresh triggered before first init).
-                if (this._db) {
-                    this._db.exec(`
-                        DROP TABLE IF EXISTS persons;
-                        DROP TABLE IF EXISTS results;
-                        DROP TABLE IF EXISTS ranks_single;
-                        DROP TABLE IF EXISTS ranks_average;
-                        DROP TABLE IF EXISTS competitions;
-                        DROP TABLE IF EXISTS meta;
-                    `);
+                // Import into a temporary DB first, then swap it into place only
+                // after a successful import. This avoids leaving a corrupt or partial
+                // database file behind if the refresh fails mid-run.
+                const tempDbPath = `${this.dbPath}.tmp`;
+                try {
+                    if (fs.existsSync(tempDbPath)) fs.unlinkSync(tempDbPath);
+                } catch {
+                    // ignore unlink errors
                 }
 
-                // Recreate schema (or create from scratch if _db was null)
-                this._db = this._openDb();
+                const tempDb = this._openDbPath(tempDbPath);
+                try {
+                    await this._importExport(controller.signal, tempDb);
+                    tempDb.close();
 
-                await this._importExport();
+                    if (this._db) {
+                        try {
+                            this._db.close();
+                        } catch {
+                            // ignore close errors
+                        }
+                        this._db = null;
+                    }
+
+                    try {
+                        if (fs.existsSync(this.dbPath)) fs.unlinkSync(this.dbPath);
+                    } catch {
+                        // ignore unlink errors
+                    }
+                    fs.renameSync(tempDbPath, this.dbPath);
+                    this._db = this._openDb();
+                } catch (err) {
+                    try {
+                        tempDb.close();
+                    } catch {
+                        // ignore close errors
+                    }
+                    try {
+                        if (fs.existsSync(tempDbPath)) fs.unlinkSync(tempDbPath);
+                    } catch {
+                        // ignore cleanup errors
+                    }
+                    throw err;
+                }
                 this._cleanupTsvFiles();
 
-                const { latestExportDate } = await this._checkForNewerExport();
+                const { latestExportDate } = await this._checkForNewerExport(controller.signal);
                 if (latestExportDate) this._saveExportDate(latestExportDate);
 
                 // Re-sync competitions after export refresh
-                await this._syncCompetitionsFromNetwork();
+                await this._syncCompetitionsFromNetwork(controller.signal);
 
                 this._ready = true;
                 console.log('[WcaApi] Force refresh complete.');
@@ -831,11 +1021,16 @@ export default class WcaApi {
                 // Leave _ready false so the next request retries properly
                 this._initPromise = null;
                 throw err;
+            } finally {
+                this._refreshAbortController = null;
             }
         })();
 
-        await this._initPromise;
-        this._initPromise = null;
+        try {
+            await this._initPromise;
+        } finally {
+            this._initPromise = null;
+        }
     }
 
     async _cachedFetch(cacheKey, fetchFn, ttlMs = this.cacheTtlMs) {
@@ -989,7 +1184,44 @@ export default class WcaApi {
             personalRecords[event_id].average = { best };
         }
 
-        return { name: person.name, personalRecords, results };
+        const self = this;
+
+        return {
+            name: person.name,
+            personalRecords,
+            results,
+
+            // Predicts the most likely next solve time for `eventId` and
+            // returns probability figures for a specific candidate `time`
+            // (seconds). Pass options.limit to control how many recent
+            // solves feed the model (default 100) and options.tolerance
+            // to control the +/- window width in seconds (default 0.5).
+            //
+            // Returns null if there's no/insufficient solve history for
+            // that event, or if `time` is omitted (in which case only the
+            // distribution stats — no per-time probabilities — apply, so
+            // use .mostLikelyTime() instead).
+            //
+            // Example:
+            //   const me = await api.fetchCompetitorData('2015ABCD01');
+            //   const p = me.predictTime('333', 14.8);
+            //   // p.mostLikelyTime -> e.g. 15.04
+            //   // p.probabilityWithinTolerance -> e.g. 0.42 (42%)
+            //   // p.probabilityFasterThanOrEqual -> e.g. 0.38 (38%)
+            predictTime(eventId, time, options = {}) {
+                const distribution = self._buildTimeDistribution(results, eventId, options);
+                if (!distribution) return null;
+                return self.calculateTimeProbability(distribution, time, options);
+            },
+
+            // Convenience accessor for just the most likely (mean) time,
+            // without needing a candidate time or the full probability
+            // breakdown. Returns null if there's insufficient history.
+            mostLikelyTime(eventId, options = {}) {
+                const distribution = self._buildTimeDistribution(results, eventId, options);
+                return distribution ? distribution.mean : null;
+            },
+        };
     }
 
     // Returns Map<wcaId, data|{error}>.
@@ -1241,7 +1473,7 @@ export default class WcaApi {
     // Statistical ranking model
     // ═══════════════════════════════════════════════════════════════════════
 
-    async buildPerformanceProfile(data, eventId, limit = 10) {
+    async buildPerformanceProfile(data, eventId, limit = 12) {
         const allResults = this.getAllResultsForEvent(data, eventId);
         if (allResults.length === 0) return null;
 
@@ -1254,22 +1486,10 @@ export default class WcaApi {
             const singles = recent
                 .map((r) => this.centisecondsToSeconds(r.best))
                 .filter((v) => v !== null && v > 0);
-            return singles.length === 0 ? null : this._profileFromSamples(singles, 'single');
+            return this._buildDistribution(singles, { type: 'single' });
         }
-        return this._profileFromSamples(averages, 'average');
-    }
 
-    _profileFromSamples(samples, type) {
-        const n = samples.length;
-        const mean = samples.reduce((a, b) => a + b, 0) / n;
-        const variance = n > 1 ? samples.reduce((s, v) => s + (v - mean) ** 2, 0) / (n - 1) : 0;
-        return {
-            mean,
-            stdDev: Math.sqrt(variance) || mean * 0.05,
-            sampleSize: n,
-            type,
-            recentSamples: samples,
-        };
+        return this._buildDistribution(averages, { type: 'average' });
     }
 
     _normCdf(z) {
@@ -1282,17 +1502,168 @@ export default class WcaApi {
         return z >= 0 ? approx : 1 - approx;
     }
 
+    // Normal probability DENSITY at x — a relative-likelihood value, not a
+    // true probability (a continuous distribution assigns zero probability
+    // to any single exact point). Useful for comparing "how likely is time A
+    // vs time B", but callers wanting an actual percentage should use the
+    // CDF-based range/threshold probabilities in calculateTimeProbability().
+    _normalPdf(x, mu, sigma) {
+        if (!sigma || sigma <= 0) return x === mu ? Infinity : 0;
+        const z = (x - mu) / sigma;
+        return (1 / (sigma * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * z * z);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Expected-time / probability model
+    //
+    // Every function in this file that derives an "expected time" for a
+    // competitor — whether from raw solves, competition averages, or a
+    // single live result — builds it through _buildDistribution() (or its
+    // single-observation counterpart _buildLiveDistribution()) below, and
+    // every function that turns an expected time into an actual probability
+    // (predicting a specific time, or comparing two competitors head-to-head)
+    // goes through calculateTimeProbability(). Keeping both in one place
+    // means the statistics (variance handling, zero-variance fallback, CDF
+    // approximation) only need to be correct once.
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // Central statistics builder: turns a flat array of time samples
+    // (seconds) into a { mean, stdDev, sampleSize, type, recentSamples }
+    // distribution. Returns null when there are fewer than `minSamples`
+    // samples (default 1) to work with.
+    _buildDistribution(samples, options = {}) {
+        const { type = null, minSamples = 1 } = options;
+        if (!samples || samples.length < minSamples) return null;
+
+        const n = samples.length;
+        const mean = samples.reduce((a, b) => a + b, 0) / n;
+        const variance = n > 1 ? samples.reduce((s, v) => s + (v - mean) ** 2, 0) / (n - 1) : 0;
+
+        return {
+            mean,
+            stdDev: Math.sqrt(variance) || mean * 0.05,
+            sampleSize: n,
+            type,
+            recentSamples: samples,
+        };
+    }
+
+    _profileFromSamples(samples, type = 'average') {
+        return this._buildDistribution(samples, { type, minSamples: 1 });
+    }
+
+    // Synthetic distribution for a single live/in-progress observation.
+    // A lone sample has no computable variance, so the spread is
+    // approximated as a fraction of the competitor's historical stdDev when
+    // one is available, or a flat percentage of the observed time otherwise.
+    // Used wherever a live result needs to be treated as an "expected time"
+    // going forward (e.g. after a round completes, before the next begins).
+    _buildLiveDistribution(observedTime, options = {}) {
+        const { historicalStdDev = null, scale = 1, fallbackFraction = 0.02 } = options;
+        if (!Number.isFinite(observedTime) || observedTime <= 0) return null;
+
+        const stdDev = historicalStdDev
+            ? historicalStdDev * scale
+            : observedTime * fallbackFraction;
+
+        return {
+            mean: observedTime,
+            stdDev,
+            sampleSize: 1,
+            type: 'live',
+            recentSamples: [observedTime],
+        };
+    }
+
+    // Builds a normal-distribution profile (mean/stdDev) from a person's raw
+    // solve times for one event. This operates on individual solves (single
+    // attempts), not averages — use buildPerformanceProfile() instead when
+    // you want competition-average-based profiles.
+    //
+    // Returns null when there isn't enough solve history (fewer than 2 valid
+    // solves) to model.
+    _buildTimeDistribution(results, eventId, options = {}) {
+        const { limit = 100 } = options;
+
+        const allResults = results.filter((r) => r.event_id === eventId);
+        if (allResults.length === 0) return null;
+
+        // getSolves() expects raw result rows and returns centisecond values,
+        // most recent first, already flattened/filtered of DNF/DNS markers.
+        const solvesCs = this.getSolves(allResults, limit);
+        const samples = solvesCs
+            .map((cs) => this.centisecondsToSeconds(cs))
+            .filter((v) => v !== null && v > 0);
+
+        return this._buildDistribution(samples, { type: 'solve', minSamples: 2 });
+    }
+
+    // Given a distribution (from _buildDistribution / _buildLiveDistribution
+    // / _buildTimeDistribution) and a target time in seconds, returns the
+    // most likely time alongside several probability figures for that
+    // specific time. `options.tolerance` (default 0.5s) controls the width
+    // of the "probability within tolerance" window.
+    //
+    // This is the single place in the file that turns a mean/stdDev pair
+    // into an actual probability via the normal CDF — _probXBeatsY() below
+    // reuses it rather than repeating the CDF math.
+    calculateTimeProbability(distribution, time, options = {}) {
+        if (!distribution || !Number.isFinite(time)) return null;
+        const { tolerance = 0.5 } = options;
+        const { mean, stdDev, sampleSize } = distribution;
+
+        const density = this._normalPdf(time, mean, stdDev);
+
+        // Probability of a solve landing at or below `time` (i.e. beating it,
+        // since a lower cube time is better).
+        const probabilityFasterThanOrEqual = this._normCdf((time - mean) / stdDev);
+
+        // Probability within [time - tolerance, time + tolerance].
+        const zHigh = (time + tolerance - mean) / stdDev;
+        const zLow = (time - tolerance - mean) / stdDev;
+        const probabilityWithinTolerance = this._normCdf(zHigh) - this._normCdf(zLow);
+
+        return {
+            time,
+            mostLikelyTime: mean,
+            stdDev,
+            sampleSize,
+            tolerance,
+            density,
+            probabilityFasterThanOrEqual,
+            probabilitySlowerThan: 1 - probabilityFasterThanOrEqual,
+            probabilityWithinTolerance,
+        };
+    }
+
+    // Probability that competitor X's result beats (is faster than)
+    // competitor Y's, given their two expected-time distributions. Modelled
+    // as the distribution of the difference (X - Y): its mean is the gap
+    // between their expected times and its stdDev combines both competitors'
+    // uncertainty. "X beats Y" is then just "the difference is <= 0", which
+    // is exactly what calculateTimeProbability()'s probabilityFasterThanOrEqual
+    // already computes — so we build that synthetic distribution and reuse it
+    // instead of calling the normal CDF a second time.
     _probXBeatsY(pX, pY) {
-        const md = pX.mean - pY.mean;
-        const sd = Math.sqrt(pX.stdDev ** 2 + pY.stdDev ** 2);
-        return this._normCdf(-md / sd);
+        const diffDistribution = {
+            mean: pX.mean - pY.mean,
+            stdDev: Math.sqrt(pX.stdDev ** 2 + pY.stdDev ** 2),
+            sampleSize: Math.min(pX.sampleSize || 1, pY.sampleSize || 1),
+        };
+        const result = this.calculateTimeProbability(diffDistribution, 0);
+        return result ? result.probabilityFasterThanOrEqual : 0.5;
     }
 
     computeRoundRankings(profiles) {
         const valid = [];
         for (const [wcaId, entry] of profiles.entries()) {
             if (entry?.profile && !entry.profile.error) {
-                valid.push({ wcaId, name: entry.name, profile: entry.profile });
+                valid.push({
+                    wcaId,
+                    name: entry.name,
+                    countryIso2: entry.countryIso2 || null,
+                    profile: entry.profile,
+                });
             }
         }
         if (valid.length === 0) return [];
@@ -1300,9 +1671,6 @@ export default class WcaApi {
         const n = valid.length;
         const winMatrix = valid.map((a) =>
             valid.map((b) => (a.wcaId === b.wcaId ? 0 : this._probXBeatsY(a.profile, b.profile))),
-        );
-        const expectedRanks = valid.map(
-            (_, i) => 1 + valid.reduce((s, _, j) => (j !== i ? s + winMatrix[j][i] : s), 0),
         );
 
         const SIMS = 2000;
@@ -1330,8 +1698,9 @@ export default class WcaApi {
             .map((c, i) => ({
                 wcaId: c.wcaId,
                 name: c.name,
+                expectedResult: c.profile.mean,
+                countryIso2: c.countryIso2 || null,
                 profile: c.profile,
-                expectedRank: expectedRanks[i],
                 winProbability: winCounts[i] / SIMS,
                 podiumProbability: podiumCounts[i] / SIMS,
                 top8Probability: top8Counts[i] / SIMS,
@@ -1339,7 +1708,7 @@ export default class WcaApi {
                     valid.map((b, j) => [b.wcaId, winMatrix[i][j]]),
                 ),
             }))
-            .sort((a, b) => a.expectedRank - b.expectedRank);
+            .sort((a, b) => a.expectedResult - b.expectedResult);
     }
 
     async analyzeRound(competitionId, eventId, roundId, liveResults = null) {
@@ -1365,13 +1734,7 @@ export default class WcaApi {
                 if (le) {
                     const result = this.centisecondsToSeconds(le.average || le.best);
                     if (result)
-                        profile = {
-                            mean: result,
-                            stdDev: result * 0.02,
-                            sampleSize: 1,
-                            type: 'live',
-                            recentSamples: [result],
-                        };
+                        profile = this._buildLiveDistribution(result, { fallbackFraction: 0.02 });
                 }
             }
             profiles.set(id, { name: competitor.name, profile });
@@ -1439,6 +1802,162 @@ export default class WcaApi {
         }
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // WCIF result extraction
+    //
+    // The WCIF public endpoint already carries round.results[] as results are
+    // entered — the same data used to show result counts in the drawer.
+    // We use this as the primary source so real times are always reflected,
+    // even when the WCA Live GraphQL API is unreachable.
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // Returns an array of result objects shaped identically to fetchLiveResults():
+    //   { wcaId, ranking, advancing, best, average, attempts }
+    // Returns null when no results are present for that round.
+    _extractWcifResults(wcif, eventId, roundId) {
+        // Build registrantId (integer) → person map for wcaId lookup
+        const personMap = new Map();
+        for (const p of wcif?.persons || []) {
+            if (p.registrantId != null) {
+                personMap.set(p.registrantId, {
+                    wcaId: p.wcaId || null,
+                    name: p.name || null,
+                    countryIso2: p.countryIso2 || null,
+                });
+            }
+        }
+
+        const event = wcif?.events?.find((e) => e.id === eventId);
+        const round = event?.rounds?.find((r) => r.id === roundId);
+        if (!round?.results?.length) return null;
+
+        const mapped = round.results
+            .map((r) => {
+                const person = personMap.get(r.personId);
+                const best = typeof r.best === 'number' ? r.best : 0;
+                const average = typeof r.average === 'number' ? r.average : 0;
+                return {
+                    wcaId: person?.wcaId || null,
+                    name: person?.name || null,
+                    countryIso2: person?.countryIso2 || null,
+                    ranking: r.ranking || 0,
+                    advancing: r.advancing === true,
+                    best,
+                    average,
+                    attempts: (r.attempts || []).map((a) =>
+                        typeof a.result === 'number' ? a.result : 0,
+                    ),
+                };
+            })
+            // Keep only entries with a valid result (positive = real time)
+            .filter((r) => r.wcaId && (r.best > 0 || r.average > 0));
+
+        return mapped.length > 0 ? mapped : null;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Qualifying-set helpers  (subsequent-round filtering)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // Extract the ordinal round number from a WCIF round ID (e.g. "333-r2" → 2).
+    _getRoundNumber(roundId) {
+        const m = String(roundId).match(/-r(\d+)$/i);
+        return m ? parseInt(m[1], 10) : 1;
+    }
+
+    // Return the ID of the round that immediately precedes roundId,
+    // or null when roundId is already round 1.
+    _getPreviousRoundId(roundId) {
+        const n = this._getRoundNumber(roundId);
+        if (n <= 1) return null;
+        return String(roundId).replace(/-r(\d+)$/i, `-r${n - 1}`);
+    }
+
+    // Return the WCIF round object for (eventId, roundId), or null if not found.
+    _getWcifRound(wcif, eventId, roundId) {
+        const event = wcif?.events?.find((e) => e.id === eventId);
+        return event?.rounds?.find((r) => r.id === roundId) || null;
+    }
+
+    // Determine which competitors qualify from the previous round.
+    //
+    // Strategy (in priority order):
+    //  1. If prevRoundLiveResults is a non-empty array and any entry carries
+    //     advancing === true, use those entries directly.
+    //  2. If prevRoundLiveResults has entries without the advancing flag, sort
+    //     by result and apply the advancement condition.
+    //  3. If no live results exist, fall back to predicting from profiles:
+    //     sort allEventProfileMap by predicted mean and apply the condition.
+    //
+    // Returns { wcaIds: Set<string>, fromRealResults: boolean }.
+    _computeQualifiers(advancementCondition, prevRoundLiveResults, allEventProfileMap) {
+        if (prevRoundLiveResults && prevRoundLiveResults.length > 0) {
+            // Prefer explicit advancing flag when the WCA Live API sets it
+            const explicitlyAdvancing = prevRoundLiveResults.filter(
+                (r) => r.advancing === true && r.wcaId,
+            );
+            if (explicitlyAdvancing.length > 0) {
+                return {
+                    wcaIds: new Set(explicitlyAdvancing.map((r) => r.wcaId)),
+                    fromRealResults: true,
+                };
+            }
+
+            // No advancing flag — compute from sorted results
+            const completed = prevRoundLiveResults
+                .filter((r) => r.wcaId && (r.average > 0 || r.best > 0))
+                .sort((a, b) => {
+                    const aRes = a.average > 0 ? a.average : a.best;
+                    const bRes = b.average > 0 ? b.average : b.best;
+                    return aRes - bRes;
+                });
+
+            const cutoff = this._applyAdvCutoff(advancementCondition, completed.length, completed);
+            return {
+                wcaIds: new Set(completed.slice(0, cutoff).map((r) => r.wcaId)),
+                fromRealResults: true,
+            };
+        }
+
+        // No real results — predict from historical profiles
+        const withProfile = [];
+        for (const [wcaId, entry] of allEventProfileMap) {
+            if (entry?.profile?.mean) {
+                withProfile.push({ wcaId, mean: entry.profile.mean });
+            }
+        }
+        withProfile.sort((a, b) => a.mean - b.mean);
+
+        const cutoff = this._applyAdvCutoff(advancementCondition, withProfile.length, null);
+        return {
+            wcaIds: new Set(withProfile.slice(0, cutoff).map((c) => c.wcaId)),
+            fromRealResults: false,
+        };
+    }
+
+    // Translate an advancementCondition into a concrete count of qualifiers.
+    // sortedResults is required for 'attemptResult' type; may be null for others.
+    _applyAdvCutoff(cond, totalCount, sortedResults) {
+        if (!cond) return totalCount;
+        switch (cond.type) {
+            case 'percent':
+                return Math.ceil((totalCount * cond.level) / 100);
+            case 'ranking':
+                return Math.min(cond.level, totalCount);
+            case 'attemptResult':
+                if (sortedResults) {
+                    return sortedResults.filter((r) => {
+                        const res = r.average > 0 ? r.average : r.best;
+                        return res > 0 && res <= cond.level;
+                    }).length;
+                }
+                // Cannot apply time-based cutoff to predictions — include all ranked
+                return totalCount;
+            default:
+                return totalCount;
+        }
+    }
+
     async handleStreamingAnalysisRequest(req, res) {
         const { id, eventId, roundId } = req.params;
         res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
@@ -1449,48 +1968,205 @@ export default class WcaApi {
         const send = (obj) => res.write(JSON.stringify(obj) + '\n');
 
         try {
-            let liveResults = null;
-            if (await this.isLiveInWcaLive(id)) liveResults = await this.fetchLiveResults(id);
+            // ── Fetch WCIF and live results (both use response-level caching) ──
+            let wcaLiveResults = null;
+            try {
+                if (await this.isLiveInWcaLive(id))
+                    wcaLiveResults = await this.fetchLiveResults(id);
+            } catch (_) {
+                /* live API unreachable — WCIF results will be used */
+            }
 
             const wcif = await this.fetchWcif(id);
-            const competitors = this.parseWcifCompetitors(wcif);
-            const eventCompetitors = this.getCompetitorsForEvent(competitors, eventId);
+            const allCompetitors = this.parseWcifCompetitors(wcif);
+            const allEventCompetitors = this.getCompetitorsForEvent(allCompetitors, eventId);
+
+            // ── Determine round numbers up-front ────────────────────────────
+            const roundNum = this._getRoundNumber(roundId);
+            const prevRoundId = roundNum > 1 ? this._getPreviousRoundId(roundId) : null;
+
+            // ── Build effective live results from WCIF + WCA Live API ────────
+            // The WCIF already contains round.results[] as times are entered — this
+            // is the authoritative source and always reflects the current state.
+            // WCA Live GraphQL results overlay the WCIF data where available.
+            const effectiveLive = {};
+
+            // Seed from WCIF results for every round we care about
+            const roundsToExtract = [roundId];
+            if (prevRoundId) roundsToExtract.push(prevRoundId);
+            for (const rid of roundsToExtract) {
+                const extracted = this._extractWcifResults(wcif, eventId, rid);
+                if (extracted) {
+                    effectiveLive[eventId] = effectiveLive[eventId] || {};
+                    effectiveLive[eventId][rid] = extracted;
+                }
+            }
+
+            // WCA Live API takes priority (may be more up-to-date)
+            if (wcaLiveResults?.[eventId]) {
+                effectiveLive[eventId] = effectiveLive[eventId] || {};
+                for (const [rid, results] of Object.entries(wcaLiveResults[eventId])) {
+                    if (results?.length) effectiveLive[eventId][rid] = results;
+                }
+            }
+
+            const liveResults = Object.keys(effectiveLive).length > 0 ? effectiveLive : null;
+
+            // ── Per-competition profile cache ────────────────────────────────
+            // Profiles are keyed as "<wcaId>:<eventId>" and persist for the
+            // lifetime of the server process so that subsequent round analyses
+            // of the same competition never re-fetch competitor histories.
+            if (!this.compProfileCache.has(id)) {
+                this.compProfileCache.set(id, new Map());
+            }
+            const profileCache = this.compProfileCache.get(id);
+
+            // ── Determine qualifying set for subsequent rounds ───────────────
+            let qualifyingSet = null; // null ⇒ all registered competitors participate
+
+            if (roundNum > 1) {
+                const prevWcifRound = this._getWcifRound(wcif, eventId, prevRoundId);
+                const advCond = prevWcifRound?.advancementCondition || null;
+                const prevRoundLive = liveResults?.[eventId]?.[prevRoundId] || null;
+
+                if (!prevRoundLive || prevRoundLive.length === 0) {
+                    // No real results for the previous round — predict qualifying
+                    // set from historical profiles of ALL event competitors.
+                    const allWithId = allEventCompetitors.filter((c) => c.wcaId);
+
+                    // Fetch and cache any profiles we haven't seen yet
+                    const toFetch = allWithId.filter((c) => {
+                        const cacheKey = `${this.normalizeWcaId(c.wcaId)}:${eventId}`;
+                        return !profileCache.has(cacheKey);
+                    });
+                    if (toFetch.length > 0) {
+                        const historyMap = await this.fetchManyCompetitors(
+                            toFetch.map((c) => c.wcaId),
+                        );
+                        await Promise.all(
+                            toFetch.map(async (competitor) => {
+                                const norm = this.normalizeWcaId(competitor.wcaId);
+                                const cacheKey = `${norm}:${eventId}`;
+                                const historyData = historyMap.get(norm);
+                                if (!historyData || historyData.error) {
+                                    profileCache.set(cacheKey, null);
+                                } else {
+                                    profileCache.set(
+                                        cacheKey,
+                                        await this.buildPerformanceProfile(historyData, eventId),
+                                    );
+                                }
+                            }),
+                        );
+                    }
+
+                    // Build a profile map for the qualifying-set computation
+                    const allProfileMap = new Map();
+                    for (const c of allWithId) {
+                        const norm = this.normalizeWcaId(c.wcaId);
+                        allProfileMap.set(norm, {
+                            name: c.name,
+                            profile: profileCache.get(`${norm}:${eventId}`) || null,
+                        });
+                    }
+
+                    const qualified = this._computeQualifiers(advCond, null, allProfileMap);
+                    qualifyingSet = qualified.wcaIds;
+                } else {
+                    // Real results available for the previous round — use them
+                    const qualified = this._computeQualifiers(advCond, prevRoundLive, null);
+                    qualifyingSet = qualified.wcaIds;
+                }
+            }
+
+            // ── Filter competitors to the qualifying set ──────────────────────
+            const eventCompetitors = qualifyingSet
+                ? allEventCompetitors.filter(
+                      (c) => c.wcaId && qualifyingSet.has(this.normalizeWcaId(c.wcaId)),
+                  )
+                : allEventCompetitors;
+
             const withId = eventCompetitors.filter((c) => c.wcaId);
-            const withoutId = eventCompetitors.filter((c) => !c.wcaId);
+            // Competitors without a WCA ID can only appear in round 1
+            const withoutId = roundNum === 1 ? allEventCompetitors.filter((c) => !c.wcaId) : [];
+
+            // ── Advancement condition for the current round ──────────────────
+            // Tells the front-end who advances to the next round (null = final).
+            const currentWcifRound = this._getWcifRound(wcif, eventId, roundId);
+            const advancementCondition = currentWcifRound?.advancementCondition || null;
 
             send({
                 type: 'meta',
-                totalRegistered: eventCompetitors.length,
+                totalRegistered: roundNum === 1 ? allEventCompetitors.length : withId.length,
                 unranked: withoutId.map((c) => ({ name: c.name, reason: 'no_wca_id' })),
+                advancementCondition,
             });
 
+            // ── Build profiles for qualifying competitors ──────────────────
             const profileMap = new Map();
 
             await Promise.all(
                 withId.map(async (competitor) => {
                     const idNorm = this.normalizeWcaId(competitor.wcaId);
+                    const cacheKey = `${idNorm}:${eventId}`;
                     try {
-                        const historyData = await this.fetchCompetitorData(idNorm);
-                        let profile = await this.buildPerformanceProfile(historyData, eventId);
+                        // Retrieve from per-competition cache, fetching if absent
+                        if (!profileCache.has(cacheKey)) {
+                            const historyData = await this.fetchCompetitorData(idNorm);
+                            profileCache.set(
+                                cacheKey,
+                                await this.buildPerformanceProfile(historyData, eventId),
+                            );
+                        }
+                        let profile = profileCache.get(cacheKey) || null;
 
+                        // For subsequent rounds: if the competitor has a real result
+                        // from the previous round, use that as the base profile
+                        // (it is more relevant than the historical mean).
+                        if (prevRoundId && liveResults?.[eventId]?.[prevRoundId]) {
+                            const prevLe = liveResults[eventId][prevRoundId].find(
+                                (r) => r.wcaId === idNorm,
+                            );
+                            if (prevLe) {
+                                const prevResult = this.centisecondsToSeconds(
+                                    prevLe.average > 0 ? prevLe.average : prevLe.best,
+                                );
+                                if (prevResult) {
+                                    // Keep historical stdDev scaled down (they are warmed up)
+                                    profile = this._buildLiveDistribution(prevResult, {
+                                        historicalStdDev: profile?.stdDev,
+                                        scale: 0.7,
+                                        fallbackFraction: 0.04,
+                                    });
+                                }
+                            }
+                        }
+
+                        // Current-round live result takes the highest priority
                         if (liveResults?.[eventId]?.[roundId]) {
                             const le = liveResults[eventId][roundId].find(
                                 (r) => r.wcaId === idNorm,
                             );
                             if (le) {
-                                const result = this.centisecondsToSeconds(le.average || le.best);
-                                if (result)
-                                    profile = {
-                                        mean: result,
-                                        stdDev: result * 0.02,
-                                        sampleSize: 1,
-                                        type: 'live',
-                                        recentSamples: [result],
-                                    };
+                                const result = this.centisecondsToSeconds(
+                                    le.average > 0 ? le.average : le.best,
+                                );
+                                if (result) {
+                                    const historicalProfile = profileCache.get(cacheKey);
+                                    profile = this._buildLiveDistribution(result, {
+                                        historicalStdDev: historicalProfile?.stdDev,
+                                        scale: 0.5,
+                                        fallbackFraction: 0.02,
+                                    });
+                                }
                             }
                         }
 
-                        profileMap.set(idNorm, { name: competitor.name, profile });
+                        profileMap.set(idNorm, {
+                            name: competitor.name,
+                            countryIso2: competitor.countryIso2 || null,
+                            profile,
+                        });
                         send({
                             type: 'profile',
                             wcaId: competitor.wcaId,
@@ -1499,7 +2175,15 @@ export default class WcaApi {
                             profile: profile || null,
                         });
                     } catch (err) {
-                        profileMap.set(idNorm, { name: competitor.name, profile: null });
+                        // Do NOT cache failures — allow the next refresh to retry.
+                        console.warn(
+                            `[WcaApi] Profile failed for ${idNorm} (${competitor.name}) in ${id}/${eventId}: ${err.message}`,
+                        );
+                        profileMap.set(idNorm, {
+                            name: competitor.name,
+                            countryIso2: competitor.countryIso2 || null,
+                            profile: null,
+                        });
                         send({
                             type: 'profile',
                             wcaId: competitor.wcaId,
@@ -1512,9 +2196,24 @@ export default class WcaApi {
                 }),
             );
 
+            // Collect competitors who have WCA IDs but no usable profile data.
+            // These are returned alongside the rankings so the front-end can
+            // display them in the table rather than silently omitting them.
+            const noProfile = [];
+            for (const [wcaId, entry] of profileMap) {
+                if (!entry.profile) {
+                    noProfile.push({
+                        wcaId,
+                        name: entry.name,
+                        countryIso2: entry.countryIso2 || null,
+                    });
+                }
+            }
+
             send({
                 type: 'rankings',
                 rankings: this.computeRoundRankings(profileMap),
+                noProfile,
                 analysedAt: new Date().toISOString(),
             });
         } catch (err) {
@@ -1537,6 +2236,26 @@ export default class WcaApi {
         } catch (err) {
             return res.status(500).json({ error: err.message });
         }
+    }
+
+    async handleCancelRefreshRequest(req, res) {
+        if (!this._initPromise) {
+            return res.status(409).json({ error: 'No refresh in progress' });
+        }
+
+        if (!this.cancelRefreshExport()) {
+            return res.status(409).json({ error: 'No refresh in progress' });
+        }
+
+        return res.json({ status: 'cancellation_requested' });
+    }
+
+    cancelRefreshExport() {
+        if (!this._refreshAbortController || this._refreshAbortController.signal.aborted) {
+            return false;
+        }
+        this._refreshAbortController.abort();
+        return true;
     }
 
     // Open the existing DB file without triggering a full _ensureReady() / download.
