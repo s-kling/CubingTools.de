@@ -12,6 +12,7 @@ const state = {
     timerHolding: false,
     timerAnimFrame: null,
     currentScramble: null,
+    prefetchedScramble: null,
     undoData: null,
     previousAverage: null,
     sessionPrSingle: {},
@@ -42,6 +43,14 @@ document.getElementById('target').addEventListener('input', (e) => {
     formatInputField(e.target);
     updateTargetDisplay();
     setStorage('setting_target', e.target.value);
+});
+
+document.getElementById('card-tft').addEventListener('click', () => {
+    showUserFeedbackPopup({
+        title: 'Time for Target',
+        messageHtml:
+            'This stat calculates the time needed on your next solve in order to hit your target. You can adjust your target in the <strong>Settings</strong> tab, keeping it constant, setting it to your personal best, or having it recalculate automatically to help you progress towards a bigger goal.<br><br>If the TFT shows two times separated by a |, the first time is the time needed to guarantee hitting your target on the next solve. The second number indicates the time needed to still have a chance of reaching your target on the next two solves.',
+    });
 });
 
 // === Update target display on timer page ===
@@ -117,7 +126,7 @@ function formatTime(seconds) {
 
 // === Get required solve count for current event ===
 function getRequiredSolves() {
-    return meanEvents.includes(state.eventType) ? 3 : 5;
+    return parseInt(meanEvents.includes(state.eventType) ? 3 : 5);
 }
 
 // === Update progress bar ===
@@ -674,142 +683,205 @@ function addTime() {
     updateProgress();
     updateUndoButton();
     saveIncomplete();
-    fetchScramble();
+    generateScramble();
     window._showMobileSolveResult?.();
 }
 
 // === Calculate stats for current session ===
+
 function calculateStats() {
     const n = state.times.length;
+    const required = getRequiredSolves();
 
+    // Always update general session UI
     updateProgress();
     updateSessionStats();
     updateAveragesEmptyState();
+    updateAverageProgressUI(n, required);
 
-    const required = getRequiredSolves();
+    updateMean(n);
 
-    const tftElem = document.getElementById('tft');
-    const wpaElem = document.getElementById('wpa');
-    const bpaElem = document.getElementById('bpa');
-    const meanElem = document.getElementById('mean');
-    const averageElem = document.getElementById('average');
-
-    const duringAverageElem = document.querySelectorAll('.during-average');
-    const afterAverageElem = document.querySelectorAll('.after-average');
-
-    const mean = n > 0 ? (state.times.reduce((a, b) => a + b.value, 0) / n).toFixed(2) : null;
-    if (meanElem)
-        meanElem.textContent =
-            mean === null ? '-' : isFinite(mean) ? formatTime(parseFloat(mean)) : 'DNF';
-
-    if (n !== required && n !== required - 1) {
-        if (bpaElem) bpaElem.textContent = '-';
-        if (wpaElem) wpaElem.textContent = '-';
-        if (tftElem) tftElem.textContent = '–';
-
-        const probBpaElemReset = document.getElementById('bpa-prob');
-        const probWpaElemReset = document.getElementById('wpa-prob');
-        if (probBpaElemReset) {
-            probBpaElemReset.textContent = '';
-            probBpaElemReset.style.color = '';
-        }
-        if (probWpaElemReset) {
-            probWpaElemReset.textContent = '';
-            probWpaElemReset.style.color = '';
-        }
-        const mlaEarlyReset = document.getElementById('mla');
-        const mlaSolveEarlyReset = document.getElementById('mla-solve');
-        if (mlaEarlyReset) mlaEarlyReset.textContent = '-';
-        if (mlaSolveEarlyReset) mlaSolveEarlyReset.textContent = '';
-
-        duringAverageElem.forEach((el) => (el.style.display = 'flex'));
-        afterAverageElem.forEach((el) => (el.style.display = 'none'));
-
+    // Not enough solves for BPA/WPA yet
+    if (n < required - 1) {
+        resetBpaWpa(document.getElementById('target').value);
+        resetProbabilityAndMla();
         return;
     }
 
-    if (n >= required) {
-        duringAverageElem.forEach((el) => (el.style.display = 'none'));
-        afterAverageElem.forEach((el) => (el.style.display = 'flex'));
+    if (n == required) {
+        // Calculate current averages
+        const { ao5, mo3 } = calculateCurrentAverages(n);
+
+        // Save completed averages
+        saveCompletedAverage(mo3, 3);
+        saveCompletedAverage(ao5, 5);
+    } else {
+        // Calculate BPA / WPA / TFT
+        const target = document.getElementById('target').value;
+        const { bpa, wpa, tft } = calculateBpaWpaTft(state.times, target);
+
+        displayBpaWpaTft(bpa, wpa, tft);
+
+        // Calculate probability / MLA information
+        updateProbabilityAndMla(n, bpa, wpa);
     }
 
+    updateAverageProgressUI(n, required);
+}
+
+// ============================================================
+// General display helpers
+// ============================================================
+
+function updateMean(n) {
+    const elem = document.getElementById('mean');
+    if (!elem) return;
+
+    if (n === 0) {
+        elem.textContent = '-';
+        return;
+    }
+
+    const mean = state.times.reduce((sum, time) => sum + time.value, 0) / n;
+    elem.textContent = isFinite(mean) ? formatTime(mean) : 'DNF';
+}
+
+function updateAverageProgressUI(n, required) {
+    const duringAverage = document.querySelectorAll('.during-average');
+    const afterAverage = document.querySelectorAll('.after-average');
+
+    const averageStarted = n <= required - 1;
+    const averageDone = n === required;
+
+    duringAverage.forEach((el) => {
+        el.style.display = averageStarted && !el.innerText.includes('-') ? 'flex' : 'none';
+    });
+
+    afterAverage.forEach((el) => {
+        el.style.display = averageDone ? 'flex' : 'none';
+    });
+}
+
+// ============================================================
+// Current averages
+// ============================================================
+
+function calculateCurrentAverages(n) {
     let ao5 = null;
     let mo3 = null;
 
     if (n >= 5 && !meanEvents.includes(state.eventType)) {
-        const last5 = state.times
+        const values = state.times
             .slice(-5)
-            .map((t) => t.value)
+            .map((time) => time.value)
             .sort((a, b) => a - b);
-        const trimmed = last5.slice(1, 4);
-        ao5 = (trimmed.reduce((a, b) => a + b, 0) / 3).toFixed(2);
+
+        const middle3 = values.slice(1, 4);
+        ao5 = (middle3.reduce((sum, value) => sum + value, 0) / 3).toFixed(2);
     }
 
     if (n >= 3 && meanEvents.includes(state.eventType)) {
-        const last3 = state.times
+        const values = state.times
             .slice(-3)
-            .map((t) => t.value)
+            .map((time) => time.value)
             .sort((a, b) => a - b);
-        mo3 = ((last3[0] + last3[1] + last3[2]) / 3).toFixed(2);
+
+        mo3 = (values.reduce((sum, value) => sum + value, 0) / 3).toFixed(2);
     }
 
-    const target = parseFloat(document.getElementById('target').value) || Infinity;
-    let { bpa, wpa, tft } = calculateBpaWpaTft(state.times, target);
+    return { ao5, mo3 };
+}
 
-    tft = tft ? tft : '-';
-    tft = !isNaN(tft) ? formatTime(tft) : tft;
+// ============================================================
+// BPA / WPA / TFT
+// ============================================================
 
-    // Show PR rank for BPA and WPA
-    // Helper to set value and PR rank below
-    function setStatWithPr(elem, value, prRank) {
-        if (!elem) return;
-        elem.innerHTML = '';
-        elem.style.position = 'relative';
-        const valueDiv = document.createElement('div');
-        valueDiv.textContent = value;
-        valueDiv.style.position = 'relative';
-        valueDiv.style.zIndex = '1';
-        elem.appendChild(valueDiv);
-        if (prRank && getStorage('setting_show_pr_pills') !== false) {
-            const prDiv = document.createElement('div');
-            prDiv.className = 'pr-rank-pill';
-            prDiv.textContent = `PR #${prRank}`;
-            prDiv.style.opacity = '0.8';
-            prDiv.style.fontSize = '0.7em';
-            prDiv.style.position = 'absolute';
-            prDiv.style.left = '50%';
-            prDiv.style.transform = 'translate(-50%, 100%)';
-            prDiv.style.bottom = '0';
-            prDiv.style.zIndex = '2';
-            prDiv.style.background = getPrPillColor(prRank, 'average');
-            elem.appendChild(prDiv);
+function displayBpaWpaTft(bpa, wpa, tft) {
+    setAverageStat(document.getElementById('bpa'), bpa);
+
+    setAverageStat(document.getElementById('wpa'), wpa);
+
+    const tftElem = document.getElementById('tft');
+
+    if (tftElem) {
+        if (tft == null || tft === '') {
+            tftElem.textContent = '-';
+        } else {
+            tftElem.textContent = tft;
         }
     }
+}
 
-    // BPA
-    if (bpaElem) {
-        let bpaText = bpa === 'DNF' ? 'DNF' : !isNaN(bpa) ? formatTime(bpa) : '-';
-        let bpaRank = null;
-        if (bpa !== '-' && bpa !== 'DNF' && isFinite(bpa)) {
-            bpaRank = getAverageRank(bpa);
-        }
-        setStatWithPr(bpaElem, bpaText, bpaRank);
-    }
-    // WPA
-    if (wpaElem) {
-        let wpaText = wpa === 'DNF' ? 'DNF' : !isNaN(wpa) ? formatTime(wpa) : '-';
-        let wpaRank = null;
-        if (wpa !== '-' && wpa !== 'DNF' && isFinite(wpa)) {
-            wpaRank = getAverageRank(wpa);
-        }
-        setStatWithPr(wpaElem, wpaText, wpaRank);
-    }
-    if (tftElem) tftElem.textContent = tft;
+function setAverageStat(elem, value) {
+    if (!elem) return;
 
-    // === Probability of BPA / WPA based on historical solve distribution ===
-    const probBpaElem = document.getElementById('bpa-prob');
-    const probWpaElem = document.getElementById('wpa-prob');
-    const canShowProb =
+    const isDnf = value === 'DNF';
+    const isNumber = typeof value === 'number' && isFinite(value);
+
+    const text = isDnf ? 'DNF' : isNumber ? formatTime(value) : '-';
+
+    const rank = isNumber ? getAverageRank(value) : null;
+
+    setStatWithPr(elem, text, rank);
+}
+
+// This is shared by BPA, WPA and MLA.
+function setStatWithPr(elem, value, prRank) {
+    if (!elem) return;
+
+    elem.innerHTML = '';
+    elem.style.position = 'relative';
+
+    const valueDiv = document.createElement('div');
+    valueDiv.textContent = value;
+    valueDiv.style.position = 'relative';
+    valueDiv.style.zIndex = '1';
+
+    elem.appendChild(valueDiv);
+
+    if (!prRank || getStorage('setting_show_pr_pills') === false) {
+        return;
+    }
+
+    const prDiv = document.createElement('div');
+
+    prDiv.className = 'pr-rank-pill';
+    prDiv.textContent = `PR #${prRank}`;
+    prDiv.style.opacity = '0.8';
+    prDiv.style.fontSize = '0.7em';
+    prDiv.style.position = 'absolute';
+    prDiv.style.left = '50%';
+    prDiv.style.transform = 'translate(-50%, 100%)';
+    prDiv.style.bottom = '0';
+    prDiv.style.zIndex = '2';
+    prDiv.style.background = getPrPillColor(prRank, 'average');
+
+    elem.appendChild(prDiv);
+}
+
+function resetBpaWpa(target) {
+    const bpa = document.getElementById('bpa');
+    const wpa = document.getElementById('wpa');
+    const tft = document.getElementById('tft');
+
+    const time = calculateTimeForTarget(state.times, target);
+
+    if (bpa) bpa.textContent = '-';
+    if (wpa) wpa.textContent = '-';
+    if (tft) tft.textContent = time;
+}
+
+// ============================================================
+// Probability + MLA
+// ============================================================
+
+function updateProbabilityAndMla(n, bpa, wpa) {
+    const probBpa = document.getElementById('bpa-prob');
+    const probWpa = document.getElementById('wpa-prob');
+    const mla = document.getElementById('mla');
+    const mlaSolve = document.getElementById('mla-solve');
+
+    const canShowProbability =
         n === 4 &&
         !meanEvents.includes(state.eventType) &&
         typeof bpa === 'number' &&
@@ -818,218 +890,236 @@ function calculateStats() {
         isFinite(wpa) &&
         state.userSolves.length >= 5;
 
-    // Mo3 MLA: expected mean with a 3rd solve sampled from historical distribution
-    const finiteSolvesForMla = state.userSolves.filter((s) => isFinite(s));
+    const finiteSolves = state.userSolves.filter(isFinite).splice(0, 24 * getRequiredSolves());
+
     const canShowMlaMo3 =
-        n === 2 && meanEvents.includes(state.eventType) && finiteSolvesForMla.length >= 3;
+        n === 2 && meanEvents.includes(state.eventType) && finiteSolves.length >= 3;
 
-    if (canShowProb) {
-        const currentValues = state.times.map((t) =>
-            t.penalty === 'dnf' || t.value === Infinity ? Infinity : t.value,
-        );
-        const validCurrent = currentValues.filter((v) => isFinite(v));
-        const best4 = Math.min(...validCurrent);
-        const worst4 = Math.max(...validCurrent);
-        const total = state.userSolves.length;
-        // P(BPA): next solve ≤ current best → new best dropped, remaining average = BPA
-        const pBpa = state.userSolves.filter((s) => isFinite(s) && s <= best4).length / total;
-        // P(WPA): next solve ≥ current worst (incl. DNF) → new worst dropped, remaining average = WPA
-        const pWpa = state.userSolves.filter((s) => s >= worst4).length / total;
-
-        if (probBpaElem) {
-            if (getStorage('setting_show_prob_pills') !== false) {
-                const pct = (pBpa * 100).toFixed(1);
-                probBpaElem.textContent = `${pct}%`;
-                probBpaElem.style.background = 'gray';
-                probBpaElem.style.opacity = 0.6;
-                probBpaElem.style.color = '#fff';
-            } else {
-                probBpaElem.textContent = '';
-                probBpaElem.style.background = '';
-                probBpaElem.style.color = '';
-            }
-        }
-
-        if (probWpaElem) {
-            if (getStorage('setting_show_prob_pills') !== false) {
-                const pct = (pWpa * 100).toFixed(1);
-                probWpaElem.textContent = `${pct}%`;
-                probWpaElem.style.background = 'gray';
-                probWpaElem.style.opacity = 0.6;
-                probWpaElem.style.color = '#fff';
-            } else {
-                probWpaElem.textContent = '';
-                probWpaElem.style.background = '';
-                probWpaElem.style.color = '';
-            }
-        }
-
-        // === Most Likely Average: Monte Carlo simulation sampling from actual solve history ===
-        const mlaElem = document.getElementById('mla');
-        const mlaSolveElem = document.getElementById('mla-solve');
-        if (mlaElem) {
-            const finiteSolves = state.userSolves.filter((s) => isFinite(s));
-            if (finiteSolves.length < 5) {
-                mlaElem.textContent = '-';
-                if (mlaSolveElem) mlaSolveElem.textContent = '';
-            } else {
-                // Monte Carlo MLA: sample the 5th solve 5 000 times from historical distribution,
-                // compute the resulting Ao5 each time, and average the finite results.
-                const iterations = 5000;
-                const results = [];
-                for (let i = 0; i < iterations; i++) {
-                    const x5 = finiteSolves[Math.floor(Math.random() * finiteSolves.length)];
-                    const all5 = [...currentValues, x5].sort((a, b) => a - b);
-                    const dnfCount5 = all5.filter((v) => !isFinite(v)).length;
-                    if (dnfCount5 > 1) {
-                        results.push(Infinity);
-                        continue;
-                    }
-                    const middle3 = all5.slice(1, 4);
-                    if (middle3.some((v) => !isFinite(v))) {
-                        results.push(Infinity);
-                        continue;
-                    }
-                    results.push((middle3[0] + middle3[1] + middle3[2]) / 3);
-                }
-                const finiteResults = results.filter((r) => isFinite(r));
-                const expectedMla = finiteResults.length
-                    ? finiteResults.reduce((a, b) => a + b, 0) / finiteResults.length
-                    : null;
-
-                const sortedSolves = [...finiteSolves].sort((a, b) => a - b);
-                const medianSolve = sortedSolves[Math.floor(sortedSolves.length / 2)];
-                if (mlaSolveElem) mlaSolveElem.textContent = `if ${formatTime(medianSolve)}`;
-                if (expectedMla === null) {
-                    mlaElem.textContent = 'DNF';
-                } else {
-                    setStatWithPr(mlaElem, formatTime(expectedMla), getAverageRank(expectedMla));
-                }
-            }
-        }
-    } else {
-        if (probBpaElem) {
-            probBpaElem.textContent = '';
-            probBpaElem.style.background = '';
-            probBpaElem.style.color = '';
-        }
-        if (probWpaElem) {
-            probWpaElem.textContent = '';
-            probWpaElem.style.background = '';
-            probWpaElem.style.color = '';
-        }
-        const mlaElem = document.getElementById('mla');
-        const mlaSolveElem = document.getElementById('mla-solve');
-        if (canShowMlaMo3) {
-            // Sample the 3rd solve from history and compute the expected Mo3
-            const currentMo3Values = state.times.map((t) =>
-                t.penalty === 'dnf' || !isFinite(t.value) ? Infinity : t.value,
-            );
-            const iterations = 2000;
-            const results = [];
-            for (let i = 0; i < iterations; i++) {
-                const x3 =
-                    finiteSolvesForMla[Math.floor(Math.random() * finiteSolvesForMla.length)];
-                const mean3 = (currentMo3Values[0] + currentMo3Values[1] + x3) / 3;
-                results.push(isFinite(mean3) ? mean3 : Infinity);
-            }
-            const finiteResults = results.filter((r) => isFinite(r));
-            const expectedMla = finiteResults.length
-                ? finiteResults.reduce((a, b) => a + b, 0) / finiteResults.length
-                : null;
-            const sortedMo3Solves = [...finiteSolvesForMla].sort((a, b) => a - b);
-            const medianSolve = sortedMo3Solves[Math.floor(sortedMo3Solves.length / 2)];
-            if (mlaSolveElem) mlaSolveElem.textContent = `if ${formatTime(medianSolve)}`;
-            if (mlaElem) {
-                if (expectedMla === null) {
-                    mlaElem.textContent = 'DNF';
-                } else {
-                    setStatWithPr(mlaElem, formatTime(expectedMla), getAverageRank(expectedMla));
-                }
-            }
-        } else {
-            if (mlaElem) mlaElem.textContent = '-';
-            if (mlaSolveElem) mlaSolveElem.textContent = '';
-        }
+    if (canShowProbability) {
+        updateAo5Probability(probBpa, probWpa, mla, mlaSolve);
+        return;
     }
+
+    clearProbabilityPills(probBpa, probWpa);
+
+    if (canShowMlaMo3) {
+        updateMo3Mla(mla, mlaSolve, finiteSolves);
+    } else {
+        if (mla) mla.textContent = '-';
+        if (mlaSolve) mlaSolve.textContent = '';
+    }
+}
+
+// ============================================================
+// Ao5 probability + MLA
+// ============================================================
+
+function updateAo5Probability(probBpaElem, probWpaElem, mlaElem, mlaSolveElem) {
+    const currentValues = state.times.map((time) =>
+        time.penalty === 'dnf' || time.value === Infinity ? Infinity : time.value,
+    );
+
+    const validValues = currentValues.filter(isFinite);
+
+    const best = Math.min(...validValues);
+    const worst = Math.max(...validValues);
+    const total = state.userSolves.length;
+
+    const pBpa =
+        state.userSolves.filter((solve) => isFinite(solve) && solve <= best).length / total;
+
+    const pWpa = state.userSolves.filter((solve) => solve >= worst).length / total;
+
+    setProbabilityPill(probBpaElem, pBpa);
+    setProbabilityPill(probWpaElem, pWpa);
+
+    updateAo5Mla(mlaElem, mlaSolveElem, currentValues);
+}
+
+function setProbabilityPill(elem, probability) {
+    if (!elem) return;
+
+    if (getStorage('setting_show_prob_pills') === false) {
+        clearProbabilityPill(elem);
+        return;
+    }
+
+    elem.textContent = `${(probability * 100).toFixed(1)}%`;
+    elem.style.background = 'gray';
+    elem.style.opacity = 0.6;
+    elem.style.color = '#fff';
+}
+
+function clearProbabilityPill(elem) {
+    if (!elem) return;
+
+    elem.textContent = '';
+    elem.style.background = '';
+    elem.style.color = '';
+}
+
+function clearProbabilityPills(bpaElem, wpaElem) {
+    clearProbabilityPill(bpaElem);
+    clearProbabilityPill(wpaElem);
+}
+
+function resetProbabilityAndMla() {
+    clearProbabilityPills(document.getElementById('bpa-prob'), document.getElementById('wpa-prob'));
+
+    const mla = document.getElementById('mla');
+    const mlaSolve = document.getElementById('mla-solve');
+
+    if (mla) mla.textContent = '-';
+    if (mlaSolve) mlaSolve.textContent = '';
+}
+
+// ============================================================
+// Ao5 Monte Carlo MLA
+// ============================================================
+
+function updateAo5Mla(mlaElem, mlaSolveElem, currentValues) {
+    const finiteSolves = state.userSolves.filter(isFinite).splice(0, 24 * 5);
+
+    if (finiteSolves.length < 5) {
+        if (mlaElem) mlaElem.textContent = '-';
+        if (mlaSolveElem) mlaSolveElem.textContent = '';
+        return;
+    }
+
+    const results = runMonteCarlo(5000, () => {
+        const nextSolve = finiteSolves[Math.floor(Math.random() * finiteSolves.length)];
+
+        return nextSolve;
+    });
+
+    displayMlaResult(mlaElem, mlaSolveElem, results);
+}
+
+// ============================================================
+// Mo3 Monte Carlo MLA
+// ============================================================
+
+function updateMo3Mla(mlaElem, mlaSolveElem, finiteSolves) {
+    const currentValues = state.times.map((time) =>
+        time.penalty === 'dnf' || !isFinite(time.value) ? Infinity : time.value,
+    );
+
+    const results = runMonteCarlo(2000, () => {
+        const nextSolve = finiteSolves[Math.floor(Math.random() * finiteSolves.length)];
+
+        return nextSolve;
+    });
+
+    displayMlaResult(mlaElem, mlaSolveElem, results);
+}
+
+// ============================================================
+// Shared Monte Carlo helpers
+// ============================================================
+
+function runMonteCarlo(iterations, callback) {
+    const results = [];
+
+    for (let i = 0; i < iterations; i++) {
+        results.push(callback());
+    }
+
+    return results.filter(isFinite);
+}
+
+function displayMlaResult(mlaElem, mlaSolveElem, results) {
+    const expectedNextSolve = results.length
+        ? results.reduce((sum, value) => sum + value, 0) / results.length
+        : null;
+
+    let currentTimes = state.times.map((a) => a.value);
+    currentTimes.push(expectedNextSolve);
+
+    const sortedSolves = currentTimes.sort((a, b) => a - b);
+    const expectedMla = sortedSolves.splice(1, 3).reduce((a, b) => a + b, 0) / 3;
+
+    if (mlaSolveElem) {
+        mlaSolveElem.textContent = `if ${formatTime(expectedNextSolve)}`;
+    }
+
+    if (!mlaElem) return;
+
+    if (expectedMla === null) {
+        mlaElem.textContent = 'DNF';
+        return;
+    }
+
+    setStatWithPr(mlaElem, formatTime(expectedMla), getAverageRank(expectedMla));
+}
+
+// ============================================================
+// Saving completed averages
+// ============================================================
+
+function saveCompletedAverage(average, solveCount) {
+    if (!average || state.times.length !== solveCount) return;
+
+    const averageId = state.times[state.times.length - 1].averageId;
+
+    const alreadySaved = state.averageTags.some((tag) => tag.averageId === averageId);
+
+    if (alreadySaved) return;
 
     const event = document.getElementById('event-type').value;
 
-    if (mo3 && n === 3) {
-        const avgId = state.times[state.times.length - 1].averageId;
+    const tag = {
+        average,
+        times: state.times.slice(-solveCount),
+        event,
+        averageId,
+    };
 
-        const alreadySaved = state.averageTags.some((tag) => tag.averageId === avgId);
-        if (!alreadySaved) {
-            const newTag = { average: mo3, times: state.times.slice(-3), event, averageId: avgId };
-            state.averageTags.push(newTag);
-            state.previousAverage = newTag;
+    state.averageTags.push(tag);
+    state.previousAverage = tag;
 
-            const moVal = parseFloat(mo3);
-            if (
-                !isNaN(moVal) &&
-                isFinite(moVal) &&
-                (!state.sessionPrAverage[event] ||
-                    moVal < parseFloat(state.sessionPrAverage[event].average))
-            ) {
-                state.sessionPrAverage[event] = { ...newTag };
-            }
+    updateSessionAveragePr(tag, event);
 
-            saveAverages();
-            deleteStorage(`ct_incomplete_${event}`);
-            state.userAverages.push(mo3 === 'DNF' ? 'DNF' : parseFloat(mo3));
-            // Show PR rank for Mo3 below
-            let mo3Text = mo3 === 'DNF' ? 'DNF' : formatTime(parseFloat(mo3));
-            let mo3Rank = null;
-            if (mo3 !== 'DNF' && isFinite(mo3)) {
-                mo3Rank = getAverageRank(mo3);
-            }
-            setStatWithPr(averageElem, mo3Text, mo3Rank);
-            displayTags();
-            updateProgress();
-            updateSessionStats();
-            updatePrTarget();
-            updateGoalTargetAfterAverage(parseFloat(mo3));
-            celebrateAverage(moVal, mo3Rank);
-        }
+    saveAverages();
+    deleteStorage(`ct_incomplete_${event}`);
+
+    state.userAverages.push(average === 'DNF' ? 'DNF' : parseFloat(average));
+
+    displayCompletedAverage(average);
+    updateAfterAverageUI(average);
+}
+
+function updateSessionAveragePr(tag, event) {
+    const value = parseFloat(tag.average);
+
+    if (
+        !isNaN(value) &&
+        isFinite(value) &&
+        (!state.sessionPrAverage[event] ||
+            value < parseFloat(state.sessionPrAverage[event].average))
+    ) {
+        state.sessionPrAverage[event] = { ...tag };
     }
+}
 
-    if (ao5 && n === 5) {
-        const avgId = state.times[state.times.length - 1].averageId;
+function displayCompletedAverage(average) {
+    const averageElem = document.getElementById('average');
+    if (!averageElem) return;
 
-        const alreadySaved = state.averageTags.some((tag) => tag.averageId === avgId);
-        if (!alreadySaved) {
-            const newTag = { average: ao5, times: state.times.slice(-5), event, averageId: avgId };
-            state.averageTags.push(newTag);
-            state.previousAverage = newTag;
+    const text = average === 'DNF' ? 'DNF' : formatTime(parseFloat(average));
 
-            const aoVal = parseFloat(ao5);
-            if (
-                !isNaN(aoVal) &&
-                isFinite(aoVal) &&
-                (!state.sessionPrAverage[event] ||
-                    aoVal < parseFloat(state.sessionPrAverage[event].average))
-            ) {
-                state.sessionPrAverage[event] = { ...newTag };
-            }
+    const rank = average !== 'DNF' && isFinite(average) ? getAverageRank(average) : null;
 
-            saveAverages();
-            deleteStorage(`ct_incomplete_${event}`);
-            state.userAverages.push(ao5 === 'DNF' ? 'DNF' : parseFloat(ao5));
-            // Show PR rank for Ao5 below
-            let ao5Text = ao5 === 'DNF' ? 'DNF' : formatTime(parseFloat(ao5));
-            let ao5Rank = null;
-            if (ao5 !== 'DNF' && isFinite(ao5)) {
-                ao5Rank = getAverageRank(ao5);
-            }
-            setStatWithPr(averageElem, ao5Text, ao5Rank);
-            displayTags();
-            updateProgress();
-            updateSessionStats();
-            updatePrTarget();
-            updateGoalTargetAfterAverage(parseFloat(ao5));
-            celebrateAverage(aoVal, ao5Rank);
-        }
-    }
+    setStatWithPr(averageElem, text, rank);
+}
+
+function updateAfterAverageUI(average) {
+    displayTags();
+    updateProgress();
+    updateSessionStats();
+    updatePrTarget();
+    updateGoalTargetAfterAverage(parseFloat(average));
+
+    celebrateAverage(parseFloat(average), getAverageRank(parseFloat(average)));
 }
 
 // === BPA / WPA / TFT calculation ===
@@ -1037,6 +1127,8 @@ function calculateStats() {
 // WPA (Worst Possible Average): worst Ao5 if the next solve is maximally bad (DNF)
 // TFT (Time For Target): exact next-solve time needed to hit the target average
 function calculateBpaWpaTft(times, target) {
+    const tft = calculateTimeForTarget(times, target);
+
     // For mean events (6x6, 7x7, BLD)
     if (times.length === 2 && meanEvents.includes(state.eventType)) {
         const mappedTimes = times.map((t) => {
@@ -1054,16 +1146,8 @@ function calculateBpaWpaTft(times, target) {
 
         // BPA: theoretical floor — best mean achievable if the 3rd solve were near zero
         // WPA: any DNF on solve 3 makes the entire Mo3 a DNF
-        const bpa = sum / 3;
+        const bpa = (sum + 0) / 3;
         const wpa = 'DNF';
-
-        // TFT: (s1 + s2 + x) / 3 = target  →  x = 3·target − sum
-        let tft = null;
-        if (target !== Infinity && target > 0) {
-            tft = target * 3 - sum;
-        }
-        // If the floor itself exceeds target, no 3rd solve can help
-        if (tft !== null && bpa > target) tft = 'Not Possible';
 
         return { bpa, wpa, tft };
     } else if (times.length === 4) {
@@ -1098,21 +1182,71 @@ function calculateBpaWpaTft(times, target) {
             wpa = (sum - best) / 3;
         }
 
-        // time for target
-        let tft = null;
-        if (target !== Infinity && dnfCount === 0) {
-            const needed = target * 3 - (sum - best - worst);
-            tft = needed;
-        }
-
-        // Handle impossible/guaranteed target
-        if (wpa < target) tft = 'Guaranteed';
-        if (bpa > target) tft = 'Not Possible';
-
         return { bpa, wpa, tft };
     }
 
-    return { bpa: '-', wpa: '-', tft: '-' };
+    return { bpa: '-', wpa: '-', tft: tft };
+}
+
+function calculateTimeForTarget(times, target) {
+    const solves = times.map((a) => parseFloat(a.value)).sort((a, b) => a - b);
+    let tft = '-';
+    let n = solves.length;
+
+    target = parseFloat(isNaN(target) ? formattedTimeToSeconds(target) : target);
+    console.log(target);
+
+    if (n === 4) {
+        let sum = solves[1] + solves[2];
+        tft = 3 * target - sum;
+        console.log(tft);
+
+        if (tft < solves[0]) return 'Not Possible';
+        else if (tft > solves[n - 1]) return 'Guaranteed';
+    } else if (n === 3) {
+        // Have BPA still be under/at target:
+        // A(x) = (s_1 + s_2 + x) / 3 {0 < x <= 3 * t - s_1 - s_2}
+        // solve for x when A(x) = t
+        // x < 3 * t - s_1 - s_2 | x ∈ R+
+        let lesserSum = solves[0] + solves[1];
+        let timeForStillPossibleBPA = 3 * target - lesserSum;
+
+        // Guarantee target average:
+        // B(x) = (s_2 + s_3 + x) / 3 {0 < x <= 3 * t - s_2 - s_3}
+        // solve for x when B(x) = t
+        // x < 3 * t - s_2 - s_3 | x ∈ R+, (s_1 + s_2 + s_3) / 3 < t
+        let greaterSum = solves[1] + solves[2];
+        let timeForGuaranteedTarget = 3 * target - greaterSum;
+
+        // Second condition for guaranteed target:
+        // (s_1 + s_2 + s_3) / 3 < t
+        let isSecondConditionMet = solves.reduce((acc, cur) => acc + cur, 0) / 3 < target;
+
+        // the BPA is no longer under target, i.e. target not possible, when x is out of the domain
+        let isWithinDomain = 0 < timeForStillPossibleBPA;
+        if (!isWithinDomain) return 'Not Possible';
+
+        // the WPA is under/at the target, i.e. target is inevitable, when x is within the domain
+        let isTargetGuaranteedConditionMet = 0 < timeForGuaranteedTarget;
+
+        timeForGuaranteedTarget =
+            isTargetGuaranteedConditionMet && isSecondConditionMet
+                ? formatTime(timeForGuaranteedTarget)
+                : 'Not Possible';
+
+        return `${timeForGuaranteedTarget} | ${formatTime(timeForStillPossibleBPA)}`;
+    } else if (n === 2) {
+        let sum = solves[0] + solves[1];
+        tft = 3 * target - sum;
+    } else if (n === 1) {
+        let sum = solves[0];
+        tft = 2 * target - sum;
+    } else return formatTime(target);
+
+    // if is number set to fixed 2
+    // tft = formatTime(tft);
+
+    return tft > 0 ? formatTime(tft) : 'Not Possible';
 }
 
 // === Display current times in right container ===
@@ -1644,7 +1778,10 @@ async function fetchUserData(wcaId) {
         ...state.userSolves,
         ...convertedSolves.filter((t) => !state.userSolves.includes(t)),
     ];
-    state.userAverages = [...state.userAverages];
+    state.userAverages = [
+        ...state.userAverages,
+        ...convertedAverages.filter((t) => !state.userAverages.includes(t)),
+    ];
 
     // Keep competition page WCA-only data in sync
     compState.wcaSolves = convertedSolves.filter((t) => isFinite(t));
@@ -1824,7 +1961,11 @@ function setGoalModeEnabled(enabled) {
     const subEl = document.getElementById('goalSubSettings');
     if (subEl) subEl.style.display = enabled ? 'block' : 'none';
     const goalModeEl = document.getElementById('settingsGoalMode');
-    if (goalModeEl) goalModeEl.checked = enabled;
+    if (goalModeEl) {
+        goalModeEl.checked = enabled;
+        document.getElementById('settingsUsePr').checked = !enabled;
+    }
+
     if (enabled) {
         applyGoalTarget();
     } else {
@@ -1953,7 +2094,7 @@ function scheduleSave() {
     _saveDebounceTimer = setTimeout(() => {
         _saveDebounceTimer = null;
         flushSave();
-    }, 500);
+    }, 5000);
 }
 
 function flushSave() {
@@ -2229,11 +2370,6 @@ eventSelector.addEventListener('change', async (e) => {
     // Save incomplete solves for current event before switching
     saveIncomplete(lastEventType);
 
-    // Load incomplete solves for the new event if they exist
-    state.times = [];
-    loadIncomplete();
-    if (state.times.length === 0) displayCurrentTimes();
-
     // Reset session-specific rankings
     state.userSolves = [];
     state.userAverages = [];
@@ -2254,7 +2390,7 @@ eventSelector.addEventListener('change', async (e) => {
         applyGoalTarget();
     }
     updateTargetDisplay();
-    fetchScramble();
+    generateScramble();
 
     // Reload WCA data if a valid WCA ID is present, since rankings are event-specific
     const wcaId = document.getElementById('wca').value.trim().toUpperCase();
@@ -2275,6 +2411,11 @@ eventSelector.addEventListener('change', async (e) => {
             });
         }
     }
+
+    // Load incomplete solves for the new event if they exist
+    state.times = [];
+    loadIncomplete();
+    if (state.times.length === 0) displayCurrentTimes();
 
     // Keep timer event select in sync
     if (timerEventSelect) timerEventSelect.value = newEvent;
@@ -2397,7 +2538,7 @@ window.addEventListener('DOMContentLoaded', () => {
     updateProgress();
     updateUndoButton();
     updateTargetDisplay();
-    fetchScramble();
+    generateScramble();
 
     // Trigger WCA data load if a saved WCA ID is valid
     if (savedWca && /\d{4}[a-zA-Z]{4}\d{2}/.test(savedWca)) {
@@ -2448,10 +2589,12 @@ const PUZZLE_MAP = {
 
 function updateScrambleDrawing(scramble) {
     const viewer = document.getElementById('scrambleViewer');
+    const bigViewer = document.getElementById('bigScrambleViewer');
     if (!viewer) return;
 
     const puzzle = PUZZLE_MAP[state.eventType] || '3x3x3';
     viewer.puzzle = puzzle;
+    bigViewer.puzzle = puzzle;
 
     // remove <br> from scramble before drawing
     scramble = scramble ? scramble.replace(/<br>/g, ' ') : '';
@@ -2459,13 +2602,17 @@ function updateScrambleDrawing(scramble) {
     if (scramble) {
         viewer.alg = '';
         viewer.experimentalSetupAlg = scramble;
+        bigViewer.alg = '';
+        bigViewer.experimentalSetupAlg = scramble;
     } else {
         viewer.alg = '';
         viewer.experimentalSetupAlg = '';
+        bigViewer.alg = '';
+        bigViewer.experimentalSetupAlg = '';
     }
 }
 
-async function fetchScramble() {
+async function generateScramble() {
     const scrambleText = document.getElementById('scrambleText');
     if (!scrambleText) return;
 
@@ -2494,7 +2641,7 @@ async function fetchScramble() {
     }
 }
 
-document.getElementById('newScrambleBtn').addEventListener('click', fetchScramble);
+document.getElementById('newScrambleBtn').addEventListener('click', generateScramble);
 
 // === SCRAMBLE FULLSCREEN POPUP ===
 
@@ -3008,13 +3155,13 @@ function addTimerTime(time) {
         triggerEmojiAnimation('🎉', 10, document.getElementById('timerDisplay'));
     }
 
-    calculateStats();
     displayCurrentTimes();
     updateProgress();
     updateUndoButton();
     saveIncomplete();
-    fetchScramble();
+    generateScramble();
     window._showMobileSolveResult?.();
+    calculateStats();
 }
 
 // === EMOJI CELEBRATION ANIMATION ===
@@ -3067,7 +3214,7 @@ function triggerEmojiAnimation(emoji, count, originEl) {
 // Celebration priority (most special = most emojis):
 //   under target  → 🎯  ×  5
 //   PR single     → 🎉  × 10  (triggered in addTimerTime)
-//   PR average    → 🏆  × 18
+//   PR average    → 🎉  × 18
 //   under goal    → 🌟  × 25
 function celebrateAverage(avgVal, rank) {
     if (typeof avgVal !== 'number' || !isFinite(avgVal)) return;
@@ -3082,7 +3229,7 @@ function celebrateAverage(avgVal, rank) {
     if (isUnderGoal) {
         triggerEmojiAnimation('🌟', 25, originEl);
     } else if (isPrAvg) {
-        triggerEmojiAnimation('🏆', 18, originEl);
+        triggerEmojiAnimation('🎉', 18, originEl);
     } else if (isUnderTarget) {
         triggerEmojiAnimation('🎯', 5, originEl);
     }
@@ -3092,105 +3239,140 @@ function celebrateAverage(avgVal, rank) {
 document.addEventListener('keydown', (e) => {
     if (state.mode !== 'timer') return;
 
-    // Ignore if focus is on an input/textarea
+    // Don't interfere with text input
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
-    // Escape cancels inspection
+    // Escape cancels an active inspection
     if (e.key === 'Escape' && state.inspectionRunning) {
+        e.preventDefault();
         stopInspection();
         resetTimerDisplay();
         timerDisplay.textContent = '0.00';
         return;
     }
 
-    // If timer is running, allow ANY key to stop
+    // Any key stops a running timer
     if (state.timerRunning) {
+        e.preventDefault();
         stopTimer();
         if (e.key === 'Escape') applyPenalty(state.times.length - 1, 'dnf');
         return;
     }
 
-    // Only allow spacebar to start the timer / inspection
+    // From here on, only Space matters
     if (e.code !== 'Space') return;
     e.preventDefault();
 
-    if (state.timerHolding) return; // already holding
+    // Don't restart/duplicate an existing hold
+    if (state.timerHolding) return;
 
     state.timerHolding = true;
 
+    // ---------------------------------------------------------
+    // Inspection already running:
+    // hold Space to end inspection and start the solve
+    // ---------------------------------------------------------
     if (state.inspectionRunning) {
-        // During inspection: show warning colour while holding, green when ready
         timerDisplay.classList.add('inspection-holding');
+
         holdTimeout = setTimeout(() => {
             state.timerReady = true;
             timerDisplay.classList.remove('inspection-holding');
             timerDisplay.classList.add('inspection-ready');
         }, currentHoldDuration);
-    } else if (shouldUseInspection()) {
-        // Color green immediately to indicate inspection mode, but only start timer on keyup (no hold needed)
-        timerDisplay.classList.add('inspecting');
-        if (!state.inspectionAnimFrame) updateInspectionDisplay();
-    } else {
-        // No inspection: normal hold-to-start-timer flow
-        timerDisplay.textContent = '0.00';
-        timerDisplay.classList.remove(
-            'running',
-            'inspecting',
-            'inspection-plus2',
-            'inspection-dnf',
-        );
-        timerDisplay.classList.add('holding');
-        holdTimeout = setTimeout(() => {
-            state.timerReady = true;
-            timerDisplay.classList.remove('holding');
-            timerDisplay.classList.add('ready');
-        }, currentHoldDuration);
+
+        return;
     }
+
+    // ---------------------------------------------------------
+    // Inspection should be used:
+    // first Space press starts inspection immediately.
+    // A later Space press will use the hold flow above.
+    // ---------------------------------------------------------
+    if (shouldUseInspection()) {
+        state.timerHolding = false;
+
+        timerDisplay.classList.add('inspecting');
+
+        if (!state.inspectionAnimFrame) {
+            startInspection();
+        }
+
+        return;
+    }
+
+    // ---------------------------------------------------------
+    // No inspection:
+    // hold Space until the timer is ready to start.
+    // ---------------------------------------------------------
+    timerDisplay.textContent = '0.00';
+
+    timerDisplay.classList.remove('running', 'inspecting', 'inspection-plus2', 'inspection-dnf');
+    timerDisplay.classList.add('holding');
+
+    holdTimeout = setTimeout(() => {
+        state.timerReady = true;
+        timerDisplay.classList.remove('holding');
+        timerDisplay.classList.add('ready');
+    }, currentHoldDuration);
 });
 
 document.addEventListener('keyup', (e) => {
     if (state.mode !== 'timer') return;
+    if (e.code !== 'Space') return;
 
-    // Only care about spacebar for starting, but ignore key for stopping
-    if (!state.timerRunning && e.code !== 'Space') return;
+    // Don't interfere with text input
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
     e.preventDefault();
 
+    // Cancel the hold timer regardless of how far we got
     if (holdTimeout) {
         clearTimeout(holdTimeout);
         holdTimeout = null;
     }
 
-    if (state.timerReady && !state.timerRunning && e.code === 'Space') {
+    // ---------------------------------------------------------
+    // Space was held long enough:
+    // start the solve.
+    // ---------------------------------------------------------
+    if (state.timerReady && !state.timerRunning) {
         state.timerHolding = false;
+        state.timerReady = false;
+
         timerDisplay.classList.remove('ready', 'holding', 'inspection-holding', 'inspection-ready');
 
         if (state.inspectionRunning) {
-            // Held long enough during inspection → stop inspection and start solve
             stopInspection();
-            startTimer();
-        } else {
-            // No inspection (or already handled above): start timer
-            startTimer();
         }
+
+        startTimer();
         return;
     }
 
-    // Released without completing the hold
+    // ---------------------------------------------------------
+    // Space was released before the hold completed.
+    // ---------------------------------------------------------
     state.timerHolding = false;
     state.timerReady = false;
+
     timerDisplay.classList.remove('ready', 'holding', 'inspection-holding', 'inspection-ready');
 
-    if (e.code === 'Space' && !state.timerRunning) {
-        if (state.timerJustStopped) {
-            state.timerJustStopped = false;
-        } else if (!state.inspectionRunning && shouldUseInspection()) {
-            // Tap to start inspection — no hold needed
-            startInspection();
-        } else if (state.inspectionRunning) {
-            // Released too early during hold — inspection still running, just restore class
-            timerDisplay.classList.add('inspecting');
-            if (!state.inspectionAnimFrame) updateInspectionDisplay();
+    // A timer was just stopped, so consume this Space release
+    // without starting anything.
+    if (state.timerJustStopped) {
+        state.timerJustStopped = false;
+        return;
+    }
+
+    // If inspection is active, restore its visual state.
+    if (state.inspectionRunning) {
+        timerDisplay.classList.add('inspecting');
+
+        if (!state.inspectionAnimFrame) {
+            updateInspectionDisplay();
         }
     }
 });
@@ -3441,14 +3623,6 @@ function undoLastSolve() {
         state.averageTags.pop();
     }
 
-    // Clean up cookies for events that lost their last average
-    removedTags.forEach((tag) => {
-        const remaining = state.averageTags.filter((t) => t.event === tag.event);
-        if (remaining.length === 0) {
-            deleteStorage(`averages_${tag.event}`);
-        }
-    });
-
     state.times = undo.times;
     state.currentScramble = undo.scramble;
 
@@ -3466,10 +3640,10 @@ function undoLastSolve() {
     displayCurrentTimes();
     displayTags();
     updateProgress();
-    calculateStats();
     updateUndoButton();
     updateSessionStats();
     updateAveragesEmptyState();
+    calculateStats();
 }
 
 function updateUndoButton() {
