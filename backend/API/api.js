@@ -79,12 +79,6 @@ const adminStatusLimiter = createRateLimiter(
     'Too many status requests, please try again later.',
 );
 
-const adminUpdateWcaLimiter = createRateLimiter(
-    24 * 60 * 60 * 1000,
-    2,
-    'Too many WCA update requests, please try again later.',
-);
-
 const adminTodosReadLimiter = createRateLimiter(
     15 * 60 * 1000,
     60,
@@ -306,6 +300,14 @@ router.get('/api/admin/verify', adminVerifyLimiter, (req, res) =>
     adminSessionApi.handleVerify(req, res),
 );
 
+// Combined admin overview payload used by the dashboard and message pages.
+router.get(
+    '/api/admin/overview',
+    adminVerifyLimiter,
+    adminSessionApi.requireAuth.bind(adminSessionApi),
+    (req, res) => adminSessionApi.getAdminOverview(req, res),
+);
+
 // Change password (any authenticated user)
 router.post('/api/admin/change-password', adminChangePasswordLimiter, (req, res) =>
     adminSessionApi.handleChangePassword(req, res),
@@ -369,6 +371,22 @@ router.patch(
     adminUsersWriteLimiter,
     adminSessionApi.requireAdmin.bind(adminSessionApi),
     (req, res) => adminSessionApi.updateUserRole(req, res),
+);
+
+// Update user display role
+router.patch(
+    '/api/admin/users/:username/display-role',
+    adminUsersWriteLimiter,
+    adminSessionApi.requireAdmin.bind(adminSessionApi),
+    (req, res) => adminSessionApi.updateUserDisplayRole(req, res),
+);
+
+// Update user display name
+router.patch(
+    '/api/admin/users/:username/name',
+    adminUsersWriteLimiter,
+    adminSessionApi.requireAdmin.bind(adminSessionApi),
+    (req, res) => adminSessionApi.updateUserName(req, res),
 );
 
 // Reset user password
@@ -560,6 +578,14 @@ router.patch(
     adminMessagesWriteLimiter,
     adminSessionApi.requireOperatorOrAdmin.bind(adminSessionApi),
     (req, res) => adminSessionApi.handleMarkMessageDone(req, res),
+);
+
+// Reply to a message
+router.post(
+    '/api/admin/messages/:id/reply',
+    adminMessagesWriteLimiter,
+    adminSessionApi.requireOperatorOrAdmin.bind(adminSessionApi),
+    (req, res) => adminSessionApi.handleReplyMessage(req, res),
 );
 
 // =========================

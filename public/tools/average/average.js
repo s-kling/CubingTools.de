@@ -24,8 +24,159 @@ const state = {
     inspectionTime: null, // seconds used in the last inspection
 };
 
-// Events that use Mean of 3 rather than Average of 5
-const meanEvents = ['666', '777', '444bf', '555bf'];
+// ============================================================
+// EVENT METADATA
+// Single source of truth for event name / puzzle-viewer id / icon / whether
+// the event uses Mean-of-3 instead of Average-of-5. Previously this was
+// spread across meanEvents / PUZZLE_MAP / EVENT_NAMES / an inline icons map
+// that had drifted out of sync with each other.
+// ============================================================
+
+const EVENTS = {
+    '222': { name: '2x2x2', puzzle: '2x2x2', isMean: false },
+    '333': { name: '3x3x3', puzzle: '3x3x3', isMean: false },
+    '444': { name: '4x4x4', puzzle: '4x4x4', isMean: false },
+    '555': { name: '5x5x5', puzzle: '5x5x5', isMean: false },
+    '666': { name: '6x6x6', puzzle: '6x6x6', isMean: true },
+    '777': { name: '7x7x7', puzzle: '7x7x7', isMean: true },
+    '333bf': { name: '3x3 Blindfolded', puzzle: '3x3x3', isMean: false },
+    '333oh': { name: '3x3 One-Handed', puzzle: '3x3x3', isMean: false },
+    'clock': { name: 'Clock', puzzle: 'clock', isMean: false },
+    'fto': { name: 'FTO', puzzle: 'fto', isMean: false },
+    'minx': { name: 'Megaminx', puzzle: 'megaminx', isMean: false },
+    'pyram': { name: 'Pyraminx', puzzle: 'pyraminx', isMean: false },
+    'skewb': { name: 'Skewb', puzzle: 'skewb', isMean: false },
+    'sq1': { name: 'Square-1', puzzle: 'square1', isMean: false },
+    '444bf': { name: '4x4 Blindfolded', puzzle: '4x4x4', isMean: true },
+    '555bf': { name: '5x5 Blindfolded', puzzle: '5x5x5', isMean: true },
+    '333mbf': { name: '3x3 Multi-Blind', puzzle: '3x3x3', isMean: false },
+    '333fm': { name: '3x3 Fewest Moves', puzzle: '3x3x3', isMean: false },
+};
+
+// Events that use Mean of 3 rather than Average of 5, derived from EVENTS
+// so this can never drift out of sync with the rest of the event metadata.
+const meanEvents = Object.keys(EVENTS).filter((id) => EVENTS[id].isMean);
+
+const BLIND_EVENTS = ['333bf', '444bf', '555bf'];
+
+function isDnfValue(value) {
+    return (
+        value === 'DNF' ||
+        value === -1 ||
+        value === Infinity ||
+        value === Number.POSITIVE_INFINITY ||
+        value === Number.NEGATIVE_INFINITY
+    );
+}
+
+function getSolveValue(solve) {
+    if (!solve) return Infinity;
+
+    if (solve.penalty === 'dnf' || solve.raw === -1 || isDnfValue(solve.value)) {
+        return Infinity;
+    }
+
+    const raw = Number(solve.value ?? solve.raw);
+    if (!Number.isFinite(raw)) return Infinity;
+
+    return solve.penalty === 'plus2' ? raw + 2 : raw;
+}
+
+// ============================================================
+// Shared time-string parsing
+// Single canonical parser used by the manual time input, the edit modal,
+// the competition page, and the goal-time settings input. Previously each
+// of these re-implemented "DNF" / "m:ss.xx" / "ss.xx" parsing slightly
+// differently.
+// ============================================================
+
+function parseTimeString(rawInput) {
+    const input = String(rawInput ?? '').trim();
+    if (!input) {
+        return { raw: null, isDnf: false, error: 'Invalid time format' };
+    }
+
+    if (input.toUpperCase() === 'DNF') {
+        return { raw: null, isDnf: true, error: null };
+    }
+
+    let numericValue;
+    if (input.includes(':')) {
+        const parts = input.split(':');
+        if (parts.length !== 2) {
+            return { raw: null, isDnf: false, error: 'Invalid time format' };
+        }
+
+        const minutes = Number.parseFloat(parts[0]);
+        const seconds = Number.parseFloat(parts[1]);
+        if (!Number.isFinite(minutes) || !Number.isFinite(seconds)) {
+            return { raw: null, isDnf: false, error: 'Invalid time format' };
+        }
+
+        numericValue = minutes * 60 + seconds;
+    } else {
+        numericValue = Number.parseFloat(input);
+    }
+
+    if (!Number.isFinite(numericValue)) {
+        return { raw: null, isDnf: false, error: 'Invalid time format' };
+    }
+
+    return { raw: numericValue, isDnf: false, error: null };
+}
+
+// Wraps parseTimeString for the main time-input field / edit modal, which
+// represent DNF as raw = -1, value = Infinity, to match the stored solve shape.
+function parseSolveInput(rawInput) {
+    const parsed = parseTimeString(rawInput);
+    if (parsed.error) {
+        return { raw: null, value: null, penalty: null, error: parsed.error };
+    }
+    if (parsed.isDnf) {
+        return { raw: -1, value: Infinity, penalty: 'dnf', error: null };
+    }
+    return { raw: parsed.raw, value: parsed.raw, penalty: null, error: null };
+}
+
+function getFiniteAverageValues(items) {
+    return items.map((item) => Number(item)).filter((value) => Number.isFinite(value));
+}
+
+// ============================================================
+// Shared best/worst-solve helper
+// Given an array of numeric solve values (DNF represented as Infinity),
+// returns the index of the best (lowest finite) and worst (first DNF, else
+// highest finite) solve. Previously this min/max/"mark first occurrence"
+// logic was reimplemented independently in four different places.
+// ============================================================
+
+function getBestWorstIndices(values) {
+    let bestIdx = -1;
+    let worstIdx = -1;
+    let bestValue = Infinity;
+    let worstValue = -Infinity;
+    let sawDnf = false;
+
+    values.forEach((value, idx) => {
+        if (!Number.isFinite(value)) {
+            if (!sawDnf) {
+                sawDnf = true;
+                worstIdx = idx;
+            }
+            return;
+        }
+        if (value < bestValue) {
+            bestValue = value;
+            bestIdx = idx;
+        }
+        if (!sawDnf && value > worstValue) {
+            worstValue = value;
+            worstIdx = idx;
+        }
+    });
+
+    return { bestIdx, worstIdx };
+}
 
 // === Format input field on input ===
 document.getElementById('timeInput').addEventListener('input', (e) => {
@@ -114,8 +265,8 @@ function formatInputField(input) {
 
 // === Format time for display (handles minutes:seconds) ===
 function formatTime(seconds) {
-    if (seconds === Infinity || seconds === -1) return 'DNF';
-    if (typeof seconds !== 'number' || isNaN(seconds)) return 'DNF';
+    if (isDnfValue(seconds)) return 'DNF';
+    if (typeof seconds !== 'number' || Number.isNaN(seconds)) return 'DNF';
     if (seconds >= 60) {
         const mins = Math.floor(seconds / 60);
         const secs = (seconds % 60).toFixed(2);
@@ -124,31 +275,56 @@ function formatTime(seconds) {
     return seconds.toFixed(2);
 }
 
-// === Get required solve count for current event ===
-function getRequiredSolves() {
-    return parseInt(meanEvents.includes(state.eventType) ? 3 : 5);
+function getRequiredSolvesForEvent(eventType) {
+    return meanEvents.includes(eventType) ? 3 : 5;
 }
 
-// === Update progress bar ===
-function updateProgress() {
-    const required = getRequiredSolves();
-    const current = state.times.length;
-    const pct = Math.min((current / required) * 100, 100);
+// === Get required solve count for current event ===
+function getRequiredSolves() {
+    return getRequiredSolvesForEvent(state.eventType);
+}
 
-    const fill = document.getElementById('progressFill');
-    const label = document.getElementById('progressLabel');
-    const hint = document.getElementById('solveCountHint');
+function getMeanOfFiniteValues(values) {
+    const finiteValues = values.filter((value) => Number.isFinite(value));
+    if (!finiteValues.length) return null;
+    return finiteValues.reduce((sum, value) => sum + value, 0) / finiteValues.length;
+}
 
-    if (fill) {
-        fill.style.width = `${pct}%`;
-        fill.classList.toggle('complete', current >= required);
+function getAverageValueForSet(solves, eventType = state.eventType) {
+    const required = getRequiredSolvesForEvent(eventType);
+    if (!Array.isArray(solves) || solves.length < required) return null;
+
+    const values = solves
+        .slice(-required)
+        .map((solve) => getSolveValue(solve))
+        .sort((a, b) => a - b);
+
+    if (!values.every(Number.isFinite)) return null;
+
+    if (meanEvents.includes(eventType)) {
+        return values.reduce((sum, value) => sum + value, 0) / required;
     }
-    if (label) {
-        label.textContent = `${current} / ${required} solves`;
-    }
-    if (hint) {
-        hint.textContent = required;
-    }
+
+    return values.slice(1, 4).reduce((sum, value) => sum + value, 0) / 3;
+}
+
+// === Rebuild userAverages from stored averages for an event ===
+// Use this any time a completed average is invalidated (penalty change,
+// edit, delete). A single solve's value cannot be reliably matched back to
+// the average it belonged to, so the safe approach is to rebuild the whole
+// list from state.averageTags rather than trying to splice out one entry.
+function rebuildUserAverages(event) {
+    state.userAverages = state.averageTags
+        .filter((tag) => tag.event === event)
+        .map((a) => parseFloat(a.average))
+        .filter((a) => !isNaN(a) && isFinite(a));
+}
+
+// === Is the stats page currently the active tab? ===
+// Used to avoid rebuilding Chart.js charts on every solve/average change
+// when the stats page isn't even visible.
+function isStatsPageActive() {
+    return !!document.getElementById('page-stats')?.classList.contains('active');
 }
 
 // === Update session stats ===
@@ -181,11 +357,7 @@ function updateSessionStats() {
             return;
         }
 
-        const validSolves = allSolves
-            .map((s) =>
-                s.penalty === 'dnf' ? Infinity : s.penalty === 'plus2' ? s.raw + 2 : s.raw,
-            )
-            .filter((v) => isFinite(v));
+        const validSolves = getFiniteAverageValues(allSolves.map((solve) => getSolveValue(solve)));
 
         if (validSolves.length > 0) {
             const best = Math.min(...validSolves);
@@ -209,9 +381,9 @@ function updateSessionStats() {
             return;
         }
 
-        const validAverages = eventAverages
-            .map((a) => parseFloat(a.average))
-            .filter((a) => !isNaN(a) && isFinite(a));
+        const validAverages = getFiniteAverageValues(
+            eventAverages.map((average) => average.average),
+        );
 
         if (validAverages.length > 0) {
             const best = Math.min(...validAverages);
@@ -280,6 +452,11 @@ function calcStatsTrend(data) {
 
 function renderStatsCharts() {
     if (!window.Chart) return;
+    // Avoid rebuilding charts the user can't currently see (e.g. every solve
+    // add/delete used to pay for a full Chart.js destroy+rebuild even while
+    // on the timer/input page).
+    if (!isStatsPageActive()) return;
+
     const currentEvent = document.getElementById('event-type').value;
     updateSliderMax(currentEvent);
     const n = parseInt(document.getElementById('statsHistorySlider')?.value || '30', 10);
@@ -316,9 +493,10 @@ function renderStatsCharts() {
         if (statsView === 'solves') {
             if (avgLabelEl) avgLabelEl.textContent = 'Singles';
             const recentSolves = allSolves.slice(-n);
-            chartData = recentSolves.map((s) =>
-                s.penalty === 'dnf' ? null : s.penalty === 'plus2' ? s.raw + 2 : s.raw,
-            );
+            chartData = recentSolves.map((solve) => {
+                const value = getSolveValue(solve);
+                return Number.isFinite(value) ? value : null;
+            });
             chartLabels = recentSolves.map(
                 (_, i) => allSolves.length - recentSolves.length + i + 1,
             );
@@ -545,7 +723,6 @@ function displaySolves() {
         const avgRow = document.createElement('div');
         avgRow.classList.add('avg-row');
 
-        // Left: number + time + rank
         const leftSide = document.createElement('span');
         leftSide.style.cssText = 'display:flex;align-items:baseline;gap:0.5em;';
 
@@ -554,26 +731,21 @@ function displaySolves() {
         numSpan.textContent = `${allItems.length - idx}.`;
         leftSide.appendChild(numSpan);
 
+        const solveValue = getSolveValue(solve);
         const timeSpan = document.createElement('span');
         timeSpan.classList.add('avg-value');
-        if (solve.penalty === 'dnf') {
+        if (!Number.isFinite(solveValue)) {
             timeSpan.textContent = 'DNF';
             timeSpan.style.color = 'var(--error)';
         } else if (solve.penalty === 'plus2') {
-            timeSpan.textContent = formatTime(solve.raw + 2) + '+';
+            timeSpan.textContent = formatTime(solveValue) + '+';
             timeSpan.style.color = 'var(--warning, #f0a500)';
         } else {
-            timeSpan.textContent = formatTime(solve.raw);
+            timeSpan.textContent = formatTime(solveValue);
         }
         leftSide.appendChild(timeSpan);
 
-        const solveVal =
-            solve.penalty === 'dnf'
-                ? Infinity
-                : solve.penalty === 'plus2'
-                  ? solve.raw + 2
-                  : solve.raw;
-        const rank = isFinite(solveVal) ? getSingleRank(solveVal) : null;
+        const rank = Number.isFinite(solveValue) ? getSingleRank(solveValue) : null;
         if (rank) {
             const rankSpan = document.createElement('span');
             rankSpan.classList.add('avg-rank');
@@ -613,38 +785,20 @@ function displaySolves() {
 // === Add time ===
 function addTime() {
     const input = document.getElementById('timeInput');
-    let time = input.value;
+    const parsed = parseSolveInput(input.value);
 
-    let penalty = null;
+    if (parsed.error) {
+        alert(parsed.error);
+        return;
+    }
 
     const required = getRequiredSolves();
     if (state.times.length >= required) {
         state.times = [];
     }
 
-    if (time == 'DNF') {
-        time = '-1';
-        penalty = 'dnf';
-    }
-
-    // Convert time to seconds
-    if (time.includes(':')) {
-        const parts = time.split(':');
-        if (parts.length !== 2) {
-            alert('Invalid time format');
-            return;
-        }
-        const minutes = parseInt(parts[0], 10);
-        const seconds = parseFloat(parts[1]);
-        if (isNaN(minutes) || isNaN(seconds)) {
-            alert('Invalid time format');
-            return;
-        }
-        time = minutes * 60 + seconds;
-    } else {
-        time = parseFloat(time);
-    }
-
+    const time = parsed.raw;
+    const penalty = parsed.penalty;
     const event = document.getElementById('event-type').value;
 
     // Generate a custom ID to link each time to an average
@@ -680,7 +834,6 @@ function addTime() {
 
     calculateStats();
     displayCurrentTimes();
-    updateProgress();
     updateUndoButton();
     saveIncomplete();
     generateScramble();
@@ -694,7 +847,6 @@ function calculateStats() {
     const required = getRequiredSolves();
 
     // Always update general session UI
-    updateProgress();
     updateSessionStats();
     updateAveragesEmptyState();
     updateAverageProgressUI(n, required);
@@ -742,8 +894,14 @@ function updateMean(n) {
         return;
     }
 
-    const mean = state.times.reduce((sum, time) => sum + time.value, 0) / n;
-    elem.textContent = isFinite(mean) ? formatTime(mean) : 'DNF';
+    const hasDnf = state.times.some((time) => !Number.isFinite(getSolveValue(time)));
+    if (hasDnf) {
+        elem.textContent = 'DNF';
+        return;
+    }
+
+    const mean = state.times.reduce((sum, time) => sum + getSolveValue(time), 0) / n;
+    elem.textContent = Number.isFinite(mean) ? formatTime(mean) : 'DNF';
 }
 
 function updateAverageProgressUI(n, required) {
@@ -770,23 +928,21 @@ function calculateCurrentAverages(n) {
     let ao5 = null;
     let mo3 = null;
 
-    if (n >= 5 && !meanEvents.includes(state.eventType)) {
-        const values = state.times
-            .slice(-5)
-            .map((time) => time.value)
-            .sort((a, b) => a - b);
+    const eventType = state.eventType;
+    const required = getRequiredSolvesForEvent(eventType);
 
-        const middle3 = values.slice(1, 4);
-        ao5 = (middle3.reduce((sum, value) => sum + value, 0) / 3).toFixed(2);
+    if (n >= required && !meanEvents.includes(eventType)) {
+        const averageValue = getAverageValueForSet(state.times.slice(-required), eventType);
+        if (averageValue !== null) {
+            ao5 = averageValue.toFixed(2);
+        }
     }
 
-    if (n >= 3 && meanEvents.includes(state.eventType)) {
-        const values = state.times
-            .slice(-3)
-            .map((time) => time.value)
-            .sort((a, b) => a - b);
-
-        mo3 = (values.reduce((sum, value) => sum + value, 0) / 3).toFixed(2);
+    if (n >= required && meanEvents.includes(eventType)) {
+        const averageValue = getAverageValueForSet(state.times.slice(-required), eventType);
+        if (averageValue !== null) {
+            mo3 = averageValue.toFixed(2);
+        }
     }
 
     return { ao5, mo3 };
@@ -815,38 +971,38 @@ function displayBpaWpaTft(bpa, wpa, tft) {
 function setAverageStat(elem, value) {
     if (!elem) return;
 
-    const isDnf = value === 'DNF';
     const isNumber = typeof value === 'number' && isFinite(value);
-
-    const text = isDnf ? 'DNF' : isNumber ? formatTime(value) : '-';
-
+    const text = value === 'DNF' ? 'DNF' : isNumber ? formatTime(value) : '-';
     const rank = isNumber ? getAverageRank(value) : null;
 
-    setStatWithPr(elem, text, rank);
+    renderMetricValue(elem, text, { rank, pillKind: 'average' });
 }
 
-// This is shared by BPA, WPA and MLA.
-function setStatWithPr(elem, value, prRank) {
+function renderMetricValue(
+    elem,
+    value,
+    { rank = null, pillKind = 'average', fallbackText = '–' } = {},
+) {
     if (!elem) return;
 
     elem.innerHTML = '';
     elem.style.position = 'relative';
 
+    const displayText =
+        value === null || value === undefined || value === '' ? fallbackText : value;
     const valueDiv = document.createElement('div');
-    valueDiv.textContent = value;
+    valueDiv.textContent = displayText;
     valueDiv.style.position = 'relative';
     valueDiv.style.zIndex = '1';
-
     elem.appendChild(valueDiv);
 
-    if (!prRank || getStorage('setting_show_pr_pills') === false) {
+    if (!rank || getStorage('setting_show_pr_pills') === false) {
         return;
     }
 
     const prDiv = document.createElement('div');
-
     prDiv.className = 'pr-rank-pill';
-    prDiv.textContent = `PR #${prRank}`;
+    prDiv.textContent = `PR #${rank}`;
     prDiv.style.opacity = '0.8';
     prDiv.style.fontSize = '0.7em';
     prDiv.style.position = 'absolute';
@@ -854,9 +1010,14 @@ function setStatWithPr(elem, value, prRank) {
     prDiv.style.transform = 'translate(-50%, 100%)';
     prDiv.style.bottom = '0';
     prDiv.style.zIndex = '2';
-    prDiv.style.background = getPrPillColor(prRank, 'average');
+    prDiv.style.background = getPrPillColor(rank, pillKind);
 
     elem.appendChild(prDiv);
+}
+
+// This is shared by BPA, WPA and MLA.
+function setStatWithPr(elem, value, prRank) {
+    renderMetricValue(elem, value, { rank: prRank, pillKind: 'average' });
 }
 
 function resetBpaWpa(target) {
@@ -903,7 +1064,7 @@ function updateProbabilityAndMla(n, bpa, wpa) {
     clearProbabilityPills(probBpa, probWpa);
 
     if (canShowMlaMo3) {
-        updateMo3Mla(mla, mlaSolve, finiteSolves);
+        updateMla(mla, mlaSolve);
     } else {
         if (mla) mla.textContent = '-';
         if (mlaSolve) mlaSolve.textContent = '';
@@ -915,9 +1076,7 @@ function updateProbabilityAndMla(n, bpa, wpa) {
 // ============================================================
 
 function updateAo5Probability(probBpaElem, probWpaElem, mlaElem, mlaSolveElem) {
-    const currentValues = state.times.map((time) =>
-        time.penalty === 'dnf' || time.value === Infinity ? Infinity : time.value,
-    );
+    const currentValues = state.times.map((time) => getSolveValue(time));
 
     const validValues = currentValues.filter(isFinite);
 
@@ -933,7 +1092,7 @@ function updateAo5Probability(probBpaElem, probWpaElem, mlaElem, mlaSolveElem) {
     setProbabilityPill(probBpaElem, pBpa);
     setProbabilityPill(probWpaElem, pWpa);
 
-    updateAo5Mla(mlaElem, mlaSolveElem, currentValues);
+    updateMla(mlaElem, mlaSolveElem);
 }
 
 function setProbabilityPill(elem, probability) {
@@ -974,48 +1133,35 @@ function resetProbabilityAndMla() {
 }
 
 // ============================================================
-// Ao5 Monte Carlo MLA
+// Monte-Carlo "Most Likely Average" (MLA)
+// Simulates the next solve from the user's solve history and estimates the
+// resulting Ao5 (best/worst trimmed) or Mo3 (plain mean) accordingly.
+// Previously this was two nearly-identical functions (updateAo5Mla /
+// updateMo3Mla) and the shared display step used Ao5 trimming logic even
+// for Mo3 events, which produced a wrong result for Mo3 (it averaged only 2
+// of the 3 values instead of all 3).
 // ============================================================
 
-function updateAo5Mla(mlaElem, mlaSolveElem, currentValues) {
-    const finiteSolves = state.userSolves.filter(isFinite).splice(0, 24 * 5);
+function updateMla(mlaElem, mlaSolveElem) {
+    const eventType = state.eventType;
+    const required = getRequiredSolvesForEvent(eventType);
+    const isMean = meanEvents.includes(eventType);
 
-    if (finiteSolves.length < 5) {
+    const finiteSolves = state.userSolves.filter(isFinite).splice(0, 24 * required);
+
+    if (finiteSolves.length < required) {
         if (mlaElem) mlaElem.textContent = '-';
         if (mlaSolveElem) mlaSolveElem.textContent = '';
         return;
     }
 
-    const results = runMonteCarlo(5000, () => {
-        const nextSolve = finiteSolves[Math.floor(Math.random() * finiteSolves.length)];
-
-        return nextSolve;
+    const iterations = isMean ? 2000 : 5000;
+    const results = runMonteCarlo(iterations, () => {
+        return finiteSolves[Math.floor(Math.random() * finiteSolves.length)];
     });
 
-    displayMlaResult(mlaElem, mlaSolveElem, results);
+    displayMlaResult(mlaElem, mlaSolveElem, results, isMean);
 }
-
-// ============================================================
-// Mo3 Monte Carlo MLA
-// ============================================================
-
-function updateMo3Mla(mlaElem, mlaSolveElem, finiteSolves) {
-    const currentValues = state.times.map((time) =>
-        time.penalty === 'dnf' || !isFinite(time.value) ? Infinity : time.value,
-    );
-
-    const results = runMonteCarlo(2000, () => {
-        const nextSolve = finiteSolves[Math.floor(Math.random() * finiteSolves.length)];
-
-        return nextSolve;
-    });
-
-    displayMlaResult(mlaElem, mlaSolveElem, results);
-}
-
-// ============================================================
-// Shared Monte Carlo helpers
-// ============================================================
 
 function runMonteCarlo(iterations, callback) {
     const results = [];
@@ -1027,24 +1173,35 @@ function runMonteCarlo(iterations, callback) {
     return results.filter(isFinite);
 }
 
-function displayMlaResult(mlaElem, mlaSolveElem, results) {
+function displayMlaResult(mlaElem, mlaSolveElem, results, isMean) {
     const expectedNextSolve = results.length
         ? results.reduce((sum, value) => sum + value, 0) / results.length
         : null;
 
-    let currentTimes = state.times.map((a) => a.value);
-    currentTimes.push(expectedNextSolve);
-
-    const sortedSolves = currentTimes.sort((a, b) => a - b);
-    const expectedMla = sortedSolves.splice(1, 3).reduce((a, b) => a + b, 0) / 3;
-
     if (mlaSolveElem) {
-        mlaSolveElem.textContent = `if ${formatTime(expectedNextSolve)}`;
+        mlaSolveElem.textContent =
+            expectedNextSolve !== null ? `if ${formatTime(expectedNextSolve)}` : '';
     }
 
     if (!mlaElem) return;
 
-    if (expectedMla === null) {
+    if (expectedNextSolve === null) {
+        mlaElem.textContent = 'DNF';
+        return;
+    }
+
+    const currentTimes = state.times.map((a) => a.value);
+    currentTimes.push(expectedNextSolve);
+    const sortedSolves = currentTimes.sort((a, b) => a - b);
+
+    // Ao5 trims the best and worst of the 5 values; Mo3 uses the plain mean
+    // of all 3 (no trimming) — these are different formulas, so they must be
+    // branched rather than sharing the Ao5 splice(1, 3) logic.
+    const expectedMla = isMean
+        ? sortedSolves.reduce((a, b) => a + b, 0) / sortedSolves.length
+        : sortedSolves.slice(1, 4).reduce((a, b) => a + b, 0) / 3;
+
+    if (!Number.isFinite(expectedMla)) {
         mlaElem.textContent = 'DNF';
         return;
     }
@@ -1082,7 +1239,14 @@ function saveCompletedAverage(average, solveCount) {
     saveAverages();
     deleteStorage(`ct_incomplete_${event}`);
 
-    state.userAverages.push(average === 'DNF' ? 'DNF' : parseFloat(average));
+    // Only track finite averages in userAverages (used for PR ranking) — a
+    // literal 'DNF' string here would corrupt the numeric sort in rankIn().
+    if (average !== 'DNF') {
+        const numericAverage = parseFloat(average);
+        if (Number.isFinite(numericAverage)) {
+            state.userAverages.push(numericAverage);
+        }
+    }
 
     displayCompletedAverage(average);
     updateAfterAverageUI(average);
@@ -1105,16 +1269,15 @@ function displayCompletedAverage(average) {
     const averageElem = document.getElementById('average');
     if (!averageElem) return;
 
-    const text = average === 'DNF' ? 'DNF' : formatTime(parseFloat(average));
+    const numeric = typeof average === 'number' ? average : parseFloat(average);
+    const text = average === 'DNF' || !Number.isFinite(numeric) ? 'DNF' : formatTime(numeric);
+    const rank = Number.isFinite(numeric) ? getAverageRank(numeric) : null;
 
-    const rank = average !== 'DNF' && isFinite(average) ? getAverageRank(average) : null;
-
-    setStatWithPr(averageElem, text, rank);
+    renderMetricValue(averageElem, text, { rank, pillKind: 'average' });
 }
 
 function updateAfterAverageUI(average) {
     displayTags();
-    updateProgress();
     updateSessionStats();
     updatePrTarget();
     updateGoalTargetAfterAverage(parseFloat(average));
@@ -1132,8 +1295,8 @@ function calculateBpaWpaTft(times, target) {
     // For mean events (6x6, 7x7, BLD)
     if (times.length === 2 && meanEvents.includes(state.eventType)) {
         const mappedTimes = times.map((t) => {
-            if (t.penalty === 'dnf' || t.value === Infinity) return 'DNF';
-            return t.value;
+            const v = getSolveValue(t);
+            return Number.isFinite(v) ? v : 'DNF';
         });
 
         const dnfCount = mappedTimes.filter((t) => t === 'DNF').length;
@@ -1153,8 +1316,8 @@ function calculateBpaWpaTft(times, target) {
     } else if (times.length === 4) {
         // Get last 4 times as numbers (handle DNF)
         const last4 = times.slice(-4).map((t) => {
-            if (t.penalty === 'dnf' || t.value === Infinity) return 'DNF';
-            return t.value;
+            const v = getSolveValue(t);
+            return Number.isFinite(v) ? v : 'DNF';
         });
 
         // Count DNFs
@@ -1194,12 +1357,10 @@ function calculateTimeForTarget(times, target) {
     let n = solves.length;
 
     target = parseFloat(isNaN(target) ? formattedTimeToSeconds(target) : target);
-    console.log(target);
 
     if (n === 4) {
         let sum = solves[1] + solves[2];
         tft = 3 * target - sum;
-        console.log(tft);
 
         if (tft < solves[0]) return 'Not Possible';
         else if (tft > solves[n - 1]) return 'Guaranteed';
@@ -1243,9 +1404,6 @@ function calculateTimeForTarget(times, target) {
         tft = 2 * target - sum;
     } else return formatTime(target);
 
-    // if is number set to fixed 2
-    // tft = formatTime(tft);
-
     return tft > 0 ? formatTime(tft) : 'Not Possible';
 }
 
@@ -1255,41 +1413,18 @@ function displayCurrentTimes() {
     container.innerHTML = '';
 
     // Find best and worst solves (exclude DNFs for best, include all for worst)
-    let bestIdx = -1,
-        worstIdx = -1;
-    let bestValue = Infinity,
-        worstValue = -Infinity;
-    state.times.forEach((solve, idx) => {
-        if (solve.penalty === 'dnf') {
-            // For worst, DNF is always worst
-            if (worstValue !== 'dnf') {
-                worstValue = 'dnf';
-                worstIdx = idx;
-            }
-        } else {
-            if (solve.value < bestValue) {
-                bestValue = solve.value;
-                bestIdx = idx;
-            }
-            if (worstValue !== 'dnf' && solve.value > worstValue) {
-                worstValue = solve.value;
-                worstIdx = idx;
-            }
-        }
-    });
+    const values = state.times.map((solve) => getSolveValue(solve));
+    const { bestIdx, worstIdx } = getBestWorstIndices(values);
 
     state.times.forEach((solve, i) => {
         const wrapper = document.createElement('div');
         wrapper.classList.add('solve');
 
-        let displayText;
-        if (solve.penalty === 'dnf') {
-            displayText = 'DNF';
-        } else if (solve.penalty === 'plus2') {
-            displayText = `${formatTime(solve.raw)}+`;
-        } else {
-            displayText = formatTime(solve.raw);
-        }
+        // NOTE: this used to be `const displayText`, which was then
+        // reassigned below for best/worst solves — that throws a
+        // TypeError ("Assignment to constant variable") at runtime and
+        // breaks rendering whenever a best or worst solve is present.
+        let displayText = getSolveDisplayText(solve);
 
         // Highlight best/worst
         const textSpan = document.createElement('span');
@@ -1302,8 +1437,7 @@ function displayCurrentTimes() {
             displayText = `(${displayText})`;
         }
 
-        const rank =
-            solve.penalty !== 'dnf' && isFinite(solve.value) ? getSingleRank(solve.value) : null;
+        const rank = Number.isFinite(values[i]) ? getSingleRank(values[i]) : null;
 
         // Add PR pill if rank exists
         textSpan.textContent = displayText;
@@ -1446,9 +1580,12 @@ function applyPenalty(index, type) {
     }
 
     // Invalidate the parent average so it is recalculated with the updated penalty
+    const event = document.getElementById('event-type').value;
     state.averageTags = state.averageTags.filter((tag) => tag.averageId !== solve.averageId);
     saveAverages();
-    state.userAverages.shift();
+    // Rebuild rather than shift(): shift() removed the OLDEST average, not
+    // necessarily the one that was just invalidated.
+    rebuildUserAverages(event);
 
     calculateStats();
     displayCurrentTimes();
@@ -1497,42 +1634,26 @@ function confirmEdit() {
     if (!solve) return;
 
     const editInput = document.getElementById('editTimeInput');
-    let time = editInput.value;
-    let penalty = null;
+    const parsed = parseSolveInput(editInput.value);
 
-    if (time.toUpperCase() === 'DNF') {
-        time = -1;
-        penalty = 'dnf';
-    } else if (time.includes(':')) {
-        const parts = time.split(':');
-        if (parts.length !== 2) {
-            alert('Invalid time format');
-            return;
-        }
-        const minutes = parseInt(parts[0], 10);
-        const seconds = parseFloat(parts[1]);
-        if (isNaN(minutes) || isNaN(seconds)) {
-            alert('Invalid time format');
-            return;
-        }
-        time = minutes * 60 + seconds;
-    } else {
-        time = parseFloat(time);
-        if (isNaN(time)) {
-            alert('Invalid time format');
-            return;
-        }
+    if (parsed.error) {
+        alert(parsed.error);
+        return;
     }
 
-    solve.raw = time;
-    solve.value = time;
-    solve.penalty = penalty;
+    solve.raw = parsed.raw;
+    solve.value = parsed.value;
+    solve.penalty = parsed.penalty;
 
     // Remove the average that this time belongs to, since the value changed
+    const event = document.getElementById('event-type').value;
     const avgId = solve.averageId;
     state.averageTags = state.averageTags.filter((tag) => tag.averageId !== avgId);
     saveAverages();
-    state.userAverages = state.userAverages.filter((avg) => avg !== solve.value);
+    // Rebuild rather than filtering userAverages by solve.value: userAverages
+    // holds AVERAGE values, not individual solve times, so that comparison
+    // almost never matched and left the stale average's value in the list.
+    rebuildUserAverages(event);
 
     closeEditModal();
     calculateStats();
@@ -1586,11 +1707,13 @@ function deleteTime(index) {
             if (!solve) return;
 
             // Remove the average that this time belongs to, since the set is incomplete now
+            const event = document.getElementById('event-type').value;
             const avgId = solve.averageId;
             state.averageTags = state.averageTags.filter((tag) => tag.averageId !== avgId);
             saveAverages();
-            // Remove from averages
-            state.userAverages = state.userAverages.filter((avg) => avg !== solve.value);
+            // Rebuild rather than filtering userAverages by solve.value (see
+            // confirmEdit for why that comparison doesn't work).
+            rebuildUserAverages(event);
 
             // Remove the time from the current session
             state.times.splice(index, 1);
@@ -1600,7 +1723,6 @@ function deleteTime(index) {
             localStorage.setItem('deleteStatShameCounter', state.deleteStatShameCounter);
 
             displayCurrentTimes();
-            updateProgress();
             saveIncomplete();
             calculateStats();
         },
@@ -1624,10 +1746,7 @@ function deleteAverage(averageId) {
             }
 
             // Rebuild user averages
-            state.userAverages = state.averageTags
-                .filter((tag) => tag.event === currentEvent)
-                .map((a) => parseFloat(a.average))
-                .filter((a) => !isNaN(a) && isFinite(a));
+            rebuildUserAverages(currentEvent);
 
             displayTags();
             updateSessionStats();
@@ -1862,18 +1981,13 @@ function getGoalEventKey() {
     return document.getElementById('event-type').value;
 }
 
+// Wraps parseTimeString: DNF or invalid strings resolve to NaN, matching the
+// original behaviour of this function.
 function formattedTimeToSeconds(str) {
-    if (!str || str === '' || str === 'DNF') return NaN;
-    if (str.includes(':')) {
-        const parts = str.split(':');
-        if (parts.length === 2) {
-            const mins = parseInt(parts[0], 10);
-            const secs = parseFloat(parts[1]);
-            if (!isNaN(mins) && !isNaN(secs)) return mins * 60 + secs;
-        }
-        return NaN;
-    }
-    return parseFloat(str);
+    if (!str || str === '') return NaN;
+    const parsed = parseTimeString(str);
+    if (parsed.error || parsed.isDnf) return NaN;
+    return parsed.raw;
 }
 
 function getSmoothedPerf() {
@@ -2248,7 +2362,14 @@ function displayTags() {
         .forEach((tag) => {
             const li = document.createElement('li');
 
-            tag.average = !isFinite(tag.average) ? 'DNF' : parseFloat(tag.average).toFixed(2);
+            // Use a local display value instead of mutating tag.average in
+            // place — the previous code rewrote tag.average on every render,
+            // which is a surprising side effect for a display function and
+            // made other readers of tag.average (e.g. showAverageDetail)
+            // depend on render order.
+            const numericAverage = parseFloat(tag.average);
+            const isDnfAvg = tag.average === 'DNF' || !Number.isFinite(numericAverage);
+            const displayAverage = isDnfAvg ? 'DNF' : numericAverage.toFixed(2);
 
             // Top row: average value + rank + delete
             const avgRow = document.createElement('div');
@@ -2258,10 +2379,10 @@ function displayTags() {
             const avgSpan = document.createElement('span');
             avgSpan.classList.add('avg-value');
             avgSpan.textContent =
-                tag.average === 'DNF' ? 'DNF' : formatTime(parseFloat(tag.average));
+                displayAverage === 'DNF' ? 'DNF' : formatTime(parseFloat(displayAverage));
             leftSide.appendChild(avgSpan);
 
-            const rank = getAverageRank(tag.average);
+            const rank = getAverageRank(displayAverage);
             if (rank) {
                 const rankSpan = document.createElement('span');
                 rankSpan.classList.add('avg-rank');
@@ -2281,7 +2402,7 @@ function displayTags() {
             snapBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 shareSnapshot('average', {
-                    average: tag.average,
+                    average: displayAverage,
                     times: tag.times,
                     event: tag.event,
                     rank: rank,
@@ -2307,34 +2428,21 @@ function displayTags() {
             const timesDiv = document.createElement('div');
             timesDiv.classList.add('times');
 
-            const values = tag.times.map((t) => {
-                const timeValue = t.value ?? t.raw;
-                return timeValue === -1 ? Infinity : timeValue;
-            });
-            const min = Math.min(...values);
-            const max = Math.max(...values);
+            const values = tag.times.map((t) => getSolveValue(t));
+            const { bestIdx, worstIdx } = getBestWorstIndices(values);
 
-            let markedBest = false;
-            let markedWorst = false;
-
-            tag.times.forEach((t) => {
+            tag.times.forEach((t, i) => {
                 let span = document.createElement('span');
-                const timeValue = t.value ?? t.raw;
-                const val = timeValue === Infinity || timeValue === -1 ? 'DNF' : timeValue;
-                span.textContent =
-                    val === 'DNF' ? 'DNF' : typeof val === 'number' ? formatTime(val) : 'DNF';
+                const numVal = values[i];
+                const timeStr = numVal === Infinity ? 'DNF' : formatTime(numVal);
 
-                if (val === min && !markedBest) {
-                    span.classList.add('best');
-                    span.textContent = `[${span.textContent}]`;
-                    markedBest = true;
-                } else if ((val === max || val === 'DNF') && !markedWorst) {
-                    span.classList.add('worst');
-                    span.textContent = `[${span.textContent}]`;
-                    markedWorst = true;
-                }
+                const isBest = i === bestIdx;
+                const isWorst = i === worstIdx;
+                span.textContent = isBest || isWorst ? `[${timeStr}]` : timeStr;
+                if (isBest) span.classList.add('best');
+                if (isWorst) span.classList.add('worst');
 
-                const solveRank = val === 'DNF' ? null : getSingleRank(timeValue);
+                const solveRank = numVal === Infinity ? null : getSingleRank(numVal);
                 if (solveRank) span.textContent += ` (#${solveRank})`;
 
                 timesDiv.appendChild(span);
@@ -2371,9 +2479,9 @@ eventSelector.addEventListener('change', async (e) => {
     saveIncomplete(lastEventType);
 
     // Reset session-specific rankings
+    state.times = [];
     state.userSolves = [];
     state.userAverages = [];
-    state.averageTags = [];
     lastEventType = newEvent;
     state.eventType = newEvent;
     calculateStats();
@@ -2383,7 +2491,6 @@ eventSelector.addEventListener('change', async (e) => {
     // Load event-specific averages and rebuild stats
     loadAverages();
     calculateStats();
-    updateProgress();
     updatePrTarget();
     updateGoalTimeInput();
     if (getStorage('setting_goal_enabled') === true) {
@@ -2413,7 +2520,6 @@ eventSelector.addEventListener('change', async (e) => {
     }
 
     // Load incomplete solves for the new event if they exist
-    state.times = [];
     loadIncomplete();
     if (state.times.length === 0) displayCurrentTimes();
 
@@ -2535,7 +2641,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
     loadAverages();
     loadIncomplete();
-    updateProgress();
     updateUndoButton();
     updateTargetDisplay();
     generateScramble();
@@ -2568,31 +2673,12 @@ window.addEventListener('DOMContentLoaded', () => {
 
 // === SCRAMBLE ===
 
-const PUZZLE_MAP = {
-    '222': '2x2x2',
-    '333': '3x3x3',
-    '444': '4x4x4',
-    '555': '5x5x5',
-    '666': '6x6x6',
-    '777': '7x7x7',
-    '333bf': '3x3x3',
-    '333oh': '3x3x3',
-    'clock': 'clock',
-    'fto': 'fto',
-    'minx': 'megaminx',
-    'pyram': 'pyraminx',
-    'skewb': 'skewb',
-    'sq1': 'square1',
-    '444bf': '4x4x4',
-    '555bf': '5x5x5',
-};
-
 function updateScrambleDrawing(scramble) {
     const viewer = document.getElementById('scrambleViewer');
     const bigViewer = document.getElementById('bigScrambleViewer');
     if (!viewer) return;
 
-    const puzzle = PUZZLE_MAP[state.eventType] || '3x3x3';
+    const puzzle = EVENTS[state.eventType]?.puzzle || '3x3x3';
     viewer.puzzle = puzzle;
     bigViewer.puzzle = puzzle;
 
@@ -2996,8 +3082,6 @@ function resetTimerDisplay() {
 
 // === INSPECTION HELPERS ===
 
-const BLIND_EVENTS = ['333bf', '444bf', '555bf'];
-
 function shouldUseInspection() {
     if (getStorage('setting_inspection_enabled') !== true) return false;
     const eventsMode = getStorage('setting_inspection_events') || 'notBlind';
@@ -3156,7 +3240,6 @@ function addTimerTime(time) {
     }
 
     displayCurrentTimes();
-    updateProgress();
     updateUndoButton();
     saveIncomplete();
     generateScramble();
@@ -3395,16 +3478,8 @@ const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
 
             // Don't intercept buttons, inputs, or the scramble text
             const tag = e.target.tagName;
-            const isProgressLabel = e.target.classList.contains('progress-label');
             const isScramble = !!e.target.closest('.scramble-container');
-            if (
-                tag === 'INPUT' ||
-                tag === 'BUTTON' ||
-                tag === 'SELECT' ||
-                isProgressLabel ||
-                isScramble
-            )
-                return;
+            if (tag === 'INPUT' || tag === 'BUTTON' || tag === 'SELECT' || isScramble) return;
 
             e.preventDefault();
 
@@ -3452,16 +3527,8 @@ const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
         if (state.mode !== 'timer') return;
 
         const tag = e.target.tagName;
-        const isProgressLabel = e.target.classList.contains('progress-label');
         const isScramble = !!e.target.closest('.scramble-container');
-        if (
-            tag === 'INPUT' ||
-            tag === 'BUTTON' ||
-            tag === 'SELECT' ||
-            isProgressLabel ||
-            isScramble
-        )
-            return;
+        if (tag === 'INPUT' || tag === 'BUTTON' || tag === 'SELECT' || isScramble) return;
 
         if (touchHoldTimeout) {
             clearTimeout(touchHoldTimeout);
@@ -3580,25 +3647,6 @@ const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
     });
 })();
 
-// === EVENT NAMES FOR DISPLAY ===
-const EVENT_NAMES = {
-    '222': '2x2x2',
-    '333': '3x3x3',
-    '444': '4x4x4',
-    '555': '5x5x5',
-    '666': '6x6x6',
-    '777': '7x7x7',
-    '333bf': '3x3 Blindfolded',
-    '333oh': '3x3 One-Handed',
-    'clock': 'Clock',
-    'minx': 'Megaminx',
-    'pyram': 'Pyraminx',
-    'skewb': 'Skewb',
-    'sq1': 'Square-1',
-    '444bf': '4x4 Blindfolded',
-    '555bf': '5x5 Blindfolded',
-};
-
 // === UNDO ===
 
 function saveUndoState() {
@@ -3639,11 +3687,21 @@ function undoLastSolve() {
     saveIncomplete();
     displayCurrentTimes();
     displayTags();
-    updateProgress();
     updateUndoButton();
     updateSessionStats();
     updateAveragesEmptyState();
     calculateStats();
+}
+
+function getSolveDisplayText(solve) {
+    if (!solve) return '–';
+    if (solve.penalty === 'dnf' || solve.raw === -1 || !Number.isFinite(getSolveValue(solve))) {
+        return 'DNF';
+    }
+    if (solve.penalty === 'plus2') {
+        return `${formatTime(solve.raw)}+`;
+    }
+    return formatTime(solve.raw);
 }
 
 function updateUndoButton() {
@@ -3719,7 +3777,7 @@ function generateSnapshotCanvas(type, data) {
 
     const F = "'Poppins', sans-serif"; // --font-main
 
-    const eventName = EVENT_NAMES[data.event] || data.event;
+    const eventName = EVENTS[data.event]?.name || data.event;
     const isMean = meanEvents.includes(data.event);
     const avgLabel = isMean ? 'Mean of 3' : 'Average of 5';
 
@@ -3857,24 +3915,15 @@ function generateSnapshotCanvas(type, data) {
     ctx.textAlign = 'left';
 
     if (type === 'average' && data.times) {
-        const values = data.times.map((t) => {
-            const v = t.value ?? t.raw;
-            return v === -1 || v === Infinity ? Infinity : v;
-        });
-        const min = Math.min(...values);
-        const max = Math.max(...values);
-        let markedBest = false,
-            markedWorst = false;
+        const values = data.times.map((t) => getSolveValue(t));
+        const { bestIdx, worstIdx } = getBestWorstIndices(values);
 
         data.times.forEach((t, i) => {
-            const val = t.value ?? t.raw;
-            const numVal = val === -1 || val === Infinity ? Infinity : val;
+            const numVal = values[i];
             const timeStr = numVal === Infinity ? 'DNF' : formatTime(numVal);
 
-            let isBest = numVal === min && !markedBest;
-            let isWorst = (numVal === max || numVal === Infinity) && !markedWorst;
-            if (isBest) markedBest = true;
-            if (isWorst) markedWorst = true;
+            const isBest = i === bestIdx;
+            const isWorst = i === worstIdx;
 
             const display = isBest || isWorst ? `(${timeStr})` : timeStr;
             const numStr = `${i + 1}. `;
@@ -3979,103 +4028,6 @@ async function shareSnapshot(type, data) {
     }
 }
 
-// === PROGRESS BAR POPUP ===
-
-function showProgressPopup() {
-    const required = getRequiredSolves();
-    if (state.times.length === required + 1) return;
-
-    const popup = document.getElementById('progressPopup');
-    const content = document.getElementById('progressPopupContent');
-    const title = document.getElementById('progressPopupTitle');
-
-    title.textContent = `Current Solves (${state.times.length} / ${required})`;
-
-    content.innerHTML = '';
-
-    // Sort times by value for ranking
-    const sorted = [...state.times]
-        .map((t, i) => ({ ...t, originalIndex: i }))
-        .sort((a, b) => {
-            if (a.value === Infinity) return 1;
-            if (b.value === Infinity) return -1;
-            return a.value - b.value;
-        });
-
-    sorted.forEach((solve, rank) => {
-        const row = document.createElement('div');
-        row.classList.add('progress-solve-row');
-
-        const rankSpan = document.createElement('span');
-        rankSpan.classList.add('progress-solve-rank');
-        rankSpan.textContent = `#${rank + 1}`;
-
-        const timeSpan = document.createElement('span');
-        timeSpan.classList.add('progress-solve-time');
-        if (solve.penalty === 'dnf') {
-            timeSpan.textContent = 'DNF';
-        } else if (solve.penalty === 'plus2') {
-            timeSpan.textContent = `${formatTime(solve.raw)}+`;
-        } else {
-            timeSpan.textContent = formatTime(solve.raw);
-        }
-
-        const prSpan = document.createElement('span');
-        prSpan.classList.add('progress-solve-pr');
-        if (solve.value !== Infinity && solve.value !== -1) {
-            const prRank = getSingleRank(solve.value);
-            if (prRank) prSpan.textContent = `PR${prRank}`;
-        }
-
-        const snapBtn = document.createElement('button');
-        snapBtn.classList.add('progress-solve-snap');
-        snapBtn.innerHTML = '<i class="fas fa-share-alt"></i>';
-        snapBtn.title = 'Share this time';
-        snapBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const snapRank = getSingleRank(solve.value);
-            shareSnapshot('single', {
-                value: solve.value,
-                raw: solve.raw,
-                penalty: solve.penalty,
-                scramble: solve.scramble || null,
-                event: solve.event,
-                rank: snapRank,
-            });
-        });
-
-        row.appendChild(rankSpan);
-        row.appendChild(timeSpan);
-        row.appendChild(prSpan);
-        row.appendChild(snapBtn);
-        content.appendChild(row);
-    });
-
-    popup.hidden = false;
-}
-
-document.querySelector('.progress-bar').addEventListener('click', (e) => {
-    e.stopPropagation();
-    showProgressPopup();
-});
-document.querySelector('.progress-label').addEventListener('click', (e) => {
-    e.stopPropagation();
-    showProgressPopup();
-});
-document.querySelector('.progress-fill').addEventListener('click', (e) => {
-    e.stopPropagation();
-    showProgressPopup();
-});
-
-document.getElementById('progressPopupClose').addEventListener('click', () => {
-    document.getElementById('progressPopup').hidden = true;
-});
-document.getElementById('progressPopup').addEventListener('click', (e) => {
-    if (e.target === e.currentTarget) {
-        document.getElementById('progressPopup').hidden = true;
-    }
-});
-
 // === AVERAGE DETAIL POPUP ===
 
 let _avgDetailTag = null;
@@ -4088,7 +4040,7 @@ function showAverageDetail(tag) {
     const rankEl = document.getElementById('avgDetailRank');
     const solvesEl = document.getElementById('avgDetailSolves');
 
-    const eventName = EVENT_NAMES[tag.event] || tag.event;
+    const eventName = EVENTS[tag.event]?.name || tag.event;
     const isMean = meanEvents.includes(tag.event);
     titleEl.textContent = `${eventName} ${isMean ? 'Mean of 3' : 'Average of 5'}`;
 
@@ -4100,14 +4052,8 @@ function showAverageDetail(tag) {
 
     solvesEl.innerHTML = '';
 
-    const values = tag.times.map((t) => {
-        const v = t.value ?? t.raw;
-        return v === -1 || v === Infinity ? Infinity : v;
-    });
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    let markedBest = false;
-    let markedWorst = false;
+    const values = tag.times.map((t) => getSolveValue(t));
+    const { bestIdx, worstIdx } = getBestWorstIndices(values);
 
     tag.times.forEach((t, i) => {
         const row = document.createElement('div');
@@ -4120,14 +4066,11 @@ function showAverageDetail(tag) {
         const infoDiv = document.createElement('div');
         infoDiv.classList.add('avg-detail-solve-info');
 
-        const val = t.value ?? t.raw;
-        const numVal = val === -1 || val === Infinity ? Infinity : val;
+        const numVal = values[i];
         const timeStr = numVal === Infinity ? 'DNF' : formatTime(numVal);
 
-        let isBest = numVal === min && !markedBest;
-        let isWorst = (numVal === max || numVal === Infinity) && !markedWorst;
-        if (isBest) markedBest = true;
-        if (isWorst) markedWorst = true;
+        const isBest = i === bestIdx;
+        const isWorst = i === worstIdx;
 
         const timeRow = document.createElement('div');
         const timeSpan = document.createElement('span');
@@ -4225,30 +4168,15 @@ function updateToolbar() {
         labelEl.textContent = `SOLVE ${next}`;
     }
 
-    // Event icon: first digit/letter of event
+    // Event icon: derived from the shared EVENTS map so it can never list an
+    // event that doesn't otherwise exist in the app.
     if (iconEl) {
         const ev = state.eventType || '333';
-        const icons = {
-            '333': '<span class="cubing-icon event-333 unofficial-333"></span>',
-            '222': '<span class="cubing-icon event-222 unofficial-222"></span>',
-            '444': '<span class="cubing-icon event-444 unofficial-444"></span>',
-            '555': '<span class="cubing-icon event-555 unofficial-555"></span>',
-            '666': '<span class="cubing-icon event-666 unofficial-666"></span>',
-            '777': '<span class="cubing-icon event-777 unofficial-777"></span>',
-            '333bf': '<span class="cubing-icon event-333bf unofficial-333bf"></span>',
-            '333oh': '<span class="cubing-icon event-333oh unofficial-333oh"></span>',
-            'clock': '<span class="cubing-icon event-clock unofficial-clock"></span>',
-            'fto': '<span class="cubing-icon event-fto unofficial-fto"></span>',
-            'minx': '<span class="cubing-icon event-minx unofficial-minx"></span>',
-            'pyram': '<span class="cubing-icon event-pyram unofficial-pyram"></span>',
-            'skewb': '<span class="cubing-icon event-skewb unofficial-skewb"></span>',
-            'sq1': '<span class="cubing-icon event-sq1 unofficial-sq1"></span>',
-            '444bf': '<span class="cubing-icon event-444bf unofficial-444bf"></span>',
-            '555bf': '<span class="cubing-icon event-555bf unofficial-555bf"></span>',
-            '333mbf': '<span class="cubing-icon event-333mbf unofficial-333mbf"></span>',
-            '333fm': '<span class="cubing-icon event-333fm unofficial-333fm"></span>',
-        };
-        iconEl.innerHTML = icons[ev] || ev[0].toUpperCase();
+        if (EVENTS[ev]) {
+            iconEl.innerHTML = `<span class="cubing-icon event-${ev} unofficial-${ev}"></span>`;
+        } else {
+            iconEl.innerHTML = ev[0].toUpperCase();
+        }
     }
 
     // Target pill
@@ -4276,16 +4204,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const solveList = document.getElementById('currentTimes');
     if (solveList) {
         new MutationObserver(updateToolbar).observe(solveList, { childList: true, subtree: true });
-    }
-
-    // Also watch the progress label text, which changes on every updateProgress() call
-    const progressLabel = document.getElementById('progressLabel');
-    if (progressLabel) {
-        new MutationObserver(updateToolbar).observe(progressLabel, {
-            childList: true,
-            characterData: true,
-            subtree: true,
-        });
     }
 });
 
@@ -4318,7 +4236,9 @@ const compState = {
 };
 
 function getCompRequiredSolves() {
-    return meanEvents.includes(state.eventType) ? 3 : 5;
+    // Was its own copy of the mean-events check; now delegates to the single
+    // shared helper so event-count rules can never drift between pages.
+    return getRequiredSolvesForEvent(state.eventType);
 }
 
 // Initialize (or reinit on event change) — resets times if count changes
@@ -4473,25 +4393,17 @@ function parseAndSaveCompTime(index, value) {
         return;
     }
 
-    let raw,
-        penalty = null;
-    const upper = value.toUpperCase();
-
-    if (upper === 'DNF') {
-        raw = 0;
-        penalty = 'dnf';
-    } else if (value.includes(':')) {
-        const parts = value.split(':');
-        const mins = parseInt(parts[0], 10);
-        const secs = parseFloat(parts[1]);
-        raw = !isNaN(mins) && !isNaN(secs) ? mins * 60 + secs : null;
-    } else {
-        raw = parseFloat(value);
-        if (isNaN(raw)) raw = null;
-    }
+    // Uses the shared parseTimeString parser (see top of file) instead of a
+    // separate hand-rolled DNF/m:ss.xx parser. Comp page represents an
+    // in-progress DNF's raw value as 0 (not -1) so the "clear penalty"
+    // button has something sensible to fall back to — that quirk is
+    // preserved here.
+    const parsed = parseTimeString(value);
+    const raw = parsed.error ? null : parsed.isDnf ? 0 : parsed.raw;
+    const penalty = parsed.isDnf ? 'dnf' : null;
 
     const prev = compState.times[index];
-    // Preserve explicit +2 penalty unless overridden by DNF or clear
+    // Preserve explicit +2 penalty unless overridden by DNF or a fresh valid time
     const effectivePenalty = penalty ?? (prev.penalty === 'plus2' ? 'plus2' : null);
     const effectiveValue =
         effectivePenalty === 'dnf'
@@ -4520,23 +4432,12 @@ function renderCompSolveHighlights() {
     const filled = compState.times.filter((t) => t.value !== null);
     if (filled.length < n || meanEvents.includes(state.eventType)) return;
 
-    const vals = compState.times.map((t) => t.value);
-    const finiteVals = vals.filter((v) => isFinite(v));
-    const hasDnf = vals.some((v) => !isFinite(v));
-    const bestVal = finiteVals.length > 0 ? Math.min(...finiteVals) : null;
-    const worstVal = hasDnf ? Infinity : finiteVals.length > 0 ? Math.max(...finiteVals) : null;
+    const values = compState.times.map((t) => (t.value === null ? Infinity : t.value));
+    const { bestIdx, worstIdx } = getBestWorstIndices(values);
 
-    let bestMarked = false,
-        worstMarked = false;
     rows.forEach((row, i) => {
-        const val = compState.times[i]?.value;
-        if (!bestMarked && val === bestVal && isFinite(val)) {
-            row.classList.add('best-solve');
-            bestMarked = true;
-        } else if (!worstMarked && (!isFinite(val) || val === worstVal)) {
-            row.classList.add('worst-solve');
-            worstMarked = true;
-        }
+        if (i === bestIdx) row.classList.add('best-solve');
+        else if (i === worstIdx) row.classList.add('worst-solve');
     });
 }
 
@@ -4594,57 +4495,17 @@ function calculateCompStats() {
         duringCards.forEach((el) => (el.style.display = 'none'));
         afterCards.forEach((el) => (el.style.display = 'flex'));
 
-        let average;
-        const isMean = meanEvents.includes(state.eventType);
-
-        if (isMean) {
-            // Mean of 3
-            const dnfCount = compState.times.slice(0, n).filter((t) => !isFinite(t.value)).length;
-            if (dnfCount > 0) {
-                average = 'DNF';
-            } else {
-                average = (
-                    compState.times.slice(0, n).reduce((a, b) => a + b.value, 0) / n
-                ).toFixed(2);
-            }
-        } else {
-            // Average of 5 (drop best and worst)
-            const vals = compState.times
-                .slice(0, n)
-                .map((t) => t.value)
-                .sort((a, b) => a - b);
-            const totalDnf = vals.filter((v) => !isFinite(v)).length;
-            if (totalDnf > 1) {
-                average = 'DNF';
-            } else {
-                const middle3 = vals.slice(1, 4);
-                average = middle3.some((v) => !isFinite(v))
-                    ? 'DNF'
-                    : (middle3.reduce((a, b) => a + b, 0) / 3).toFixed(2);
-            }
-        }
+        const averageValue = getAverageValueForSet(compState.times.slice(0, n), state.eventType);
+        const average = averageValue === null ? 'DNF' : averageValue.toFixed(2);
 
         if (avgEl) {
-            avgEl.innerHTML = '';
-            avgEl.style.position = 'relative';
-            if (average === 'DNF') {
-                avgEl.textContent = 'DNF';
-            } else {
-                const avgVal = parseFloat(average);
-                const valDiv = document.createElement('div');
-                valDiv.textContent = formatTime(avgVal);
-                valDiv.style.position = 'relative';
-                valDiv.style.zIndex = '1';
-                avgEl.appendChild(valDiv);
-                const rank = getCompAverageRank(avgVal);
-                if (rank) {
-                    const prDiv = document.createElement('div');
-                    prDiv.className = 'pr-rank-pill';
-                    prDiv.textContent = `PR #${rank}`;
-                    prDiv.style.background = getPrPillColor(rank, 'average');
-                    avgEl.appendChild(prDiv);
-                }
-            }
+            const numeric = average === 'DNF' ? null : parseFloat(average);
+            const text =
+                average === 'DNF' || !Number.isFinite(numeric) ? 'DNF' : formatTime(numeric);
+            const rank = Number.isFinite(numeric) ? getCompAverageRank(numeric) : null;
+            // Reuses the same rendering helper as the average-calculator page
+            // instead of a second hand-rolled DOM-building block.
+            renderMetricValue(avgEl, text, { rank, pillKind: 'average' });
         }
     } else {
         // During average — show BPA / WPA / TFT when n−1 times are filled
@@ -4658,50 +4519,16 @@ function calculateCompStats() {
             const { bpa, wpa, tft } = calculateBpaWpaTft(filledTimes, target);
 
             if (bpaEl) {
-                bpaEl.innerHTML = '';
-                bpaEl.style.position = 'relative';
-                if (bpa === 'DNF') {
-                    bpaEl.textContent = 'DNF';
-                } else if (typeof bpa === 'number' && !isNaN(bpa) && isFinite(bpa)) {
-                    const valDiv = document.createElement('div');
-                    valDiv.textContent = formatTime(bpa);
-                    valDiv.style.position = 'relative';
-                    valDiv.style.zIndex = '1';
-                    bpaEl.appendChild(valDiv);
-                    const rank = getCompAverageRank(bpa);
-                    if (rank) {
-                        const pill = document.createElement('div');
-                        pill.className = 'pr-rank-pill';
-                        pill.textContent = `PR #${rank}`;
-                        pill.style.background = getPrPillColor(rank, 'average');
-                        bpaEl.appendChild(pill);
-                    }
-                } else {
-                    bpaEl.textContent = '–';
-                }
+                const isNumber = typeof bpa === 'number' && !isNaN(bpa) && isFinite(bpa);
+                const text = bpa === 'DNF' ? 'DNF' : isNumber ? formatTime(bpa) : '–';
+                const rank = isNumber ? getCompAverageRank(bpa) : null;
+                renderMetricValue(bpaEl, text, { rank, pillKind: 'average' });
             }
             if (wpaEl) {
-                wpaEl.innerHTML = '';
-                wpaEl.style.position = 'relative';
-                if (wpa === 'DNF') {
-                    wpaEl.textContent = 'DNF';
-                } else if (typeof wpa === 'number' && !isNaN(wpa) && isFinite(wpa)) {
-                    const valDiv = document.createElement('div');
-                    valDiv.textContent = formatTime(wpa);
-                    valDiv.style.position = 'relative';
-                    valDiv.style.zIndex = '1';
-                    wpaEl.appendChild(valDiv);
-                    const rank = getCompAverageRank(wpa);
-                    if (rank) {
-                        const pill = document.createElement('div');
-                        pill.className = 'pr-rank-pill';
-                        pill.textContent = `PR #${rank}`;
-                        pill.style.background = getPrPillColor(rank, 'average');
-                        wpaEl.appendChild(pill);
-                    }
-                } else {
-                    wpaEl.textContent = '–';
-                }
+                const isNumber = typeof wpa === 'number' && !isNaN(wpa) && isFinite(wpa);
+                const text = wpa === 'DNF' ? 'DNF' : isNumber ? formatTime(wpa) : '–';
+                const rank = isNumber ? getCompAverageRank(wpa) : null;
+                renderMetricValue(wpaEl, text, { rank, pillKind: 'average' });
             }
             if (tftEl) {
                 tftEl.innerHTML = '';
@@ -4741,30 +4568,15 @@ function calculateCompStats() {
                 const dnfCount5 = all5.filter((v) => !isFinite(v)).length;
 
                 if (mlaEl) {
-                    mlaEl.innerHTML = '';
-                    mlaEl.style.position = 'relative';
-                    if (dnfCount5 > 1) {
-                        mlaEl.textContent = 'DNF';
+                    const middle3 = all5.slice(1, 4);
+                    if (dnfCount5 > 1 || middle3.some((v) => !isFinite(v))) {
+                        renderMetricValue(mlaEl, 'DNF', {});
                     } else {
-                        const middle3 = all5.slice(1, 4);
-                        if (middle3.some((v) => !isFinite(v))) {
-                            mlaEl.textContent = 'DNF';
-                        } else {
-                            const mlaVal = (middle3[0] + middle3[1] + middle3[2]) / 3;
-                            const mlaValDiv = document.createElement('div');
-                            mlaValDiv.textContent = formatTime(mlaVal);
-                            mlaValDiv.style.position = 'relative';
-                            mlaValDiv.style.zIndex = '1';
-                            mlaEl.appendChild(mlaValDiv);
-                            const rank = getCompAverageRank(mlaVal);
-                            if (rank) {
-                                const prDiv = document.createElement('div');
-                                prDiv.className = 'pr-rank-pill';
-                                prDiv.textContent = `PR #${rank}`;
-                                prDiv.style.background = getPrPillColor(rank, 'average');
-                                mlaEl.appendChild(prDiv);
-                            }
-                        }
+                        const mlaVal = (middle3[0] + middle3[1] + middle3[2]) / 3;
+                        renderMetricValue(mlaEl, formatTime(mlaVal), {
+                            rank: getCompAverageRank(mlaVal),
+                            pillKind: 'average',
+                        });
                     }
                 }
             }

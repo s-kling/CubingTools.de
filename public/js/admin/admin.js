@@ -567,41 +567,19 @@ async function loadPeriodicTasks(role, username) {
 }
 
 async function loadDashboardBadges(token) {
-    // Messages card: badge with count of non-done messages
     try {
-        const res = await fetch('/api/admin/messages', {
+        const overviewRes = await fetch('/api/admin/overview', {
             headers: { Authorization: `Bearer ${token}` },
         });
-        if (res.ok) {
-            const data = await res.json();
-            const pending = (Array.isArray(data.messages) ? data.messages : []).filter(
-                (m) => m.status !== 'done',
-            ).length;
-            if (pending > 0) setCardBadge('messages', pending);
-        }
-    } catch {}
+        if (!overviewRes.ok) return;
 
-    // Status card: flag elevated error rate
-    try {
-        const [statusRes, threshRes] = await Promise.all([
-            fetch('/api/admin/status', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({}),
-            }),
-            fetch('/api/admin/config/error-rate-threshold', {
-                headers: { Authorization: `Bearer ${token}` },
-            }),
-        ]);
-        let threshold = 1;
-        if (threshRes.ok) {
-            const td = await threshRes.json();
-            threshold = td.threshold ?? 1;
-        }
-        if (statusRes.ok) {
-            const data = await statusRes.json();
-            const errorRate = parseFloat(data.logs?.errorRate) || 0;
-            if (errorRate > threshold) setCardBadge('status', '!');
+        const data = await overviewRes.json();
+        const pending = Number(data?.counts?.pendingMessages || 0);
+        if (pending > 0) setCardBadge('messages', pending);
+
+        const warnings = data?.warnings || {};
+        if (warnings.hasUnconfirmedMessages || warnings.hasPendingAppeals) {
+            setCardBadge('status', '!');
         }
     } catch {}
 }

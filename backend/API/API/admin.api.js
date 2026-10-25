@@ -39,11 +39,33 @@ export default class AdminSessionApi {
     }
 
     // Create a new bearer token with configured TTL.
-    createSession(username, role) {
+    createSession(username, role, displayRole = null, name = null) {
         this._cleanExpired();
         const token = crypto.randomBytes(32).toString('hex');
-        this.sessions.set(token, { expiry: Date.now() + this.SESSION_TTL_MS, username, role });
+        const safeDisplayRole = String(displayRole || '').trim() || null;
+        const safeName = String(name || '').trim() || null;
+        this.sessions.set(token, {
+            expiry: Date.now() + this.SESSION_TTL_MS,
+            username,
+            role,
+            displayRole: safeDisplayRole,
+            name: safeName,
+        });
         return token;
+    }
+
+    resolveDisplayRole(user, fallbackRole = 'Operator') {
+        const safeUserRole = String(user?.displayRole || '').trim();
+        if (safeUserRole) return safeUserRole;
+        const safeFallback = String(fallbackRole || '').trim();
+        return safeFallback || 'Operator';
+    }
+
+    resolveDisplayName(user, fallbackUsername = 'User') {
+        const safeName = String(user?.name || '').trim();
+        if (safeName) return safeName;
+        const safeUsername = String(fallbackUsername || '').trim();
+        return safeUsername || 'User';
     }
 
     // Validate token and return session metadata or null.
@@ -94,10 +116,12 @@ export default class AdminSessionApi {
         user.lastLogin = new Date().toISOString();
         await this._saveUser(user.username, user);
 
-        const token = this.createSession(user.username, user.role);
+        const token = this.createSession(user.username, user.role, user.displayRole, user.name);
         return res.json({
             token,
             role: user.role,
+            displayRole: this.resolveDisplayRole(user, user.role),
+            name: this.resolveDisplayName(user, user.username),
             requiresPasswordChange: Boolean(user.firstLogin),
         });
     }
@@ -111,11 +135,15 @@ export default class AdminSessionApi {
         }
         const users = await this._loadUsers();
         const user = users.find((u) => u.username === session.username);
+        const displayRole = this.resolveDisplayRole(user, session.displayRole || session.role);
+        const displayName = this.resolveDisplayName(user, session.name || session.username);
         return res.json({
             valid: true,
             role: session.role,
             username: session.username,
+            name: displayName,
             color: user?.color || '#888888',
+            displayRole,
             requiresPasswordChange: Boolean(user?.firstLogin),
         });
     }
@@ -168,7 +196,12 @@ export default class AdminSessionApi {
         if (!session) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
-        req.adminUser = { username: session.username, role: session.role };
+        req.adminUser = {
+            username: session.username,
+            role: session.role,
+            displayRole: session.displayRole || this.resolveDisplayRole(null, session.role),
+            name: session.name || session.username,
+        };
         next();
     }
 
@@ -182,7 +215,12 @@ export default class AdminSessionApi {
         if (session.role !== 'admin') {
             return res.status(403).json({ error: 'Forbidden: admin access required' });
         }
-        req.adminUser = { username: session.username, role: session.role };
+        req.adminUser = {
+            username: session.username,
+            role: session.role,
+            displayRole: session.displayRole || this.resolveDisplayRole(null, session.role),
+            name: session.name || session.username,
+        };
         next();
     }
 
@@ -196,7 +234,12 @@ export default class AdminSessionApi {
         if (session.role !== 'admin' && session.role !== 'operator') {
             return res.status(403).json({ error: 'Forbidden: operator or admin access required' });
         }
-        req.adminUser = { username: session.username, role: session.role };
+        req.adminUser = {
+            username: session.username,
+            role: session.role,
+            displayRole: session.displayRole || this.resolveDisplayRole(null, session.role),
+            name: session.name || session.username,
+        };
         next();
     }
 
@@ -225,21 +268,30 @@ export default class AdminSessionApi {
     // Return list of users (passwords omitted) for admin UI.
     async listUsers(req, res) {
         const users = await this._loadUsers();
-        const safe = users.map(({ password: _pw, ...rest }) => rest);
+        const safe = users.map(({ password: _pw, ...rest }) => ({
+            ...rest,
+            name: String(rest.name || '').trim() || rest.username,
+            displayRole: rest.displayRole || rest.role || 'Operator',
+        }));
         return res.json({ users: safe });
     }
 
-    // Return usernames and colors (any authenticated user, for assignment dropdowns).
+    // Return usernames, colors, and display roles (any authenticated user, for assignment dropdowns).
     async listUsernames(req, res) {
         const users = await this._loadUsers();
         return res.json({
-            users: users.map((u) => ({ username: u.username, color: u.color || '#888888' })),
+            users: users.map((u) => ({
+                username: u.username,
+                name: this.resolveDisplayName(u, u.username),
+                color: u.color || '#888888',
+                displayRole: this.resolveDisplayRole(u, u.role || 'Operator'),
+            })),
         });
     }
 
     // Add a new user (admin only).
     async addUser(req, res) {
-        const { username, role } = req.body || {};
+        const { username, role, displayRole, name } = req.body || {};
         if (!username || typeof username !== 'string' || !username.trim()) {
             return res.status(400).json({ error: 'Username is required' });
         }
@@ -256,14 +308,25 @@ export default class AdminSessionApi {
             return res.status(409).json({ error: 'Username already exists' });
         }
 
+        const normalizedDisplayRole = String(displayRole || '').trim();
+        const normalizedName = String(name || '').trim();
+
         // Generate a random color for the user
         const randomColor = `#${crypto.randomBytes(3).toString('hex')}`;
 
         const defaultPasswordHash = await bcrypt.hash('cubingtools', BCRYPT_ROUNDS);
+        const defaultDisplayRole =
+            normalizedRole === 'admin'
+                ? 'Admin'
+                : normalizedRole === 'operator'
+                  ? 'Operator'
+                  : 'Tester';
         const newUser = {
             username: username.trim(),
+            name: normalizedName || username.trim(),
             password: defaultPasswordHash,
             role: normalizedRole,
+            displayRole: normalizedDisplayRole || defaultDisplayRole,
             color: randomColor,
             firstLogin: true,
         };
@@ -325,6 +388,48 @@ export default class AdminSessionApi {
         return res.json({ success: true });
     }
 
+    // Update a user's custom display role (admin only).
+    async updateUserDisplayRole(req, res) {
+        const { username } = req.params;
+        const { displayRole } = req.body || {};
+
+        if (!username || typeof username !== 'string') {
+            return res.status(400).json({ error: 'Username is required' });
+        }
+
+        const normalizedDisplayRole = String(displayRole || '').trim();
+        const users = await this._loadUsers();
+        const user = users.find((u) => u.username.toLowerCase() === username.trim().toLowerCase());
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        user.displayRole = normalizedDisplayRole || user.role || 'Operator';
+        await this._saveUser(user.username, user);
+        return res.json({ success: true, displayRole: user.displayRole });
+    }
+
+    // Update a user's public name used in email signatures (admin only).
+    async updateUserName(req, res) {
+        const { username } = req.params;
+        const { name } = req.body || {};
+
+        if (!username || typeof username !== 'string') {
+            return res.status(400).json({ error: 'Username is required' });
+        }
+
+        const normalizedName = String(name || '').trim();
+        const users = await this._loadUsers();
+        const user = users.find((u) => u.username.toLowerCase() === username.trim().toLowerCase());
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        user.name = normalizedName || user.username;
+        await this._saveUser(user.username, user);
+        return res.json({ success: true, name: user.name });
+    }
+
     // Reset a user's password to the default and flag firstLogin (admin only).
     async resetUserPassword(req, res) {
         const { username } = req.params;
@@ -364,7 +469,7 @@ export default class AdminSessionApi {
             }
         }
 
-        const updated = await contactApi.assignMessage(id, normalizedAssignee);
+        const updated = await this.contactApi.assignMessage(id, normalizedAssignee);
         if (!updated) {
             return res.status(404).json({ error: 'Message not found' });
         }
@@ -401,11 +506,114 @@ export default class AdminSessionApi {
         return res.json({ success: true });
     }
 
+    // Reply to a contact message on behalf of the current admin/operator user.
+    async handleReplyMessage(req, res) {
+        const id = String(req?.params?.id || '').trim();
+        const replyText = typeof req.body?.replyText === 'string' ? req.body.replyText : '';
+        const email = typeof req.body?.email === 'string' ? req.body.email : '';
+        const subject = typeof req.body?.subject === 'string' ? req.body.subject : '';
+
+        if (!id) {
+            return res.status(400).json({ error: 'Message id required' });
+        }
+
+        const { username, role, name } = req.adminUser;
+        const users = await this._loadUsers();
+        const sender = users.find((user) => user.username === username);
+        const senderDisplayRole = this.resolveDisplayRole(sender, role);
+        const senderName = this.resolveDisplayName(sender, name || username);
+
+        if (role === 'tester' && (!replyText || !replyText.trim())) {
+            return res.status(400).json({ error: 'Reply text required' });
+        }
+
+        const messages = await this.contactApi.getMessages();
+        const message = messages.find((m) => m.id === id);
+        if (!message) {
+            return res.status(404).json({ error: 'Message not found' });
+        }
+        if (role !== 'admin' && message.assignedTo !== username) {
+            return res.status(403).json({ error: 'Not authorized to reply to this message' });
+        }
+
+        const success = await this.contactApi.sendReplyEmail({
+            message,
+            subject,
+            email,
+            replyText,
+            senderUsername: username,
+            senderName,
+            senderRole: role,
+            senderDisplayRole,
+        });
+
+        if (!success) {
+            return res.status(500).json({ error: 'Failed to send reply email' });
+        }
+
+        await this.contactApi.addReplyToMessage(id, {
+            username,
+            name: senderName,
+            role,
+            displayRole: senderDisplayRole,
+            message: replyText,
+        });
+
+        return res.json({ success: true });
+    }
+
     // Return moderation data for admin UI.
     async getAdminMessages(req, res) {
         const messages = await this.contactApi.getMessages();
         const bans = this.contactApi.getBans();
         return res.json({ messages, bans });
+    }
+
+    async getAdminOverview(req, res) {
+        const session = req.adminUser;
+        const users = await this._loadUsers();
+        const currentUser = users.find((user) => user.username === session.username) || {
+            username: session.username,
+            role: session.role,
+            displayRole: this.resolveDisplayRole(null, session.role),
+            name: session.name || session.username,
+        };
+        const messages = await this.contactApi.getMessages();
+        const bans = this.contactApi.getBans();
+        const pendingMessages = messages.filter((message) => message.status !== 'done').length;
+        const unconfirmedMessages = messages.filter((message) => !message.confirmed).length;
+        const pendingAppeals = [...(bans.emails || []), ...(bans.ips || [])].filter(
+            (entry) => entry?.appeal_pending,
+        ).length;
+
+        return res.json({
+            currentUser: {
+                username: session.username,
+                role: session.role,
+                name: this.resolveDisplayName(currentUser, session.username),
+                color: currentUser.color || '#888888',
+                displayRole: this.resolveDisplayRole(currentUser, session.role),
+            },
+            users: users.map((user) => ({
+                username: user.username,
+                name: this.resolveDisplayName(user, user.username),
+                role: user.role,
+                color: user.color || '#888888',
+                displayRole: this.resolveDisplayRole(user, user.role || 'Operator'),
+            })),
+            messages,
+            bans,
+            counts: {
+                totalMessages: messages.length,
+                pendingMessages,
+                unconfirmedMessages,
+                pendingAppeals,
+            },
+            warnings: {
+                hasUnconfirmedMessages: unconfirmedMessages > 0,
+                hasPendingAppeals: pendingAppeals > 0,
+            },
+        });
     }
 
     // Delete one queued/confirmed message by ID.

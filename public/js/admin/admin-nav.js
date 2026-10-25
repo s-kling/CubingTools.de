@@ -141,51 +141,23 @@ async function loadNavBadges() {
         link.appendChild(badge);
     }
 
-    // Messages badge: non-done message count
     try {
-        const res = await fetch('/api/admin/messages', {
+        const overviewRes = await fetch('/api/admin/overview', {
             headers: { Authorization: `Bearer ${token}` },
         });
-        if (res.ok) {
-            const data = await res.json();
-            const pending = (Array.isArray(data.messages) ? data.messages : []).filter(
-                (m) => m.status !== 'done',
-            ).length;
-            if (pending > 0) {
-                const text = pending > 99 ? '99+' : String(pending);
-                const noun = pending === 1 ? 'message' : 'messages';
-                setSubnavBadge('messages', text, `${pending} ${noun} pending review`);
-            }
-        }
-    } catch {}
+        if (!overviewRes.ok) return;
 
-    // Status badge: elevated error rate
-    try {
-        const [statusRes, threshRes] = await Promise.all([
-            fetch('/api/admin/status', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: '{}',
-            }),
-            fetch('/api/admin/config/error-rate-threshold', {
-                headers: { Authorization: `Bearer ${token}` },
-            }),
-        ]);
-        let threshold = 1;
-        if (threshRes.ok) {
-            const td = await threshRes.json();
-            threshold = td.threshold ?? 1;
+        const data = await overviewRes.json();
+        const pending = Number(data?.counts?.pendingMessages || 0);
+        if (pending > 0) {
+            const text = pending > 99 ? '99+' : String(pending);
+            const noun = pending === 1 ? 'message' : 'messages';
+            setSubnavBadge('messages', text, `${pending} ${noun} pending review`);
         }
-        if (statusRes.ok) {
-            const data = await statusRes.json();
-            const errorRate = parseFloat(data.logs?.errorRate) || 0;
-            if (errorRate > threshold) {
-                setSubnavBadge(
-                    'status',
-                    '!',
-                    `Error rate ${data.logs?.errorRate} exceeds ${threshold}% threshold`,
-                );
-            }
+
+        const warnings = data?.warnings || {};
+        if (warnings.hasUnconfirmedMessages || warnings.hasPendingAppeals) {
+            setSubnavBadge('status', '!', 'Admin warnings require attention');
         }
     } catch {}
 }

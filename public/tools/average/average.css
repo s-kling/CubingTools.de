@@ -122,6 +122,7 @@ ul li::before {
     display: flex;
     flex-direction: column;
     gap: var(--space-md);
+    padding-bottom: var(--space-md);
 }
 
 .settings-section {
@@ -377,26 +378,26 @@ ul li::before {
     align-items: center;
     gap: var(--space-sm);
     width: 100%;
-    max-width: 900px;
-    margin-left: auto;
-    margin-right: auto;
-    padding: var(--space-sm) var(--space-md);
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
+    margin: 0 auto;
     border-radius: var(--main-radius);
-    margin-bottom: var(--space-sm);
     box-sizing: border-box;
+    max-width: 100%;
+    background: transparent;
+    border: none;
+    padding: var(--space-xs) var(--space-md);
+    flex-shrink: 0;
 }
 
 .scramble-text {
     flex: 1;
-    font-size: var(--font-size-base);
+    font-size: 1.2rem;
     font-family: monospace !important;
+    margin-right: 5px;
     color: var(--main-text);
     line-height: 1.5;
     word-spacing: 0.15em;
     letter-spacing: 0.02em;
-    text-align: center;
+    text-align: left;
     min-height: 1.5em;
     margin: 0;
     white-space: normal;
@@ -452,7 +453,7 @@ ul li::before {
     color: var(--main-text);
     font-family: var(--font-main);
     margin: var(--space-md) 0;
-    min-width: 300px;
+    min-width: 100vw;
     user-select: none;
     transition: color 0.15s ease;
 }
@@ -735,10 +736,9 @@ ul li::before {
     align-items: center;
     gap: var(--space-xxs);
     padding: var(--space-sm) var(--space-md);
-    background: transparent;
+    background: rgba(0, 0, 0, 0.2);
     border: none;
-    border-right: 1px solid var(--card-border);
-    border-radius: 0;
+    border-radius: var(--main-radius);
     min-width: 80px;
     position: relative;
 }
@@ -1056,9 +1056,11 @@ ul li::before {
 /* === BOTTOM ROW (Scramble + Stats) === */
 
 .bottom-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: 2fr 1fr 2fr;
+    grid-template-rows: 1fr;
     gap: var(--space-md);
-    margin: var(--space-md) 0;
+    margin-top: var(--space-md);
     align-items: stretch;
     height: fit-content;
 }
@@ -1072,6 +1074,7 @@ ul li::before {
     display: flex;
     align-items: center;
     justify-content: center;
+    scale: 1.02;
 }
 
 .scramble-box twisty-player {
@@ -1083,7 +1086,6 @@ ul li::before {
 /* Bottom-row solves sidebar */
 .bottom-solves {
     flex: 0 0 200px;
-    max-height: 290px;
     overflow-y: auto;
     background: var(--main-lighter);
     padding: var(--space-sm);
@@ -1095,9 +1097,10 @@ ul li::before {
 
 .stats-box {
     flex: 1;
-    background: transparent;
-    border: none;
-    padding: var(--space-sm);
+    background: var(--main-lighter);
+    border: 1px solid var(--input-border);
+    border-radius: var(--main-radius);
+    padding: var(--space-md);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1116,6 +1119,7 @@ ul li::before {
     max-width: 700px;
     width: 100%;
     margin: 0 auto;
+    padding-bottom: var(--space-md);
     display: flex;
     flex-direction: column;
     gap: var(--space-md);
@@ -1753,11 +1757,6 @@ main.timer-running .compsim-toolbar {
         position: relative;
     }
 
-    /* ── Hide solves in bottom row on mobile ── */
-    .bottom-solves {
-        display: none !important;
-    }
-
     /* ── Timer area: full screen, touch-friendly ── */
     .timer-area {
         order: 1;
@@ -1777,23 +1776,11 @@ main.timer-running .compsim-toolbar {
         justify-content: center;
     }
 
-    /* Scramble: minimal top text, grows with content */
-    .scramble-container {
-        max-width: 100%;
-        background: transparent;
-        border: none;
-        padding: var(--space-xs) var(--space-md);
-        margin-bottom: 0;
-        flex-shrink: 0;
-    }
-
     .scramble-container .icon-btn {
         display: none;
     }
 
     .scramble-text {
-        font-size: 0.95rem;
-        font-weight: 500;
         line-height: 1.6;
         word-spacing: 0.3em;
         overflow: visible;
@@ -2020,14 +2007,13 @@ main.timer-running .compsim-toolbar {
 
     /* Scramble: slightly smaller text on tiny screens, still 3-line clamp */
     .scramble-text {
-        font-size: 0.88rem;
         word-spacing: 0.3em;
         line-height: 1.5;
         overflow: hidden;
         display: -webkit-box;
-        -webkit-line-clamp: 3;
+        -webkit-line-clamp: 10;
         -webkit-box-orient: vertical;
-        line-clamp: 3;
+        line-clamp: 10;
         text-overflow: ellipsis;
     }
 
@@ -2631,5 +2617,179 @@ main.zen-mode .timer-display {
 
     .comp-solve-row .penalty-buttons {
         opacity: 1;
+    }
+}
+
+/* ===== VERTICAL STAT LIST ===== */
+
+.stats-box .stats,
+.comp-stats-section .stats {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0;
+    width: 100%;
+}
+
+.stats-box .stat-card,
+.comp-stats-section .stat-card {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--space-sm);
+    width: 100%;
+    min-width: 0;
+    padding: var(--space-xs) 0;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--card-border);
+    border-radius: 0;
+    text-align: left;
+}
+
+.stats-box .stat-card:last-child,
+.comp-stats-section .stat-card:last-child {
+    border-bottom: 0;
+}
+
+.stats-box .stat-label,
+.comp-stats-section .stat-label {
+    flex: 0 0 7.5rem;
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    color: var(--secondary-text);
+}
+
+.stats-box .stat-label::after,
+.comp-stats-section .stat-label::after {
+    content: ":";
+}
+
+.stats-box .stat-value,
+.comp-stats-section .stat-value {
+    display: inline-flex;
+    order: 2;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.45em;
+    min-width: 0;
+    font-size: var(--font-size-base);
+    font-weight: 700;
+    color: var(--main-text);
+}
+
+.stats-box .stat-value > div,
+.comp-stats-section .stat-value > div {
+    position: static !important;
+}
+
+.stats-box .stat-prob,
+.comp-stats-section .stat-prob {
+    position: static;
+    display: inline;
+    order: 1;
+    transform: none;
+    height: auto;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    color: var(--warning);
+    font-size: 0.85em;
+    line-height: inherit;
+    opacity: 1;
+}
+
+.stats-box .stat-prob::after,
+.comp-stats-section .stat-prob::after {
+    content: " chance of";
+}
+
+.stats-box #mla-solve,
+.comp-stats-section #comp-mla-solve {
+    order: 3;
+    color: var(--secondary-text);
+    font-size: 0.85em;
+    font-weight: 600;
+}
+
+.stats-box .pr-rank-pill,
+.comp-stats-section .pr-rank-pill {
+    position: static;
+    display: inline;
+    transform: none;
+    height: auto;
+    padding: 0;
+    background: transparent !important;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    color: var(--link-color);
+    font-size: 0.8em;
+    line-height: inherit;
+    opacity: 1 !important;
+}
+
+.stats-box #card-mean .stat-value,
+.comp-stats-section #comp-card-mean .stat-value {
+    color: var(--link-color);
+}
+
+.stats-box #card-bpa .stat-value,
+.comp-stats-section #comp-card-bpa .stat-value {
+    color: var(--success);
+}
+
+.stats-box #card-wpa .stat-value,
+.comp-stats-section #comp-card-wpa .stat-value {
+    color: var(--error);
+}
+
+.stats-box #card-mla .stat-value,
+.comp-stats-section #comp-card-mla .stat-value {
+    color: var(--warning);
+}
+
+.stats-box #card-tft .stat-value,
+.comp-stats-section #comp-card-tft .stat-value {
+    color: var(--link-color);
+}
+
+.stats-box .after-average .stat-value,
+.comp-stats-section #comp-card-average .stat-value {
+    color: var(--success);
+}
+
+.stats-box #card-tft .stat-label,
+.comp-stats-section #comp-card-tft .stat-label {
+    color: var(--link-color);
+}
+
+@media (max-width: 480px) {
+    .stats-box .stats,
+    .comp-stats-section .stats {
+        overflow: visible;
+        flex-wrap: nowrap;
+    }
+
+    .stats-box .stat-card,
+    .comp-stats-section .stat-card {
+        flex: 0 0 auto;
+        width: 100%;
+        min-height: 0;
+        padding: var(--space-xs) 0;
+        border-right: 0;
+    }
+
+    .stats-box .stat-label,
+    .comp-stats-section .stat-label {
+        flex-basis: 6.5rem;
+    }
+
+    .stats-box .stat-prob,
+    .comp-stats-section .stat-prob {
+        display: inline;
     }
 }

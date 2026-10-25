@@ -1,5 +1,6 @@
 const policyFolder = '../html/privacy-policies/'; // Path to the folder containing policies
 const policies = [
+    '2026-08-01',
     '2026-04-10',
     '2026-03-31',
     '2026-02-14',

@@ -8,6 +8,38 @@ import { Transform } from 'stream';
 import { DatabaseSync } from 'node:sqlite';
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Logger
+//
+// Small console wrapper so every line this class prints has a consistent,
+// scannable shape: a colored tag, then the message. Colors are skipped
+// automatically when stdout isn't a TTY (e.g. piped into a log file).
+// ─────────────────────────────────────────────────────────────────────────────
+
+const COLOR = {
+    reset: '\x1b[0m',
+    bold: '\x1b[1m',
+    dim: '\x1b[2m',
+    cyan: '\x1b[36m',
+    green: '\x1b[32m',
+    yellow: '\x1b[33m',
+    red: '\x1b[31m',
+    gray: '\x1b[90m',
+};
+
+const canColor = typeof process !== 'undefined' && process.stdout && process.stdout.isTTY;
+const paint = (color, text) => (canColor ? `${color}${text}${COLOR.reset}` : text);
+
+const logger = {
+    info: (...args) => console.log(paint(COLOR.cyan, '[WcaApi]'), ...args),
+    success: (...args) => console.log(paint(COLOR.green, '[WcaApi]'), ...args),
+    warn: (...args) => console.warn(paint(COLOR.yellow, '[WcaApi]'), ...args),
+    error: (...args) => console.error(paint(COLOR.red, '[WcaApi]'), ...args),
+    debug: (...args) => {
+        if (process.env.WCA_DEBUG) console.log(paint(COLOR.gray, '[WcaApi:debug]'), ...args);
+    },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // WcaApi
 //
 // Historical person/results data is served from a local SQLite database that is
@@ -28,6 +60,36 @@ import { DatabaseSync } from 'node:sqlite';
 //
 // WCA Live data still uses the network API because it covers events not yet in
 // the export and live scoring.
+//
+// Startup behaviour (important):
+//   The DB file usually already exists on disk from a previous run. In that
+//   case `_ensureReady()` becomes ready as soon as the existing data is
+//   queryable — it does NOT wait on a "is there a newer export?" metadata
+//   check, let alone a multi-GB download/import, before serving requests.
+//   Any newer export is instead fetched via `forceRefreshExport()` in the
+//   background, exactly like a periodic refresh. The ONLY time `_ensureReady()`
+//   legitimately blocks callers is a true first run (no DB file / an empty
+//   one yet) — there is simply nothing to serve until that import finishes.
+//
+// Refresh behaviour (important):
+//   Every refresh (`forceRefreshExport`, whether triggered manually or by the
+//   startup check above) downloads and imports into a brand-new *temporary*
+//   database file while the existing `this._db` keeps serving reads
+//   completely normally. Only the final atomic swap-in of the new file is a
+//   critical section, and that section does no I/O that yields to the event
+//   loop, so it never blocks a request. Concurrency/status for refreshes is
+//   tracked with its own `_refreshInProgress` / `_refreshPromise` pair, kept
+//   deliberately separate from `_ready` / `_initPromise` (which only ever
+//   describe the one-time initial load) so the two can never be confused.
+//
+//   The *scheduled* background loop (`_runBackgroundRefresh`, every 24h) is
+//   NOT the same thing as "force refresh": it only checks whether the WCA has
+//   actually published a newer export (via `_checkForNewerExport()`, gated by
+//   `exportMaxAgeMs`) and calls `forceRefreshExport()` only when that check
+//   says a newer export exists. `forceRefreshExport()` itself always performs
+//   a full download when called directly — that's reserved for genuinely
+//   forced refreshes (the manual "force refresh" endpoint), not the periodic
+//   tick.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default class WcaApi {
@@ -57,7 +119,10 @@ export default class WcaApi {
         // check _ready, not _db, to know whether queries are safe.
         this._ready = false;
 
-        // Promise guard so concurrent callers share a single initialisation.
+        // Promise guard so concurrent callers share a single *initial* load.
+        // This is ONLY for the one-time first-run bootstrap — never reused for
+        // periodic refreshes (see `_refreshPromise` below), so a slow refresh
+        // can never make `_ensureReady()` block an otherwise-ready server.
         this._initPromise = null;
 
         // ── Network response caches (WCIF / live) ──────────────────────────────
@@ -76,7 +141,11 @@ export default class WcaApi {
         // competitor histories.
         this.compProfileCache = new Map();
 
-        // Controller used to cancel a manual export refresh.
+        // ── Background export refresh state ───────────────────────────────────
+        // Deliberately independent of `_ready`/`_initPromise`: a refresh in
+        // progress never makes normal queries wait (see class doc comment).
+        this._refreshInProgress = false;
+        this._refreshPromise = null;
         this._refreshAbortController = null;
 
         // Background refresh loop for periodic WCA export checks/imports.
@@ -85,6 +154,38 @@ export default class WcaApi {
         this._backgroundRefreshInterval = null;
         this._backgroundRefreshInitialDelayMs = 2 * 60 * 1000; // 2 minutes
         this._backgroundRefreshIntervalMs = 24 * 60 * 60 * 1000; // 24 hours
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Public initialization entry point
+    //
+    // Call this once at application startup:
+    //
+    //     const api = new WcaApi();
+    //     await api.init();
+    //
+    // It performs the initial load and starts the periodic background
+    // refresh loop, so every piece of setup happens proactively in one place
+    // instead of being scattered across whichever query method happens to
+    // run first. Thanks to `_performInitialLoad()`'s fast path, this resolves
+    // almost immediately whenever a populated DB file already exists on disk
+    // — it only blocks for a real download+import on a genuine first run.
+    // Whenever a populated DB already exists, an "is there a newer export?"
+    // check (and, if so, a background download) is kicked off as part of
+    // that fast path, so every startup effectively updates the export
+    // without making the caller wait for it.
+    //
+    // Every query method still calls `_ensureReady()` itself as a safety
+    // net, so the class also works correctly without ever calling `init()`
+    // explicitly — the first request just pays for the initial load instead
+    // of it happening proactively at startup, and the background refresh
+    // loop simply never starts.
+    // ═══════════════════════════════════════════════════════════════════════
+
+    async init() {
+        await this._ensureReady();
+        this.startBackgroundRefreshLoop();
+        return this;
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -164,7 +265,7 @@ export default class WcaApi {
         db.exec(`
             CREATE INDEX IF NOT EXISTS idx_results_person_event
                 ON results (person_id, event_id);
-            
+
             CREATE INDEX IF NOT EXISTS idx_competitions_dates
                 ON competitions (year, month, day);
         `);
@@ -198,6 +299,18 @@ export default class WcaApi {
         );
     }
 
+    // Whether the currently-open DB already has usable person data.
+    // Centralized here since both the initial load and the "was this a
+    // genuine first run?" check need the exact same test.
+    _hasData() {
+        if (!this._db) return false;
+        try {
+            return this._db.prepare('SELECT COUNT(*) as n FROM persons').get().n > 0;
+        } catch {
+            return false;
+        }
+    }
+
     // Pack an array of attempt integers into a compact little-endian Buffer.
     _packAttempts(arr) {
         const buf = Buffer.alloc(arr.length * 4);
@@ -214,6 +327,40 @@ export default class WcaApi {
         const out = [];
         for (let i = 0; i < b.length; i += 4) out.push(b.readInt32LE(i));
         return out;
+    }
+
+    // ── FIX (schema-drift bug) ────────────────────────────────────────────
+    // The WCA export's column *names* are far more stable than their
+    // *positions* — the export format has changed column order/count twice
+    // in 2026 alone (v2.0.0 added `results.id`, v2.0.2 removed three columns
+    // from `result_attempts`), and Rails migrations typically append new
+    // columns at the end of a table rather than where a hand-written comment
+    // like "id(0)" assumes. Binding a shifted/undefined field into a
+    // NOT NULL integer column throws inside node:sqlite (NaN isn't a valid
+    // bind value), which rolls back the whole import transaction — so the
+    // database never gets data, `_hasData()` stays false forever, and every
+    // subsequent request re-triggers a full re-download from scratch.
+    //
+    // Every TSV file except result_attempts.tsv ships a header row, so we
+    // read column positions from that header instead of hardcoding them.
+    // This self-corrects across reorderings, and fails loudly with a clear
+    // message (instead of silently corrupting data) if a column we actually
+    // need is genuinely gone.
+    _buildColumnMap(headerFields, requiredNames) {
+        const map = {};
+        headerFields.forEach((name, i) => {
+            map[String(name).trim()] = i;
+        });
+        const missing = requiredNames.filter((n) => !(n in map));
+        if (missing.length > 0) {
+            throw new Error(
+                `WCA export schema mismatch: expected column(s) [${missing.join(', ')}] ` +
+                    `not found in header [${headerFields.join(', ')}]. The WCA export format ` +
+                    `may have changed — check https://www.worldcubeassociation.org/export/results ` +
+                    `for the current schema and update the required-column list accordingly.`,
+            );
+        }
+        return map;
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -250,7 +397,7 @@ export default class WcaApi {
         }
 
         try {
-            console.log('[WcaApi] Syncing upcoming competitions from network...');
+            logger.info('Syncing upcoming competitions from network...');
 
             const today = new Date().toISOString().slice(0, 10);
             const ninetyDaysOut = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
@@ -288,10 +435,10 @@ export default class WcaApi {
             this._saveCompetitionsToDb(allComps);
             this._saveCompetitionsSyncDate(new Date().toISOString());
 
-            console.log(`[WcaApi] Synced ${allComps.length} competitions from network.`);
+            logger.success(`Synced ${allComps.length} competitions from network.`);
         } catch (err) {
             if (signal?.aborted) throw err;
-            console.warn('[WcaApi] Failed to sync competitions from network:', err.message);
+            logger.warn('Failed to sync competitions from network:', err.message);
             // Don't throw — DB may have stale data but it's better than failing
         }
     }
@@ -303,8 +450,7 @@ export default class WcaApi {
             VALUES (?,?,?,?,?,?,?,?,?,?)
         `);
 
-        const updateStmt = this._db.prepare('BEGIN');
-        updateStmt.run();
+        this._db.prepare('BEGIN').run();
 
         try {
             for (const comp of networkComps) {
@@ -378,7 +524,7 @@ export default class WcaApi {
             return { needsDownload: false, latestExportDate };
         } catch (err) {
             if (signal?.aborted) throw new Error('Refresh cancelled');
-            console.warn('[WcaApi] Could not reach export metadata endpoint:', err.message);
+            logger.warn('Could not reach export metadata endpoint:', err.message);
             return { needsDownload: false, latestExportDate: stored };
         }
     }
@@ -398,7 +544,7 @@ export default class WcaApi {
         } catch (err) {
             if (err.message.includes('Insufficient')) throw err;
             // statfsSync not available on all platforms — skip check
-            console.warn('[WcaApi] Could not check disk space:', err.message);
+            logger.warn('Could not check disk space:', err.message);
         }
     }
 
@@ -409,7 +555,7 @@ export default class WcaApi {
 
         const zipPath = this._exportPath('wca_export.tsv.zip');
 
-        console.log('[WcaApi] Downloading WCA TSV export...');
+        logger.info('Downloading WCA TSV export...');
         const response = await axios.get(this.exportTsvUrl, {
             responseType: 'stream',
             timeout: 10 * 60 * 1000,
@@ -427,7 +573,7 @@ export default class WcaApi {
         }
 
         if (signal?.aborted) throw new Error('Refresh cancelled');
-        console.log('[WcaApi] Download complete. Extracting...');
+        logger.info('Download complete. Extracting...');
 
         await new Promise((resolve, reject) => {
             const extractor = Extract({ path: this.exportDir });
@@ -448,10 +594,10 @@ export default class WcaApi {
 
         if (signal?.aborted) throw new Error('Refresh cancelled');
         fs.unlinkSync(zipPath);
-        console.log('[WcaApi] Extraction complete.');
+        logger.success('Extraction complete.');
     }
 
-    // Add this to be called after _importExport() completes
+    // Call after _importExport() completes to reclaim disk space.
     _cleanupTsvFiles() {
         const tsvFiles = [
             'WCA_export_persons.tsv',
@@ -466,10 +612,10 @@ export default class WcaApi {
             try {
                 if (fs.existsSync(p)) fs.unlinkSync(p);
             } catch (err) {
-                console.warn(`[WcaApi] Could not delete ${f}:`, err.message);
+                logger.warn(`Could not delete ${f}:`, err.message);
             }
         }
-        console.log('[WcaApi] TSV files cleaned up.');
+        logger.debug('TSV files cleaned up.');
     }
 
     // Stream-parse a TSV file, calling rowFn(fields) for every data row.
@@ -480,7 +626,13 @@ export default class WcaApi {
     // which fires only after _flush() completes — it cannot silently truncate.
     //
     // onProgress(rowsProcessed) is called every PROGRESS_INTERVAL rows.
-    _parseTsv(filePath, rowFn, onProgress = null, signal = null) {
+    //
+    // onHeader(headerFields), if given, fires exactly once with the parsed
+    // header line's fields, before rowFn is called for any data row (the
+    // header always arrives first in a well-formed TSV, and lines are
+    // processed strictly in order). Callers use this to build a name→index
+    // column map instead of hardcoding positions — see _buildColumnMap().
+    _parseTsv(filePath, rowFn, onProgress = null, signal = null, onHeader = null) {
         const PROGRESS_INTERVAL = 10_000;
 
         // Only result_attempts.tsv has no header, all others do
@@ -511,6 +663,13 @@ export default class WcaApi {
                         const fields = line.split('\t');
                         if (skipHeader && !headerSkipped) {
                             headerSkipped = true;
+                            if (onHeader) {
+                                try {
+                                    onHeader(fields);
+                                } catch (e) {
+                                    return cb(e);
+                                }
+                            }
                             continue;
                         }
                         try {
@@ -536,6 +695,13 @@ export default class WcaApi {
                         const fields = line.split('\t');
                         if (skipHeader && !headerSkipped) {
                             headerSkipped = true;
+                            if (onHeader) {
+                                try {
+                                    onHeader(fields);
+                                } catch (e) {
+                                    return cb(e);
+                                }
+                            }
                         } else {
                             try {
                                 rowFn(fields);
@@ -581,13 +747,16 @@ export default class WcaApi {
     // identical data (cheap), while new/changed rows are updated.  On a weekly
     // re-import the vast majority of rows are unchanged, so the incremental
     // cost is mostly I/O-bound TSV parsing — not full index rebuilding.
+    //
+    // IMPORTANT: `db` here is whatever database handle the caller passes in —
+    // during a refresh this is a brand-new *temporary* file, never
+    // `this._db`. That's what lets every other request keep querying the
+    // live database untouched while an import runs (see class doc comment).
     // ═══════════════════════════════════════════════════════════════════════
 
     async _importExport(signal = null, db = this._db) {
-        const effectiveDb = db;
-
         // Use disk for temp tables during import to avoid memory pressure
-        effectiveDb.exec('PRAGMA temp_store = FILE');
+        db.exec('PRAGMA temp_store = FILE');
 
         // ── Progress bar helpers ──────────────────────────────────────────────
         const BAR_WIDTH = 40;
@@ -602,24 +771,46 @@ export default class WcaApi {
             ranks_average: 550_000,
         };
 
+        // Non-interactive environments (containers, systemd, pm2, most cloud
+        // hosts) don't have a TTY, so the live carriage-return bar below is
+        // skipped for them — but a multi-minute import (result_attempts.tsv
+        // alone is ~30M rows) would then produce *zero* output until the
+        // whole file finishes, which looks indistinguishable from a hang.
+        // Emit periodic plain log lines in that case instead, at a coarser
+        // interval so they don't spam the log.
+        const NON_TTY_LOG_INTERVAL = 500_000;
+
         const renderBar = (label, done, total) => {
+            if (!process.stdout.isTTY) {
+                if (done % NON_TTY_LOG_INTERVAL === 0) {
+                    const pct = (Math.min(done / total, 1) * 100).toFixed(1);
+                    logger.info(
+                        `${label.padEnd(18)} ${done.toLocaleString()} / ~${total.toLocaleString()} rows (${pct}%)`,
+                    );
+                }
+                return;
+            }
             const pct = Math.min(done / total, 1);
             const filled = Math.round(pct * BAR_WIDTH);
             const bar = '\u2588'.repeat(filled) + '\u2591'.repeat(BAR_WIDTH - filled);
             const pctStr = (pct * 100).toFixed(1).padStart(5);
             const mRows = (done / 1_000_000).toFixed(2);
             process.stdout.write(
-                `\r[WcaApi] ${label.padEnd(18)} [${bar}] ${pctStr}%  ${mRows}M rows`,
+                `\r${paint(COLOR.cyan, '[WcaApi]')} ${label.padEnd(18)} [${paint(COLOR.green, bar)}] ${pctStr}%  ${mRows}M rows`,
             );
         };
 
         const finishStep = (label, rowCount) => {
             totalRowsImported += rowCount;
-            renderBar(label, rowCount, rowCount);
-            process.stdout.write('\n');
+            if (process.stdout.isTTY) {
+                renderBar(label, rowCount, rowCount);
+                process.stdout.write('\n');
+            } else {
+                logger.info(`${label.padEnd(18)} imported: ${rowCount.toLocaleString()} rows`);
+            }
         };
 
-        console.log('[WcaApi] Importing TSV export into SQLite...');
+        logger.info('Importing TSV export into SQLite...');
 
         // ── Transaction 1: competitions + persons + result_attempts ──────────
         db.exec('BEGIN');
@@ -631,27 +822,40 @@ export default class WcaApi {
                  VALUES (?,?,?,?,?,?,?,?,?,?)`,
             );
             let compRows = 0;
+            let compCols;
             await this._parseTsv(
                 this._exportPath('WCA_export_competitions.tsv'),
                 (f) => {
-                    // id(0) name(1) country_id(6) year(14) month(15) day(16)
-                    // end_year(17) end_month(18) end_day(19)
                     insComp.run(
-                        f[0], // competition_id
-                        f[1], // name
-                        f[6], // country_id
-                        Number(f[14]), // year
-                        Number(f[15]), // month
-                        Number(f[16]), // day
-                        Number(f[17]), // end_year
-                        Number(f[18]), // end_month
-                        Number(f[19]), // end_day
+                        f[compCols.id], // competition_id
+                        f[compCols.name], // name
+                        f[compCols.country_id], // country_id
+                        Number(f[compCols.year]), // year
+                        Number(f[compCols.month]), // month
+                        Number(f[compCols.day]), // day
+                        Number(f[compCols.end_year]), // end_year
+                        Number(f[compCols.end_month]), // end_month
+                        Number(f[compCols.end_day]), // end_day
                         'export', // source
                     );
                     compRows++;
                 },
                 (n) => renderBar('competitions', n, APPROX_ROWS.competitions),
                 signal,
+                (header) => {
+                    compCols = this._buildColumnMap(header, [
+                        'id',
+                        'name',
+                        'country_id',
+                        'year',
+                        'month',
+                        'day',
+                        'end_year',
+                        'end_month',
+                        'end_day',
+                    ]);
+                    logger.debug('WCA_export_competitions.tsv columns:', header);
+                },
             );
             finishStep('competitions', compRows);
 
@@ -660,15 +864,23 @@ export default class WcaApi {
                 'INSERT OR REPLACE INTO persons (wca_id, name, country_id) VALUES (?,?,?)',
             );
             let personRows = 0;
+            let personCols;
             await this._parseTsv(
                 this._exportPath('WCA_export_persons.tsv'),
                 (f) => {
-                    // name(0) gender(1) wca_id(2) sub_id(3) country_id(4)
-                    insPerson.run(f[2], f[0], f[4]);
+                    insPerson.run(
+                        f[personCols.wca_id],
+                        f[personCols.name],
+                        f[personCols.country_id],
+                    );
                     personRows++;
                 },
                 (n) => renderBar('persons', n, APPROX_ROWS.persons),
                 signal,
+                (header) => {
+                    personCols = this._buildColumnMap(header, ['wca_id', 'name', 'country_id']);
+                    logger.debug('WCA_export_persons.tsv columns:', header);
+                },
             );
             finishStep('persons', personRows);
 
@@ -685,17 +897,30 @@ export default class WcaApi {
                 'INSERT INTO temp_attempts (result_id, attempt_number, value) VALUES (?,?,?)',
             );
             let attemptRows = 0;
+            let attemptRowsSeen = 0;
+            let attemptSampleRejected = null;
             await this._parseTsv(
                 this._exportPath('WCA_export_result_attempts.tsv'),
                 (f) => {
-                    // value(0) attempt_number(1) result_id(2)
-                    const result_id = f[2]?.trim();
+                    // result_attempts.tsv ships with NO header (unlike every
+                    // other file here), so a column-order change can't be
+                    // self-detected the way _buildColumnMap() does elsewhere.
+                    // This assumed order (result_id, attempt_number, value)
+                    // matches the current v2.0.2 export README; if WCA
+                    // reorders it again, this is the one spot that needs a
+                    // manual update — the reject-rate warning below is meant
+                    // to make that obvious quickly rather than looping
+                    // silently on every request.
+                    attemptRowsSeen++;
+                    const result_id = f[0]?.trim();
                     const attempt_number = Number(f[1]);
-                    const value = Number(f[0]);
+                    const value = Number(f[2]);
 
                     // Skip malformed rows
-                    if (!result_id || !Number.isFinite(attempt_number) || !Number.isFinite(value))
+                    if (!result_id || !Number.isFinite(attempt_number) || !Number.isFinite(value)) {
+                        if (!attemptSampleRejected) attemptSampleRejected = f;
                         return;
+                    }
 
                     insAttempt.run(result_id, attempt_number, value);
                     attemptRows++;
@@ -703,6 +928,18 @@ export default class WcaApi {
                 (n) => renderBar('result_attempts', n, APPROX_ROWS.result_attempts),
                 signal,
             );
+            if (attemptRowsSeen > 0 && attemptRows / attemptRowsSeen < 0.9) {
+                logger.warn(
+                    `WCA_export_result_attempts.tsv: ${(
+                        100 -
+                        (100 * attemptRows) / attemptRowsSeen
+                    ).toFixed(1)}% of rows were rejected as malformed. This usually means the ` +
+                        `WCA export changed this file's column order (it has no header to self-detect ` +
+                        `from). Current code assumes [result_id, attempt_number, value]. Sample rejected ` +
+                        `row: [${attemptSampleRejected?.join(', ')}] — compare against ` +
+                        `https://www.worldcubeassociation.org/export/results to fix the field order.`,
+                );
+            }
             finishStep('result_attempts', attemptRows);
 
             db.exec('COMMIT');
@@ -712,20 +949,9 @@ export default class WcaApi {
         }
 
         // ── Index build — outside any transaction ─────────────────────────────
-        // No write lock is held on the main DB here, so WAL readers can still
-        // serve queries while this blocks the event loop.
-        process.stdout.write('[WcaApi] Building temp_attempts index ');
-        let dots = 0;
-        const dotInterval = setInterval(() => {
-            process.stdout.write('.');
-            dots++;
-        }, 500);
+        logger.info('Building temp_attempts index...');
         db.exec('CREATE INDEX temp_attempts_idx ON temp_attempts (result_id)');
-        clearInterval(dotInterval);
-        process.stdout.write(
-            '\r' + ' '.repeat('[WcaApi] Building temp_attempts index '.length + dots) + '\r',
-        );
-        console.log('[WcaApi] Index built.');
+        logger.success('Index built.');
 
         // ── Transaction 2: results + ranks ────────────────────────────────────
         db.exec('BEGIN');
@@ -747,32 +973,47 @@ export default class WcaApi {
             `);
 
             let resultRows = 0;
+            let resultCols;
             await this._parseTsv(
                 this._exportPath('WCA_export_results.tsv'),
                 (f) => {
-                    // id(0) pos(1) best(2) average(3) competition_id(4) round_type_id(5)
-                    // event_id(6) person_name(7) person_id(8) format_id(9)
-                    // regional_single_record(10) regional_average_record(11)
-                    const attempts = getAttempts.all(f[0]).map((r) => r.value);
+                    const resultId = f[resultCols.id];
+                    const attempts = getAttempts.all(resultId).map((r) => r.value);
                     const packed = this._packAttempts(attempts);
                     insResult.run(
-                        f[0], // result_id
-                        f[8], // person_id
-                        f[4], // competition_id
-                        f[6], // event_id
-                        f[5], // round_type_id
-                        Number(f[1]), // pos
-                        Number(f[2]), // best
-                        Number(f[3]), // average
-                        f[9], // format_id
-                        f[10] || null, // regional_single_record
-                        f[11] || null, // regional_average_record
+                        resultId, // result_id
+                        f[resultCols.person_id], // person_id
+                        f[resultCols.competition_id], // competition_id
+                        f[resultCols.event_id], // event_id
+                        f[resultCols.round_type_id], // round_type_id
+                        Number(f[resultCols.pos]), // pos
+                        Number(f[resultCols.best]), // best
+                        Number(f[resultCols.average]), // average
+                        f[resultCols.format_id], // format_id
+                        f[resultCols.regional_single_record] || null,
+                        f[resultCols.regional_average_record] || null,
                         packed,
                     );
                     resultRows++;
                 },
                 (n) => renderBar('results', n, APPROX_ROWS.results),
                 signal,
+                (header) => {
+                    resultCols = this._buildColumnMap(header, [
+                        'id',
+                        'person_id',
+                        'competition_id',
+                        'event_id',
+                        'round_type_id',
+                        'pos',
+                        'best',
+                        'average',
+                        'format_id',
+                        'regional_single_record',
+                        'regional_average_record',
+                    ]);
+                    logger.debug('WCA_export_results.tsv columns:', header);
+                },
             );
             finishStep('results', resultRows);
 
@@ -785,16 +1026,21 @@ export default class WcaApi {
                     `INSERT OR REPLACE INTO ${table} (person_id, event_id, best) VALUES (?,?,?)`,
                 );
                 let rankRows = 0;
+                let rankCols;
                 await this._parseTsv(
                     this._exportPath(filename),
                     (f) => {
-                        // best(0) person_id(1) event_id(2) world_rank(3) ...
-                        if (!f[0] || isNaN(Number(f[0]))) return;
-                        insRank.run(f[1], f[2], Number(f[0]));
+                        const best = f[rankCols.best];
+                        if (!best || isNaN(Number(best))) return;
+                        insRank.run(f[rankCols.person_id], f[rankCols.event_id], Number(best));
                         rankRows++;
                     },
                     (n) => renderBar(table, n, approx),
                     signal,
+                    (header) => {
+                        rankCols = this._buildColumnMap(header, ['person_id', 'event_id', 'best']);
+                        logger.debug(`${filename} columns:`, header);
+                    },
                 );
                 finishStep(table, rankRows);
             }
@@ -813,74 +1059,105 @@ export default class WcaApi {
         // Restore normal temp store now that import is done
         db.exec('PRAGMA temp_store = MEMORY');
 
-        console.log(
-            `[WcaApi] Import complete. Total rows written: ${totalRowsImported.toLocaleString()}`,
+        logger.success(
+            `Import complete. Total rows written: ${totalRowsImported.toLocaleString()}`,
         );
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // Initialisation — called lazily before any DB access
+    // Initial load — called lazily before the first DB access (and eagerly
+    // by init(), if the caller uses it).
+    //
+    // FAST PATH (the common case): a populated DB file already exists on
+    // disk. We open it, confirm it has data, and become ready immediately —
+    // we do NOT wait on a "is there a newer export?" metadata round-trip,
+    // let alone a download/import, before serving requests. If a newer
+    // export does turn out to be available, it's fetched via
+    // forceRefreshExport() in the background, which never blocks reads
+    // (see class doc comment at the top of the file).
+    //
+    // SLOW PATH (genuine first run / wiped DB): there is nothing to serve
+    // yet, so this is the one legitimate case where callers must wait for
+    // the full download + import to finish.
     // ═══════════════════════════════════════════════════════════════════════
 
     async _ensureReady() {
         if (this._ready) return;
         if (this._initPromise) return this._initPromise;
 
-        this._initPromise = (async () => {
-            try {
+        this._initPromise = this._performInitialLoad();
+
+        try {
+            await this._initPromise;
+        } finally {
+            this._initPromise = null;
+        }
+    }
+
+    async _performInitialLoad() {
+        try {
+            this._db = this._openDb();
+        } catch (err) {
+            if (this._isCorruptError(err)) {
+                logger.warn('Corrupt DB detected, rebuilding from scratch:', err.message);
+                this._closeDb();
                 try {
-                    this._db = this._openDb();
-                } catch (err) {
-                    if (this._isCorruptError(err)) {
-                        console.warn(
-                            '[WcaApi] Corrupt DB detected, rebuilding from scratch:',
-                            err.message,
-                        );
-                        this._closeDb();
-                        try {
-                            fs.unlinkSync(this.dbPath);
-                        } catch {
-                            // ignore
-                        }
-                        this._db = this._openDb();
-                    } else {
-                        throw err;
-                    }
+                    fs.unlinkSync(this.dbPath);
+                } catch {
+                    // ignore
                 }
-
-                const { needsDownload, latestExportDate } = await this._checkForNewerExport();
-
-                if (needsDownload) {
-                    await this._downloadAndExtract();
-                    await this._importExport();
-                    this._cleanupTsvFiles();
-                    if (latestExportDate) this._saveExportDate(latestExportDate);
-                } else {
-                    // DB already populated — TSVs are gone after first import, that's fine
-                    const hasData =
-                        this._db.prepare('SELECT COUNT(*) as n FROM persons').get().n > 0;
-                    if (!hasData) {
-                        // Genuinely first run or DB was wiped — need to download
-                        await this._downloadAndExtract();
-                        await this._importExport();
-                        this._cleanupTsvFiles();
-                        if (latestExportDate) this._saveExportDate(latestExportDate);
-                    }
-                    // else: DB is populated and export is current — nothing to do
-                }
-
-                // Sync upcoming competitions from network API
-                await this._syncCompetitionsFromNetwork();
-
-                this._ready = true;
-            } catch (err) {
-                this._initPromise = null;
+                this._db = this._openDb();
+            } else {
                 throw err;
             }
-        })();
+        }
 
-        await this._initPromise;
-        this._initPromise = null;
+        if (this._hasData()) {
+            // A usable database already exists on disk — the common case on
+            // every restart after the first run. Become ready immediately
+            // instead of waiting on a metadata check and a possible multi-GB
+            // download/import; fetch any newer export in the background.
+            this._ready = true;
+            logger.success('Ready — serving from existing local database.');
+
+            this._checkForNewerExport()
+                .then(({ needsDownload }) => (needsDownload ? this.forceRefreshExport() : null))
+                .catch((err) =>
+                    logger.warn('Background post-startup export check failed:', err.message),
+                );
+        } else {
+            // Nothing to serve yet (first run, or the DB was wiped) — this is
+            // the one legitimate case where callers must wait for the
+            // download + import to complete.
+            try {
+                const { latestExportDate } = await this._checkForNewerExport();
+                await this._downloadAndExtract();
+                await this._importExport();
+                this._cleanupTsvFiles();
+                if (latestExportDate) this._saveExportDate(latestExportDate);
+                this._ready = true;
+                logger.success('Ready — serving from freshly imported database.');
+            } catch (err) {
+                // Make failures loud and immediate instead of a silent retry
+                // loop: without this, every subsequent request re-triggers
+                // _performInitialLoad() (since _hasData() is still false),
+                // which re-downloads the full multi-hundred-MB export from
+                // scratch each time before failing at the same spot again.
+                logger.error(
+                    'Initial WCA export import failed — the next request will retry ' +
+                        'the full download from scratch. Fix the underlying error before retrying:',
+                    err.message,
+                );
+                this._cleanupTsvFiles();
+                throw err;
+            }
+        }
+
+        // Competitions are a small paginated JSON sync (not a multi-GB
+        // export), so it's cheap enough to await even on the fast path.
+        // _syncCompetitionsFromNetwork() already catches its own errors and
+        // never throws, so a network hiccup here can't revert readiness.
+        await this._syncCompetitionsFromNetwork();
     }
 
     startBackgroundRefreshLoop() {
@@ -890,27 +1167,45 @@ export default class WcaApi {
 
         this._backgroundRefreshTimer = setTimeout(() => {
             this._runBackgroundRefresh().catch((err) => {
-                console.error('[WcaApi] Background refresh failed:', err.message);
+                logger.error('Background refresh failed:', err.message);
             });
         }, this._backgroundRefreshInitialDelayMs);
 
         this._backgroundRefreshInterval = setInterval(() => {
             this._runBackgroundRefresh().catch((err) => {
-                console.error('[WcaApi] Background refresh failed:', err.message);
+                logger.error('Background refresh failed:', err.message);
             });
         }, this._backgroundRefreshIntervalMs);
     }
 
+    // ── FIX (bug 1) ──────────────────────────────────────────────────────────
+    // Previously this called `forceRefreshExport()` unconditionally on every
+    // tick, which meant the scheduled 24h loop did a full multi-GB
+    // download + reimport every single day regardless of whether the WCA had
+    // actually published a newer export — completely bypassing
+    // `exportMaxAgeMs` and the whole point of `_checkForNewerExport()`.
+    //
+    // This now mirrors the startup fast-path: check first, and only refresh
+    // when a newer export genuinely exists. `forceRefreshExport()` itself is
+    // still available to unconditionally force a download (used by the
+    // manual "force refresh" HTTP endpoint), but the periodic tick should
+    // never call it blindly.
     async _runBackgroundRefresh() {
-        if (this._initPromise || this._refreshAbortController) {
-            return;
-        }
+        // Skip if a refresh is already running, or the initial load hasn't
+        // even finished yet (in which case there's nothing to refresh).
+        if (this._refreshInProgress || !this._ready) return;
 
         try {
-            console.log('[WcaApi] Running scheduled background refresh...');
+            logger.debug('Running scheduled export freshness check...');
+            const { needsDownload } = await this._checkForNewerExport();
+            if (!needsDownload) {
+                logger.debug('Export is already up to date — skipping refresh.');
+                return;
+            }
+            logger.info('Newer export available — starting scheduled refresh...');
             await this.forceRefreshExport();
         } catch (err) {
-            console.error('[WcaApi] Background refresh failed during initialization:', err.message);
+            logger.error('Scheduled background refresh failed:', err.message);
         }
     }
 
@@ -947,67 +1242,126 @@ export default class WcaApi {
         }
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // Export refresh — never blocks live queries.
+    //
+    // Downloads + imports into a throwaway temp database file while
+    // `this._db` (the one every request reads from) is left completely
+    // alone. Only the final swap-in is a critical section, and it contains
+    // no `await`, so JS's single-threaded execution guarantees no other
+    // request can observe `this._db` mid-swap — the "outage" is zero
+    // wall-clock time from any other request's point of view.
+    // ═══════════════════════════════════════════════════════════════════════
+
     async forceRefreshExport() {
-        console.log('[WcaApi] Force refresh requested — re-downloading WCA export...');
+        if (this._refreshInProgress) {
+            logger.warn('Refresh already in progress — ignoring duplicate request.');
+            return this._refreshPromise;
+        }
+
+        // No baseline database yet: there's nothing to refresh "around", so
+        // just do the normal (blocking, but unavoidable) initial load.
+        if (!this._ready) {
+            return this._ensureReady();
+        }
+
+        logger.info('Starting export refresh (existing data stays available throughout)...');
 
         const controller = new AbortController();
         this._refreshAbortController = controller;
+        this._refreshInProgress = true;
 
-        // Pause any new queries during refresh
-        this._ready = false;
-        this._initPromise = (async () => {
+        this._refreshPromise = (async () => {
             try {
                 // Clean up any leftover TSVs from a previous failed run
                 this._cleanupTsvFiles();
-
                 await this._checkDiskSpace();
                 await this._downloadAndExtract(controller.signal);
 
-                // Import into a temporary DB first, then swap it into place only
-                // after a successful import. This avoids leaving a corrupt or partial
-                // database file behind if the refresh fails mid-run.
+                // Import into a temporary DB file first — `this._db` is never
+                // touched here, so every concurrent request keeps working
+                // against the current, fully-populated database.
                 const tempDbPath = `${this.dbPath}.tmp`;
-                try {
-                    if (fs.existsSync(tempDbPath)) fs.unlinkSync(tempDbPath);
-                } catch {
-                    // ignore unlink errors
+                for (const suffix of ['', '-wal', '-shm']) {
+                    try {
+                        const p = `${tempDbPath}${suffix}`;
+                        if (fs.existsSync(p)) fs.unlinkSync(p);
+                    } catch {
+                        // ignore unlink errors
+                    }
                 }
 
                 const tempDb = this._openDbPath(tempDbPath);
                 try {
                     await this._importExport(controller.signal, tempDb);
-                    tempDb.close();
-
-                    if (this._db) {
-                        try {
-                            this._db.close();
-                        } catch {
-                            // ignore close errors
-                        }
-                        this._db = null;
-                    }
-
+                    // Force a full checkpoint so all committed data lives in
+                    // the main temp DB file (not the -wal file) before we
+                    // close and rename it — see the swap comment below.
                     try {
-                        if (fs.existsSync(this.dbPath)) fs.unlinkSync(this.dbPath);
+                        tempDb.exec('PRAGMA wal_checkpoint(TRUNCATE)');
                     } catch {
-                        // ignore unlink errors
+                        // best effort — close() below still auto-checkpoints
                     }
-                    fs.renameSync(tempDbPath, this.dbPath);
-                    this._db = this._openDb();
+                    tempDb.close();
                 } catch (err) {
                     try {
                         tempDb.close();
                     } catch {
                         // ignore close errors
                     }
-                    try {
-                        if (fs.existsSync(tempDbPath)) fs.unlinkSync(tempDbPath);
-                    } catch {
-                        // ignore cleanup errors
+                    for (const suffix of ['', '-wal', '-shm']) {
+                        try {
+                            const p = `${tempDbPath}${suffix}`;
+                            if (fs.existsSync(p)) fs.unlinkSync(p);
+                        } catch {
+                            // ignore cleanup errors
+                        }
                     }
                     throw err;
                 }
+
                 this._cleanupTsvFiles();
+
+                // ── Critical section: swap the live DB file in ────────────────
+                // Fully synchronous (no awaits) so no other request can run
+                // between closing the old handle and opening the new one.
+                const oldDb = this._db;
+                try {
+                    oldDb?.close();
+                } catch {
+                    // ignore close errors
+                }
+                // ── FIX (bug 2) ──────────────────────────────────────────────
+                // Remove the old main DB file *and* its WAL/SHM sidecar files.
+                // The old close() should already have checkpointed and
+                // cleared these, but if it didn't (e.g. an earlier crash left
+                // a stale -wal around), leaving them behind is dangerous:
+                // when we reopen a *brand-new*, unrelated database at the
+                // same path a moment later, SQLite will find a -wal file
+                // matching that filename and try to replay it against the
+                // new content, which can corrupt the freshly-imported data.
+                for (const suffix of ['', '-wal', '-shm']) {
+                    try {
+                        const p = `${this.dbPath}${suffix}`;
+                        if (fs.existsSync(p)) fs.unlinkSync(p);
+                    } catch {
+                        // ignore unlink errors
+                    }
+                }
+                fs.renameSync(tempDbPath, this.dbPath);
+                this._db = this._openDb();
+                // The temp DB's own sidecar files aren't renamed along with
+                // the main file (they have a different name, `*.tmp-wal` /
+                // `*.tmp-shm`), so clean up anything that survived close().
+                for (const suffix of ['-wal', '-shm']) {
+                    try {
+                        const p = `${tempDbPath}${suffix}`;
+                        if (fs.existsSync(p)) fs.unlinkSync(p);
+                    } catch {
+                        // ignore unlink errors
+                    }
+                }
+                // ── End critical section ───────────────────────────────────────
 
                 const { latestExportDate } = await this._checkForNewerExport(controller.signal);
                 if (latestExportDate) this._saveExportDate(latestExportDate);
@@ -1015,22 +1369,30 @@ export default class WcaApi {
                 // Re-sync competitions after export refresh
                 await this._syncCompetitionsFromNetwork(controller.signal);
 
-                this._ready = true;
-                console.log('[WcaApi] Force refresh complete.');
+                logger.success('Export refresh complete — swapped in new data.');
             } catch (err) {
-                // Leave _ready false so the next request retries properly
-                this._initPromise = null;
+                if (controller.signal.aborted) {
+                    logger.warn('Export refresh cancelled.');
+                } else {
+                    logger.error('Export refresh failed:', err.message);
+                }
                 throw err;
             } finally {
+                this._refreshInProgress = false;
                 this._refreshAbortController = null;
+                this._refreshPromise = null;
             }
         })();
 
-        try {
-            await this._initPromise;
-        } finally {
-            this._initPromise = null;
+        return this._refreshPromise;
+    }
+
+    cancelRefreshExport() {
+        if (!this._refreshAbortController || this._refreshAbortController.signal.aborted) {
+            return false;
         }
+        this._refreshAbortController.abort();
+        return true;
     }
 
     async _cachedFetch(cacheKey, fetchFn, ttlMs = this.cacheTtlMs) {
@@ -1117,17 +1479,20 @@ export default class WcaApi {
 
         const person = this._db.prepare('SELECT name FROM persons WHERE wca_id = ?').get(id);
         if (!person) {
-            // Debug: try a LIKE query to see if similar IDs exist
-            try {
-                const similar = this._db
-                    .prepare('SELECT wca_id FROM persons WHERE wca_id LIKE ?')
-                    .all(`%${id.slice(2, -2)}%`);
-                console.log(
-                    `[WcaApi][DEBUG] Similar wca_id values for pattern '%${id.slice(2, -2)}%':`,
-                    similar.map((r) => r.wca_id),
-                );
-            } catch (e) {
-                console.warn('[WcaApi][DEBUG] Could not fetch similar wca_id values:', e);
+            // A full-table LIKE scan is expensive on 250k+ rows, so it only
+            // runs when explicitly debugging a lookup failure.
+            if (process.env.WCA_DEBUG) {
+                try {
+                    const similar = this._db
+                        .prepare('SELECT wca_id FROM persons WHERE wca_id LIKE ?')
+                        .all(`%${id.slice(2, -2)}%`);
+                    logger.debug(
+                        `Similar wca_id values for pattern '%${id.slice(2, -2)}%':`,
+                        similar.map((r) => r.wca_id),
+                    );
+                } catch (e) {
+                    logger.debug('Could not fetch similar wca_id values:', e.message);
+                }
             }
             throw new Error(`WCA ID not found in export: ${id}`);
         }
@@ -2176,8 +2541,8 @@ export default class WcaApi {
                         });
                     } catch (err) {
                         // Do NOT cache failures — allow the next refresh to retry.
-                        console.warn(
-                            `[WcaApi] Profile failed for ${idNorm} (${competitor.name}) in ${id}/${eventId}: ${err.message}`,
+                        logger.warn(
+                            `Profile failed for ${idNorm} (${competitor.name}) in ${id}/${eventId}: ${err.message}`,
                         );
                         profileMap.set(idNorm, {
                             name: competitor.name,
@@ -2224,13 +2589,19 @@ export default class WcaApi {
         }
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // Refresh / status endpoints
+    // ═══════════════════════════════════════════════════════════════════════
+
     async handleForceRefreshRequest(req, res) {
-        if (!this._ready && this._initPromise) {
+        if (this._refreshInProgress) {
             return res.status(409).json({ error: 'Refresh already in progress' });
         }
         try {
+            // Fire-and-forget: the request returns immediately, and normal
+            // queries keep being served from the current DB while this runs.
             this.forceRefreshExport().catch((err) =>
-                console.error('[WcaApi] Background refresh failed:', err),
+                logger.error('Background refresh failed:', err.message),
             );
             return res.json({ status: 'refresh_started' });
         } catch (err) {
@@ -2239,23 +2610,10 @@ export default class WcaApi {
     }
 
     async handleCancelRefreshRequest(req, res) {
-        if (!this._initPromise) {
+        if (!this._refreshInProgress || !this.cancelRefreshExport()) {
             return res.status(409).json({ error: 'No refresh in progress' });
         }
-
-        if (!this.cancelRefreshExport()) {
-            return res.status(409).json({ error: 'No refresh in progress' });
-        }
-
         return res.json({ status: 'cancellation_requested' });
-    }
-
-    cancelRefreshExport() {
-        if (!this._refreshAbortController || this._refreshAbortController.signal.aborted) {
-            return false;
-        }
-        this._refreshAbortController.abort();
-        return true;
     }
 
     // Open the existing DB file without triggering a full _ensureReady() / download.
@@ -2274,8 +2632,6 @@ export default class WcaApi {
         // Ensure the DB is open if it already exists on disk (e.g. after a server
         // restart before any WCA query has been served).
         this._tryOpenExistingDb();
-
-        const isRefreshing = !this._ready && this._initPromise != null;
 
         let exportDate = null;
         let personCount = null;
@@ -2299,14 +2655,14 @@ export default class WcaApi {
                     ).toISOString();
                 }
             } catch {
-                // DB may be mid-refresh; return what we have
+                // DB may be mid-swap for a fraction of a millisecond; return what we have
             }
         }
 
         return res.json({
             exportDate,
             nextScheduledCheck,
-            isRefreshing,
+            isRefreshing: this._refreshInProgress,
             personCount,
             resultCount,
             competitionCount,

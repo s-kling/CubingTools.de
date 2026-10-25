@@ -808,6 +808,82 @@ export default class ContactApi {
         }
     }
 
+    // Send a reply email to a contact sender on behalf of an admin/operator user.
+    async sendReplyEmail({
+        message,
+        subject,
+        email,
+        replyText,
+        senderUsername,
+        senderName,
+        senderRole,
+        senderDisplayRole,
+    }) {
+        if (!message || !message.email) {
+            return false;
+        }
+
+        const escapeHtml = (str) =>
+            String(str)
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+
+        const safeName = escapeHtml(String(message.name || 'there').trim() || 'there');
+        const safeEmail = escapeHtml(String(email || message.email).trim());
+        const safeTool = escapeHtml(String(message.tool || 'Other').trim());
+        const safeOriginalMessage = escapeHtml(String(message.message || '').trim());
+        const safeReplyText = escapeHtml(String(replyText || '').trim());
+        const safeSenderUsername = escapeHtml(
+            String(senderUsername || 'Support').trim() || 'Support',
+        );
+        const safeSenderName = escapeHtml(
+            String(senderName || senderUsername || 'Support').trim() || 'Support',
+        );
+        const safeSenderRole = escapeHtml(
+            String(senderDisplayRole || senderRole || '').trim() || 'Team member',
+        );
+
+        const transporter = nodemailer.createTransport({
+            host: process.env.EMAIL_HOST,
+            port: 587,
+            secure: false,
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASSWORD,
+            },
+        });
+
+        try {
+            const templatePath = path.join(__dirname, '..', 'mail', 'reply.html');
+            const htmlContent = fs
+                .readFileSync(templatePath, 'utf8')
+                .replace(/\$\{safeName\}/g, safeName)
+                .replace(/\$\{safeEmail\}/g, safeEmail)
+                .replace(/\$\{safeTool\}/g, safeTool)
+                .replace(/\$\{safeOriginalMessage\}/g, safeOriginalMessage)
+                .replace(/\$\{safeReplyText\}/g, safeReplyText.replace(/\n/g, '<br>'))
+                .replace(/\$\{safeSenderName\}/g, safeSenderName)
+                .replace(/\$\{safeSenderUsername\}/g, safeSenderUsername)
+                .replace(/\$\{safeSenderRole\}/g, safeSenderRole);
+
+            const fromDisplay = `CubingTools.de (${safeSenderName} - ${safeSenderRole}) <${process.env.EMAIL_USER}>`;
+
+            await transporter.sendMail({
+                from: fromDisplay,
+                to: safeEmail,
+                subject: subject,
+                html: htmlContent,
+            });
+
+            return true;
+        } catch (error) {
+            console.error('Failed to send admin reply email:', error);
+            return false;
+        }
+    }
+
     // Confirm queued message by id and forward to final inbox.
     async validateConfirmationLink(id) {
         // Confirmation IDs are 32-character lowercase hex strings.
@@ -861,6 +937,32 @@ export default class ContactApi {
         }
 
         await docRef.update({ assignedTo: String(assignedTo || '').trim() || null });
+        return true;
+    }
+
+    // Append a reply object to a message document.
+    async addReplyToMessage(id, reply) {
+        if (!id || !/^[0-9a-f]{32}$/.test(String(id)) || !reply || typeof reply !== 'object') {
+            return false;
+        }
+
+        const docRef = this.db.collection('messages').doc(id);
+        const doc = await docRef.get();
+        if (!doc.exists) {
+            return false;
+        }
+
+        const existing = doc.data();
+        const replies = Array.isArray(existing.replies) ? existing.replies.slice() : [];
+        replies.push({
+            username: String(reply.username || '').trim() || 'Unknown',
+            role: String(reply.role || '').trim() || 'Operator',
+            displayRole: String(reply.displayRole || reply.role || 'Operator').trim() || 'Operator',
+            message: String(reply.message || '').trim(),
+            timestamp: new Date().toISOString(),
+        });
+
+        await docRef.update({ replies });
         return true;
     }
 

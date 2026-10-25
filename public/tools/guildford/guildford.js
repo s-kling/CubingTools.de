@@ -80,6 +80,7 @@ const eventOptions = {
         'Megaminx',
         'Square-1',
     ],
+    twotoseven: ['2x2', '3x3', '4x4', '5x5', '6x6', '7x7'],
     customEventOptions: [
         '2x2',
         '3x3',

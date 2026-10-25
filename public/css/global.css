@@ -359,6 +359,158 @@ ul li:hover {
     width: fit-content !important;
 }
 
+.reply-modal {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 9600 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: var(--space-md) !important;
+    overflow-y: auto !important;
+}
+
+.reply-modal__backdrop {
+    position: absolute !important;
+    inset: 0 !important;
+    background: rgba(15, 23, 42, 0.72) !important;
+}
+
+.reply-modal__dialog {
+    position: relative !important;
+    width: min(100%, 40rem) !important;
+    max-height: calc(100dvh - 3rem) !important;
+    overflow-y: auto !important;
+    background: linear-gradient(180deg, #ffffff, #f8fafc) !important;
+    border: 1px solid rgba(148, 163, 184, 0.25) !important;
+    border-radius: 20px !important;
+    box-shadow: 0 40px 120px rgba(15, 23, 42, 0.18) !important;
+    padding: 1.5rem !important;
+    display: grid !important;
+    gap: 1rem !important;
+}
+
+.reply-modal__header {
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    gap: 1rem !important;
+}
+
+.reply-modal__title {
+    margin: 0 !important;
+    font-size: 1.6rem !important;
+    font-weight: 800 !important;
+    color: #0f172a !important;
+}
+
+.reply-modal__subtitle {
+    margin: 0.25rem 0 0 !important;
+    color: #475569 !important;
+    font-size: 0.95rem !important;
+}
+
+.reply-modal__close {
+    border: none !important;
+    background: transparent !important;
+    color: #475569 !important;
+    font-size: 1.2rem !important;
+    cursor: pointer !important;
+}
+
+.reply-modal__body {
+    display: grid !important;
+    gap: 1rem !important;
+}
+
+.reply-modal__field {
+    display: grid !important;
+    gap: 0.4rem !important;
+}
+
+.reply-modal__label {
+    font-size: 0.9rem !important;
+    font-weight: 700 !important;
+    color: #334155 !important;
+}
+
+.reply-modal__input,
+.reply-modal__textarea {
+    width: 100% !important;
+    min-height: 2.8rem !important;
+    background: #f8fafc !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 14px !important;
+    padding: 0.95rem 1rem !important;
+    color: #0f172a !important;
+    font-size: 1rem !important;
+    font-family: Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif !important;
+}
+
+.reply-modal__textarea {
+    min-height: 12rem !important;
+    resize: vertical !important;
+}
+
+.reply-modal__footer {
+    display: flex !important;
+    justify-content: flex-end !important;
+    gap: 0.75rem !important;
+    flex-wrap: wrap !important;
+}
+
+.reply-modal__button {
+    border: none !important;
+    border-radius: 999px !important;
+    padding: 0.9rem 1.4rem !important;
+    font-weight: 700 !important;
+    font-size: 0.95rem !important;
+    cursor: pointer !important;
+}
+
+.reply-modal__button--primary {
+    background: #4338ca !important;
+    color: #ffffff !important;
+}
+
+.reply-modal__button--secondary {
+    background: #f8fafc !important;
+    color: #1f2937 !important;
+    border: 1px solid #cbd5e1 !important;
+}
+
+.message-reply-row {
+    background: transparent !important;
+}
+
+.message-reply-cell {
+    padding: 0 !important;
+    border: none !important;
+}
+
+.message-reply-card {
+    margin: 0 0 0 3rem !important;
+    padding: 1rem !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 16px !important;
+    background: #F8FAFC !important;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06) !important;
+}
+
+.message-reply-header {
+    margin: 0 0 0.6rem !important;
+    color: #1f2937 !important;
+    font-size: 0.95rem !important;
+    font-weight: 700 !important;
+}
+
+.message-reply-body {
+    color: #334155 !important;
+    font-size: 0.98rem !important;
+    line-height: 1.7 !important;
+    white-space: pre-wrap !important;
+}
+
 /* Container Styles */
 .container {
     display: grid;

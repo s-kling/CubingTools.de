@@ -64,12 +64,20 @@ function buildDashboard() {
                         <input id="users-new-username" type="text" placeholder="e.g. johndoe" required autocomplete="off" />
                     </label>
                     <label>
+                        Name
+                        <input id="users-new-name" type="text" placeholder="e.g. John Doe" maxlength="80" />
+                    </label>
+                    <label>
                         Role
                         <select id="users-new-role">
                             <option value="operator">Operator</option>
                             <option value="tester">Tester</option>
                             <option value="admin">Admin</option>
                         </select>
+                    </label>
+                    <label>
+                        Display role
+                        <input id="users-new-display-role" type="text" placeholder="e.g. Support Lead" maxlength="60" />
                     </label>
                     <button type="submit">Add User</button>
                 </form>
@@ -84,8 +92,10 @@ function buildDashboard() {
                     <thead>
                         <tr>
                             <th>Username</th>
+                            <th>Name</th>
                             <th>Color</th>
                             <th>Role</th>
+                            <th>Display</th>
                             <th>First Login</th>
                             <th>Last Login</th>
                             ${isAdmin ? '<th>Actions</th>' : ''}
@@ -101,10 +111,14 @@ function buildDashboard() {
         document.getElementById('users-add-form').addEventListener('submit', async (event) => {
             event.preventDefault();
             const username = document.getElementById('users-new-username').value.trim();
+            const name = document.getElementById('users-new-name').value.trim();
             const role = document.getElementById('users-new-role').value;
+            const displayRole = document.getElementById('users-new-display-role').value.trim();
             if (!username) return;
-            await addUser(username, role);
+            await addUser(username, role, displayRole, name);
             document.getElementById('users-new-username').value = '';
+            document.getElementById('users-new-name').value = '';
+            document.getElementById('users-new-display-role').value = '';
         });
     }
 
@@ -144,7 +158,7 @@ function renderTable() {
     if (state.users.length === 0) {
         const row = document.createElement('tr');
         const cell = document.createElement('td');
-        cell.colSpan = isAdmin ? 6 : 5;
+        cell.colSpan = isAdmin ? 7 : 6;
         cell.className = 'users-empty';
         cell.textContent = 'No users found.';
         row.appendChild(cell);
@@ -155,6 +169,7 @@ function renderTable() {
     state.users.forEach((user) => {
         const row = document.createElement('tr');
         const isSelf = user.username === state.currentUsername;
+        const displayRole = user.displayRole || user.role || 'Operator';
 
         const usernameCell = document.createElement('td');
         usernameCell.textContent = user.username;
@@ -163,6 +178,23 @@ function renderTable() {
             badge.className = 'users-self-badge';
             badge.textContent = ' (you)';
             usernameCell.appendChild(badge);
+        }
+
+        const nameCell = document.createElement('td');
+        const nameValue = String(user.name || user.username || '').trim();
+        nameCell.textContent = nameValue || user.username || 'User';
+        if (isAdmin) {
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.value = nameValue || user.username || 'User';
+            nameInput.maxLength = 80;
+            nameInput.placeholder = 'Display name';
+            nameInput.className = 'users-name-input';
+            nameInput.addEventListener('change', async () => {
+                await updateUserName(user.username, nameInput.value);
+            });
+            nameCell.textContent = '';
+            nameCell.appendChild(nameInput);
         }
 
         const colorCell = document.createElement('td');
@@ -207,6 +239,23 @@ function renderTable() {
             roleCell.textContent = user.role.charAt(0).toUpperCase() + user.role.slice(1);
         }
 
+        const displayCell = document.createElement('td');
+        if (isAdmin) {
+            const displayInput = document.createElement('input');
+            displayInput.type = 'text';
+            displayInput.value = displayRole;
+            displayInput.maxLength = 60;
+            displayInput.placeholder = 'Display role';
+            displayInput.className = 'users-display-role-input';
+            displayInput.title = 'Custom display role used in reply emails';
+            displayInput.addEventListener('change', async () => {
+                await updateDisplayRole(user.username, displayInput.value);
+            });
+            displayCell.appendChild(displayInput);
+        } else {
+            displayCell.textContent = displayRole;
+        }
+
         const firstLoginCell = document.createElement('td');
         firstLoginCell.textContent = user.firstLogin ? 'Yes' : 'No';
         firstLoginCell.className = user.firstLogin ? 'users-first-login' : '';
@@ -248,13 +297,13 @@ function renderTable() {
             actionsCell.append(resetBtn, deleteBtn);
         }
 
-        row.append(usernameCell, colorCell, roleCell, firstLoginCell, lastLoginCell);
+        row.append(usernameCell, nameCell, colorCell, roleCell, displayCell, firstLoginCell, lastLoginCell);
         if (isAdmin) row.appendChild(actionsCell);
         tbody.appendChild(row);
     });
 }
 
-async function addUser(username, role) {
+async function addUser(username, role, displayRole = '', name = '') {
     try {
         const response = await fetch('/api/admin/users', {
             method: 'POST',
@@ -262,7 +311,7 @@ async function addUser(username, role) {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${state.token}`,
             },
-            body: JSON.stringify({ username, role }),
+            body: JSON.stringify({ username, role, displayRole, name }),
         });
 
         const data = await response.json();
@@ -320,6 +369,59 @@ async function updateRole(username, role) {
         await loadUsers();
     } catch {
         setStatus('Failed to update role.', 'is-error');
+    }
+}
+
+async function updateDisplayRole(username, displayRole) {
+    try {
+        const response = await fetch(
+            `/api/admin/users/${encodeURIComponent(username)}/display-role`,
+            {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${state.token}`,
+                },
+                body: JSON.stringify({ displayRole }),
+            },
+        );
+
+        const data = await response.json();
+        if (!response.ok) {
+            setStatus(data.error || 'Failed to update display role.', 'is-error');
+            await loadUsers();
+            return;
+        }
+
+        setStatus(`Display role for "${username}" updated.`, 'is-success');
+        await loadUsers();
+    } catch {
+        setStatus('Failed to update display role.', 'is-error');
+    }
+}
+
+async function updateUserName(username, name) {
+    try {
+        const response = await fetch(`/api/admin/users/${encodeURIComponent(username)}/name`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.token}`,
+            },
+            body: JSON.stringify({ name }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            setStatus(data.error || 'Failed to update user name.', 'is-error');
+            await loadUsers();
+            return;
+        }
+
+        setStatus(`Name for "${username}" updated.`, 'is-success');
+        await loadUsers();
+    } catch {
+        setStatus('Failed to update user name.', 'is-error');
     }
 }
 

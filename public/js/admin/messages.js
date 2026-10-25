@@ -4,6 +4,7 @@ const state = {
     token: null,
     role: null,
     username: null,
+    email: null,
     color: null,
     messages: [],
     users: [],
@@ -36,6 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         state.token = token;
         state.role = verifyData.role || null;
         state.username = verifyData.username || null;
+        state.email = verifyData.email || null;
         state.color = verifyData.color || null;
         initAdminNav(state.role, 'messages', state.username, state.color);
         createDashboardSkeleton();
@@ -68,6 +70,7 @@ function createDashboardSkeleton() {
                         Filter
                         <select id="messages-filter">
                             <option value="all">All</option>
+                            <option value="my-messages">My messages</option>
                             <option value="confirmed">Confirmed</option>
                             <option value="unconfirmed">Unconfirmed</option>
                             <option value="appeal-pending">Appeal pending</option>
@@ -247,7 +250,7 @@ async function loadMessages() {
     const messagesReport = document.getElementById('messages-report');
 
     try {
-        const response = await fetch('/api/admin/messages', {
+        const response = await fetch('/api/admin/overview', {
             headers: { Authorization: `Bearer ${state.token}` },
         });
 
@@ -261,17 +264,8 @@ async function loadMessages() {
         const data = await response.json();
         state.messages = Array.isArray(data.messages) ? data.messages : [];
         state.bans = normalizeBans(data.bans);
+        state.users = Array.isArray(data.users) ? data.users : [];
         cleanupSelection();
-
-        try {
-            const usersRes = await fetch('/api/admin/users/names', {
-                headers: { Authorization: `Bearer ${state.token}` },
-            });
-            if (usersRes.ok) {
-                const usersData = await usersRes.json();
-                state.users = Array.isArray(usersData.users) ? usersData.users : [];
-            }
-        } catch {}
 
         loadingEl.style.display = 'none';
         messagesReport.style.display = 'block';
@@ -379,6 +373,14 @@ function getFilteredMessages() {
         const ip = normalizeIp(message.secured_ip);
         const score = parseFloat(message.recaptcha_score);
         const isAppeal = message.rowType === 'appeal';
+
+        if (state.filters.category === 'my-messages') {
+            if (isAppeal) return false;
+            // Show messages sent by this user or assigned to them
+            if (email !== normalizeEmail(state.email) && message.assignedTo !== state.username) {
+                return false;
+            }
+        }
 
         if (state.filters.category === 'banned-email' && !bannedEmails.has(email)) return false;
         if (state.filters.category === 'banned-ip' && !bannedIps.has(ip)) return false;
@@ -586,9 +588,75 @@ function renderTable() {
             row.appendChild(emptyCell);
         }
         tbody.appendChild(row);
+
+        if (Array.isArray(message.replies) && message.replies.length > 0) {
+            const threadToggle = document.createElement('tr');
+            threadToggle.className = 'message-thread-toggle-row';
+            const toggleCell = document.createElement('td');
+            toggleCell.colSpan = 12;
+            toggleCell.className = 'message-thread-toggle-cell';
+
+            const toggleButton = document.createElement('button');
+            toggleButton.type = 'button';
+            toggleButton.className = 'message-thread-toggle';
+            toggleButton.textContent = `Show replies (${message.replies.length})`;
+            toggleButton.setAttribute('aria-expanded', 'false');
+            toggleButton.addEventListener('click', () => {
+                const toggleRow = toggleButton.closest('.message-thread-toggle-row');
+                const target = toggleRow?.nextElementSibling;
+                if (!target || !target.classList.contains('message-reply-thread')) return;
+
+                const isOpen = toggleButton.getAttribute('aria-expanded') === 'true';
+                if (!isOpen) {
+                    target.style.display = 'table-row';
+                    toggleButton.setAttribute('aria-expanded', 'true');
+                    toggleButton.textContent = `Hide replies (${message.replies.length})`;
+                } else {
+                    target.style.display = 'none';
+                    toggleButton.setAttribute('aria-expanded', 'false');
+                    toggleButton.textContent = `Show replies (${message.replies.length})`;
+                }
+            });
+
+            toggleCell.appendChild(toggleButton);
+            threadToggle.appendChild(toggleCell);
+            tbody.appendChild(threadToggle);
+
+            const threadRow = document.createElement('tr');
+            threadRow.className = 'message-reply-thread';
+            threadRow.style.display = 'none';
+            const replyCell = document.createElement('td');
+            replyCell.colSpan = 12;
+            replyCell.className = 'message-reply-thread-cell';
+
+            const thread = document.createElement('div');
+            thread.className = 'message-reply-thread__content';
+            message.replies.forEach((reply) => {
+                thread.appendChild(createReplyRow(reply));
+            });
+            replyCell.appendChild(thread);
+            threadRow.appendChild(replyCell);
+            tbody.appendChild(threadRow);
+        }
     });
 
     updateSelectAllCheckbox(visible);
+}
+
+function createReplyRow(reply) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'message-reply-card';
+
+    const header = document.createElement('div');
+    header.className = 'message-reply-header';
+    header.textContent = `${reply.username || 'Unknown'} (${reply.displayRole || reply.role || 'Operator'}) • ${formatDate(reply.timestamp)}`;
+
+    const body = document.createElement('div');
+    body.className = 'message-reply-body';
+    body.textContent = reply.message || '';
+
+    wrapper.append(header, body);
+    return wrapper;
 }
 
 function createSelectCell(message) {
@@ -901,6 +969,17 @@ function createActionCell(message) {
 
     cell.append(banSelect, assignSelect, assignBtn);
 
+    const canReply = state.role === 'admin' || message.assignedTo === state.username;
+    if (canReply) {
+        const emailBtn = document.createElement('button');
+        emailBtn.type = 'button';
+        emailBtn.textContent = 'Send email';
+        emailBtn.addEventListener('click', async () => {
+            await sendEmailToContact(message);
+        });
+        cell.appendChild(emailBtn);
+    }
+
     const canMarkDone = state.role === 'admin' || message.assignedTo === state.username;
     if (canMarkDone) {
         const isDone = message.status === 'done';
@@ -929,6 +1008,120 @@ function createUndoneActionCell(message) {
 
     cell.appendChild(undoneButton);
     return cell;
+}
+
+function escapeHtml(value) {
+    return String(value || '')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+async function submitReply(messageId, subject, replyText, email) {
+    try {
+        const response = await fetch(`/api/admin/messages/${encodeURIComponent(messageId)}/reply`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.token}`,
+            },
+            body: JSON.stringify({ subject, replyText, email }),
+        });
+
+        if (response.status === 401) {
+            redirectToLogin();
+            return;
+        }
+
+        if (!response.ok) {
+            const data = await response.json().catch(() => null);
+            const messageText = (data && data.error) || 'Failed to send the reply.';
+            setStatus(messageText, 'is-error');
+            return;
+        }
+
+        setStatus('Reply sent successfully.', 'is-success');
+    } catch {
+        setStatus('Failed to send the reply.', 'is-error');
+    }
+}
+
+async function sendEmailToContact(message) {
+    renderEmailModal(message);
+}
+
+function renderEmailModal(message) {
+    const existingModal = document.getElementById('messages-email-modal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    const backdrop = document.createElement('div');
+    backdrop.className = 'email-modal';
+    backdrop.id = 'messages-email-modal';
+
+    backdrop.innerHTML = `
+        <div class="email-modal__backdrop" aria-hidden="true"></div>
+        <div class="email-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="email-modal-title">
+            <div class="email-modal__header">
+                <div>
+                    <h2 class="email-modal__title" id="email-modal-title">Send Email to ${escapeHtml(
+                        String(message.name || 'sender'),
+                    )}</h2>
+                    <p class="email-modal__subtitle">${escapeHtml(
+                        String(message.email || 'No email provided'),
+                    )}</p>
+                </div>
+                <button class="email-modal__close" type="button" aria-label="Close email dialog">×</button>
+            </div>
+            <div class="email-modal__body">
+                <div class="email-modal__field">
+                    <label class="email-modal__label" for="email-modal-adressee">Adressee</label>
+                    <input id="email-modal-adressee" class="email-modal__input" type="email" placeholder="Email adressee" value="${escapeHtml(String(message.email || 'No email provided'))}" required />
+                    <label class="email-modal__label" for="email-modal-subject">Subject</label>
+                    <input id="email-modal-subject" class="email-modal__input" type="text" placeholder="Email subject" value="Re: Your message to CubingTools.de" required />
+                </div>
+                <div class="email-modal__field">
+                    <label class="email-modal__label" for="email-modal-body">Message</label>
+                    <textarea id="email-modal-body" class="email-modal__textarea" placeholder="Write your email message here..."></textarea>
+                </div>
+            </div>
+            <div class="email-modal__footer">
+                <button class="email-modal__button email-modal__button--secondary" type="button" id="email-modal-cancel">Cancel</button>
+                <button class="email-modal__button email-modal__button--primary" type="button" id="email-modal-send">Send email</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(backdrop);
+
+    const close = () => backdrop.remove();
+    backdrop.querySelector('#email-modal-cancel')?.addEventListener('click', close);
+    backdrop.querySelector('.email-modal__close')?.addEventListener('click', close);
+    backdrop.querySelector('.email-modal__backdrop')?.addEventListener('click', close);
+
+    backdrop.querySelector('#email-modal-send')?.addEventListener('click', async () => {
+        const subjectInput = backdrop.querySelector('#email-modal-subject');
+        const bodyTextarea = backdrop.querySelector('#email-modal-body');
+        const subject = subjectInput ? subjectInput.value.trim() : '';
+        const body = bodyTextarea ? bodyTextarea.value.trim() : '';
+
+        if (!subject) {
+            setStatus('Email subject is required.', 'is-error');
+            return;
+        }
+
+        if (!body) {
+            setStatus('Email message cannot be empty.', 'is-error');
+            return;
+        }
+
+        const emailOfAdressee = document.getElementById('email-modal-adressee').value.trim();
+
+        await submitReply(message.id, subject, body, emailOfAdressee);
+        close();
+    });
 }
 
 function createAppealActionCell(message) {

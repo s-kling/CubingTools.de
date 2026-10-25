@@ -1,4 +1,4 @@
-let currentPrivacyPolicyVersion = '2026-04-10';
+let currentPrivacyPolicyVersion = '2026-08-01';
 const GITHUB_BUG_REPORT_URL = 'https://github.com/s-kling/cubingtools.de/issues/new';
 const USER_ERROR_POPUP_COOLDOWN_MS = 20000;
 const recentUserFeedbackPopups = new Map();
@@ -668,7 +668,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         );
         // If on prod footer, and at least 3 visits, and haven't shown the popup yet, show the popup
         if (
-            (location.hostname === 'cubingtools.de' || location.port === '8001') &&
+            (location.hostname === 'cubingtools.de' || location.port === '8000') &&
             parseInt(localStorage.getItem('visits') || '0', 10) >= 3 &&
             localStorage.getItem('beta_popup_shown') === 'false'
         ) {

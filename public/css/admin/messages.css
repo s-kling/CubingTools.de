@@ -382,6 +382,159 @@
     border-color: rgba(240, 113, 103, 0.35);
 }
 
+/* Email modal styling (same as reply modal) */
+.email-modal {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+}
+
+.email-modal__backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.email-modal__dialog {
+    position: relative;
+    background: var(--secondary-background);
+    border-radius: var(--main-radius);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-width: 600px;
+    width: 90%;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.email-modal__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: var(--space-md);
+    border-bottom: 1px solid var(--card-border);
+}
+
+.email-modal__title {
+    margin: 0 0 var(--space-xs);
+    font-size: 1.2em;
+    color: var(--main-text);
+}
+
+.email-modal__subtitle {
+    margin: 0;
+    font-size: 0.9em;
+    color: var(--secondary-text);
+}
+
+.email-modal__close {
+    background: none;
+    border: none;
+    font-size: 2em;
+    color: var(--secondary-text);
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--main-radius);
+    transition: background 0.2s ease;
+}
+
+.email-modal__close:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.email-modal__body {
+    flex: 1;
+    padding: var(--space-md);
+    overflow-y: auto;
+}
+
+.email-modal__field {
+    display: grid;
+    gap: 6px;
+    margin-bottom: var(--space-md);
+}
+
+.email-modal__field:last-child {
+    margin-bottom: 0;
+}
+
+.email-modal__label {
+    font-size: 0.95em;
+    color: var(--secondary-text);
+    font-weight: 500;
+}
+
+.email-modal__input,
+.email-modal__textarea {
+    padding: 10px 12px;
+    border-radius: var(--main-radius);
+    border: 1px solid var(--input-border);
+    background: var(--input-background);
+    color: var(--main-text);
+    font-family: inherit;
+    font-size: 0.95em;
+}
+
+.email-modal__input:focus,
+.email-modal__textarea:focus {
+    outline: none;
+    border-color: var(--main-lighter);
+    box-shadow: 0 0 0 3px rgba(63, 167, 214, 0.1);
+}
+
+.email-modal__textarea {
+    resize: vertical;
+    min-height: 200px;
+    font-family: inherit;
+}
+
+.email-modal__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    border-top: 1px solid var(--card-border);
+}
+
+.email-modal__button {
+    padding: 10px 18px;
+    border-radius: var(--main-radius);
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    transition: filter 0.2s ease, transform 0.2s ease;
+}
+
+.email-modal__button:hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+}
+
+.email-modal__button--primary {
+    background: var(--main-lighter);
+    color: var(--main-text);
+}
+
+.email-modal__button--secondary {
+    background: var(--input-background);
+    color: var(--main-text);
+    border: 1px solid var(--input-border);
+}
+
 @media (max-width: 1120px) {
     .messages-controls .control-grid {
         grid-template-columns: repeat(2, minmax(180px, 1fr));
