@@ -552,7 +552,8 @@ async function getCurrentAverage(wcaId, event) {
         });
 
         // Validate the response structure
-        if (!avgData || typeof avgData.average !== 'number') {
+        // `null` is a valid answer (no solves in this event); getWCAData() shows it as DNF.
+        if (!avgData || (avgData.average !== null && typeof avgData.average !== 'number')) {
             throw new Error('Invalid response format from API (average)');
         }
 

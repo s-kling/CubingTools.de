@@ -18,7 +18,8 @@ node_modules/
 /backend/API/mail/mails.json
 /backend/API/mail/bans.json
 
-/backend/tests
 /backend/secret
 
 /wca_export
+/wca_export/
+/backend/log

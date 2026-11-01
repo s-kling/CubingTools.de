@@ -1,283 +1,55 @@
-import express from 'express';
-import fs from 'fs';
+/**
+ * Launcher: starts the three roles as separate OS processes and keeps them alive.
+ *
+ *   web   (page serving, N workers)   -> :PORT          (config prod_port / beta_port)
+ *   logic (API, N workers)            -> :LOGIC_PORT     (127.0.0.1 only by default)
+ *   jobs  (WCA import + newsletter)   -> no port, exactly one instance
+ *
+ * Usage:  node backend/server.js [--beta] [--debug] [--only=web,logic,jobs]
+ * Each role can also be started on its own (backend/web/server.js, backend/logic/server.js,
+ * backend/jobs/index.js), e.g. under separate systemd units or containers.
+ */
+import { spawn } from 'child_process';
 import path from 'path';
-import http from 'http';
-import sanitizeHtml from 'sanitize-html';
+import { fileURLToPath } from 'url';
 
-const __dirname = path.dirname(new URL(import.meta.url).pathname);
-const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+const here = path.dirname(fileURLToPath(import.meta.url));
+const forward = process.argv.slice(2).filter((a) => !a.startsWith('--only='));
+const only = (process.argv.find((a) => a.startsWith('--only=')) || '--only=web,logic,jobs').slice(7).split(',');
 
-const app = express();
-// Respect one reverse-proxy hop so req.ip is accurate for rate limiting.
-app.set('trust proxy', 1);
-let prodPort = config.prod_port;
-let betaPort = config.beta_port;
-let betaTest = process.argv.includes('--beta');
-const debug = process.argv.includes('--debug');
+const ROLES = { web: 'web/server.js', logic: 'logic/server.js', jobs: 'jobs/index.js' };
+const children = new Map();
+let stopping = false;
 
-const defaultCorsWhitelist = [
-    'https://cubingtools.de',
-    'https://beta.cubingtools.de',
-    'http://localhost:8000',
-    'http://localhost:8001',
-    'http://localhost:8002',
-];
+function start(role, delay = 500) {
+    const child = spawn(process.execPath, [path.join(here, ROLES[role]), ...forward], { stdio: 'inherit' });
+    children.set(role, child);
+    const started = Date.now();
+    child.on('exit', (code, signal) => {
+        children.delete(role);
+        if (stopping) return;
+        const lived = Date.now() - started;
+        const next = lived > 60_000 ? 500 : Math.min(delay * 2, 30_000);
+        console.error(`[launcher] ${role} exited (code=${code}, signal=${signal}); restarting in ${next}ms`);
+        setTimeout(() => start(role, next), next);
+    });
+}
 
-const corsWhitelist = new Set(
-    (process.env.CORS_WHITELIST || defaultCorsWhitelist.join(','))
-        .split(',')
-        .map((origin) => origin.trim())
-        .filter(Boolean),
-);
+for (const role of only) {
+    if (!ROLES[role]) {
+        console.error(`unknown role "${role}"`);
+        process.exit(2);
+    }
+    start(role);
+}
 
-const ansi = {
-    reset: '\x1b[0m',
-    dim: '\x1b[2m',
-    red: '\x1b[31m',
-    yellow: '\x1b[33m',
-    green: '\x1b[32m',
-    cyan: '\x1b[36m',
-    magenta: '\x1b[35m',
+const stop = () => {
+    if (stopping) return;
+    stopping = true;
+    for (const c of children.values()) c.kill('SIGTERM');
+    setTimeout(() => process.exit(0), 12_000).unref();
+    const t = setInterval(() => children.size === 0 && process.exit(0), 200);
+    t.unref?.();
 };
-
-function colorize(color, value) {
-    return `${ansi[color] || ''}${value}${ansi.reset}`;
-}
-
-function getStatusColor(statusCode) {
-    if (statusCode >= 500) {
-        return 'red';
-    }
-    if (statusCode >= 400) {
-        return 'yellow';
-    }
-    if (statusCode >= 300) {
-        return 'cyan';
-    }
-    return 'green';
-}
-
-function formatDuration(durationMs) {
-    if (durationMs < 1000) {
-        return `${durationMs}ms`;
-    }
-    return `${(durationMs / 1000).toFixed(2)}s`;
-}
-
-function debugLog(message) {
-    if (!debug) {
-        return;
-    }
-    const timestamp = new Date().toISOString();
-    console.log(`${colorize('magenta', '[debug]')} ${colorize('dim', timestamp)} ${message}`);
-}
-
-if (debug) {
-    console.log(colorize('magenta', '[debug] Debug mode enabled'));
-    // betaTest = true;
-    prodPort = config.dev_port;
-}
-
-/* =========================
-   Logging
-========================= */
-
-const logDir = path.join(__dirname, 'log');
-const logFilePath = betaTest ? path.join(logDir, 'beta.log') : path.join(logDir, 'server.log');
-
-if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir, { recursive: true });
-}
-
-function cleanOldLogs(filePath) {
-    if (!fs.existsSync(filePath)) return;
-    const retentionMs = config.log_retention_days * 24 * 60 * 60 * 1000;
-    const cutoff = Date.now() - retentionMs;
-    const lines = fs.readFileSync(filePath, 'utf8').split('\n').filter(Boolean);
-    const kept = lines.filter((line) => {
-        try {
-            return new Date(JSON.parse(line).time).getTime() >= cutoff;
-        } catch {
-            return true;
-        }
-    });
-    if (kept.length < lines.length) {
-        debugLog(
-            `log cleanup: removed ${lines.length - kept.length} entries older than ${config.log_retention_days} days`,
-        );
-        fs.writeFileSync(filePath, kept.join('\n') + (kept.length ? '\n' : ''));
-    }
-}
-
-cleanOldLogs(logFilePath);
-let logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
-
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-setInterval(() => {
-    logStream.end(() => {
-        cleanOldLogs(logFilePath);
-        logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
-    });
-}, ONE_DAY_MS);
-
-function logRequest(req, res, startTime) {
-    const durationMs = Date.now() - startTime;
-    const entry = {
-        time: new Date().toISOString(),
-        method: req.method,
-        url: req.originalUrl,
-        status: res.statusCode,
-        durationMs,
-        userAgent: req.headers['user-agent'] || null,
-    };
-
-    if (req.query.utm_source) {
-        entry.utmSource = req.query.utm_source;
-    }
-
-    const line = JSON.stringify(entry) + '\n';
-
-    logStream.write(line);
-
-    if (debug) {
-        const statusColor = getStatusColor(res.statusCode);
-        const method = colorize('cyan', req.method.padEnd(6));
-        const status = colorize(statusColor, String(res.statusCode));
-        const duration = colorize('yellow', formatDuration(durationMs));
-        const responseSize = res.getHeader('content-length') || '-';
-
-        console.log(
-            `${method} ${req.originalUrl} ${status} ${duration} ${colorize('dim', `bytes=${responseSize}`)}`,
-        );
-    }
-}
-
-/* =========================
-   Middleware
-========================= */
-
-app.use((req, res, next) => {
-    const start = Date.now();
-
-    if (debug) {
-        const queryKeys = req.query && typeof req.query === 'object' ? Object.keys(req.query) : [];
-        const hasBody =
-            req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0;
-        const bodyKeys = hasBody ? Object.keys(req.body) : [];
-        debugLog(
-            `${colorize('cyan', '→')} ${req.method} ${req.originalUrl} ${colorize('dim', `queryKeys=${queryKeys.length ? queryKeys.join(',') : '-'} bodyKeys=${bodyKeys.length ? bodyKeys.join(',') : '-'}`)}`,
-        );
-    }
-
-    res.on('finish', () => {
-        logRequest(req, res, start);
-    });
-
-    next();
-});
-
-app.use(express.static(path.join(__dirname, '../public')));
-app.use(express.json({ limit: config.body_parser_limit }));
-app.use(express.urlencoded({ extended: true, limit: config.body_parser_limit }));
-
-app.use((req, res, next) => {
-    const origin = req.headers.origin;
-
-    // Requests without Origin header (same-origin/server-to-server) are allowed.
-    if (!origin) {
-        return next();
-    }
-
-    if (corsWhitelist.has(origin)) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        res.setHeader('Vary', 'Origin');
-        res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-
-        if (req.method === 'OPTIONS') {
-            return res.sendStatus(204);
-        }
-
-        return next();
-    }
-
-    if (req.method === 'OPTIONS') {
-        return res.sendStatus(403);
-    }
-
-    return res.status(403).json({ error: 'Origin not allowed by CORS policy' });
-});
-
-/* =========================
-   Routes
-========================= */
-
-app.use((req, res, next) => {
-    if (req.body && typeof req.body === 'object') {
-        Object.keys(req.body).forEach((key) => {
-            if (typeof req.body[key] === 'string') {
-                req.body[key] = sanitizeHtml(req.body[key], { allowedTags: [] });
-            }
-        });
-    }
-    next();
-});
-
-import toolsRouter from './API/tools.js';
-import apiRouter from './API/api.js';
-import adminRoutesRouter from './API/admin-routes.js';
-import routesRouter from './API/routes.js';
-
-import { db } from './firebase.js';
-import NewsletterApi from './API/API/newsletter.api.js';
-import WcaApi from './API/API/wca.api.js';
-import { startNewsletterJobs } from './newsletter-jobs.js';
-
-const wcaApi = new WcaApi();
-
-app.use(toolsRouter);
-app.use(apiRouter);
-app.use(adminRoutesRouter);
-app.use(routesRouter);
-
-/* =========================
-   Newsletter Background Jobs
-========================= */
-
-const _newsletterApi = new NewsletterApi(db);
-const _newsletterHostname = betaTest ? 'beta.cubingtools.de' : 'cubingtools.de';
-wcaApi.startBackgroundRefreshLoop();
-startNewsletterJobs(db, _newsletterApi, _newsletterHostname);
-
-/* =========================
-   Server
-========================= */
-
-const port = betaTest ? betaPort : prodPort;
-const server = http.createServer(app);
-
-debugLog(`node=${process.version} pid=${process.pid} cwd=${process.cwd()}`);
-debugLog(`mode=${betaTest ? 'beta' : 'prod'} logFile=${logFilePath}`);
-debugLog(`bodyParserLimit=${config.body_parser_limit}`);
-
-server.listen(port, () => {
-    debugLog(`server=http://localhost:${port}`);
-});
-
-process.on('SIGINT', () => {
-    debugLog('Received SIGINT. Shutting down gracefully...');
-    debugLog('closing HTTP server and log stream');
-    server.close(() => {
-        logStream.end();
-        process.exit(0);
-    });
-});
-
-process.on('uncaughtException', (error) => {
-    debugLog(colorize('red', '[fatal] uncaughtException'), error);
-});
-
-process.on('unhandledRejection', (reason) => {
-    debugLog(colorize('red', '[fatal] unhandledRejection'), reason);
-});
+process.on('SIGINT', stop);
+process.on('SIGTERM', stop);

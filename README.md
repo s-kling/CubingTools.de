@@ -161,10 +161,12 @@ The script supports production (`8000`), beta (`8001`), or both.
 ### NPM scripts
 ```bash
 npm run start   # starts ./bin/start.sh
-npm run beta    # node backend/server.js --beta
-npm run dev     # node backend/server.js --beta --debug
-npm run debug   # node inspect backend/server.js
-npm test        # node --test backend/tests/*.test.js
+npm run beta    # all three roles, beta ports
+npm run dev     # all three roles, single worker each, request logging
+npm run web     # only the page-serving server
+npm run logic   # only the API server
+npm run jobs    # only the background jobs
+npm test        # node --test backend/tests/*.test.js (no network or Firebase needed)
 ```
 
 ## Environment Variables
@@ -172,6 +174,7 @@ npm test        # node --test backend/tests/*.test.js
 Configured in `backend/.env`.
 
 Commonly used variables:
+- `SESSION_SECRET` (optional, ≥32 chars; otherwise generated into `backend/secret/session.key`)
 - `STATUS_PAGE_PASSWORD` (SHA-256 hash expected by admin auth)
 - `EMAIL_HOST`
 - `EMAIL_USER`

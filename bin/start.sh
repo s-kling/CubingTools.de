@@ -23,8 +23,9 @@ SETUP_NEEDED=()
 [ ! -f "$CONFIG_FILE" ]                           && MISSING+=("backend/config.json — server port configuration (copy from config.example.json or create with {\"prod_port\":8000,\"beta_port\":8001})")
 [ ! -d "$SECRET_DIR" ] || [ -z "$(ls -A "$SECRET_DIR" 2>/dev/null)" ] \
                                                   && MISSING+=("backend/secret/ — directory for credentials (create it and add the files below)")
-[ ! -f "$SECRET_DIR/service-account.json" ]       && MISSING+=("backend/secret/service-account.json — Firebase/GCP service account key (download from Firebase Console > Project Settings > Service accounts)")
-[ ! -f "$SECRET_DIR/users.json" ]                 && MISSING+=("backend/secret/users.json — initial admin user seed data (see README for format)")
+if [ ! -f "$SECRET_DIR/firebase-service-account.json" ] && [ ! -f "$SECRET_DIR/service-account.json" ] && [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+    MISSING+=("backend/secret/firebase-service-account.json — Firebase/GCP service account key (or set GOOGLE_APPLICATION_CREDENTIALS)")
+fi
 
 [ ! -d "$NODE_MODULES" ]                          && SETUP_NEEDED+=("node_modules (run npm install)")
 [ ! -d "$LOG_FOLDER" ]                            && SETUP_NEEDED+=("backend/log/ folder")
@@ -72,6 +73,8 @@ fi
 
 PROD_PORT=$(grep '"prod_port"' "$CONFIG_FILE" | grep -o '[0-9]*')
 BETA_PORT=$(grep '"beta_port"' "$CONFIG_FILE" | grep -o '[0-9]*')
+LOGIC_PROD_PORT=$(grep '"logic_prod_port"' "$CONFIG_FILE" | grep -o '[0-9]*'); LOGIC_PROD_PORT=${LOGIC_PROD_PORT:-8100}
+LOGIC_BETA_PORT=$(grep '"logic_beta_port"' "$CONFIG_FILE" | grep -o '[0-9]*'); LOGIC_BETA_PORT=${LOGIC_BETA_PORT:-8101}
 
 # ─── Server Selection ───────────────────────────────────────────
 
@@ -81,8 +84,8 @@ echo "2) Beta (port $BETA_PORT)"
 read -r -p "$(echo -e "${CYAN}Enter your choice [1/2]: ${NC}")" CHOICE
 
 case "$CHOICE" in
-    1) PORT=$PROD_PORT; TYPE="production"; BETA_FLAG="" ;;
-    2) PORT=$BETA_PORT; TYPE="beta";       BETA_FLAG="--beta" ;;
+    1) PORT=$PROD_PORT; LOGIC_PORT=$LOGIC_PROD_PORT; TYPE="production"; BETA_FLAG="" ;;
+    2) PORT=$BETA_PORT; LOGIC_PORT=$LOGIC_BETA_PORT; TYPE="beta";       BETA_FLAG="--beta" ;;
     *) echo -e "${RED}Invalid choice '$CHOICE'. Please enter 1 for production or 2 for beta.${NC}"; exit 1 ;;
 esac
 
@@ -149,20 +152,6 @@ stop_tnoodle() {
 }
 
 start_server() {
-    # Stop offline server if running
-    local OFFLINE_PORT
-    if [ "$TYPE" = "beta" ]; then
-        OFFLINE_PORT=8001
-    else
-        OFFLINE_PORT=8000
-    fi
-    if lsof -i:"$OFFLINE_PORT" > /dev/null 2>&1; then
-        EXISTING_OFFLINE_PID=$(lsof -ti:"$OFFLINE_PORT" 2>/dev/null | head -1)
-        echo -e "${YELLOW}Offline server running on port $OFFLINE_PORT (PID: ${EXISTING_OFFLINE_PID:-unknown}). Stopping it...${NC}"
-        lsof -ti:"$OFFLINE_PORT" | xargs kill -9 2>/dev/null
-        sleep 0.3
-        echo -e "${GREEN}Offline server stopped.${NC}"
-    fi
 
     if lsof -i:"$PORT" > /dev/null 2>&1; then
         EXISTING_PID=$(lsof -ti:"$PORT" 2>/dev/null | head -1)
@@ -171,7 +160,13 @@ start_server() {
         sleep 0.3
     fi
 
-    echo -e "${CYAN}Starting $TYPE server on port $PORT...${NC}"
+    if lsof -i:"$LOGIC_PORT" > /dev/null 2>&1; then
+        echo -e "${YELLOW}Logic port $LOGIC_PORT is in use. Stopping the old API server...${NC}"
+        lsof -ti:"$LOGIC_PORT" | xargs kill 2>/dev/null
+        sleep 1
+    fi
+
+    echo -e "${CYAN}Starting $TYPE web (:$PORT) + logic (:$LOGIC_PORT) + jobs...${NC}"
     node "$ROOT_DIR/backend/server.js" $BETA_FLAG &
     SERVER_PID=$!
 
@@ -185,65 +180,6 @@ stop_server() {
         wait "$SERVER_PID" 2>/dev/null
         echo -e "${GREEN}$TYPE server stopped.${NC}"
         SERVER_PID=""
-        start_offline
-    fi
-}
-
-start_offline() {
-    # Start offline server (offline.js) on the correct port
-    local OFFLINE_PORT
-    if [ "$TYPE" = "beta" ]; then
-        OFFLINE_PORT=8001
-    else
-        OFFLINE_PORT=8000
-    fi
-
-    # Stop main server if running on the same port
-    if lsof -i:"$OFFLINE_PORT" > /dev/null 2>&1; then
-        # Try to detect if it's the main server (backend/server.js) and not offline.js
-        EXISTING_PID=$(lsof -ti:"$OFFLINE_PORT" 2>/dev/null | head -1)
-        if [ -n "$EXISTING_PID" ]; then
-            CMDLINE=$(ps -p "$EXISTING_PID" -o args=)
-            if [[ "$CMDLINE" == *"backend/server.js"* ]]; then
-                echo -e "${YELLOW}Main server running on port $OFFLINE_PORT (PID: $EXISTING_PID). Stopping it...${NC}"
-                kill -9 "$EXISTING_PID" 2>/dev/null
-                sleep 0.3
-                echo -e "${GREEN}Main server stopped.${NC}"
-            fi
-        fi
-    fi
-
-    # Kill any process using the offline port
-    if lsof -i:"$OFFLINE_PORT" > /dev/null 2>&1; then
-        EXISTING_PID=$(lsof -ti:"$OFFLINE_PORT" 2>/dev/null | head -1)
-        echo -e "${YELLOW}Port $OFFLINE_PORT is already in use (PID: ${EXISTING_PID:-unknown}). Killing existing process...${NC}"
-        lsof -ti:"$OFFLINE_PORT" | xargs kill -9 2>/dev/null
-        sleep 0.3
-    fi
-
-    echo -e "${CYAN}Starting offline server on port $OFFLINE_PORT...${NC}"
-    node "$ROOT_DIR/offline/offline.js" $BETA_FLAG &
-    OFFLINE_PID=$!
-    echo -e "${GREEN}Offline server started (PID: $OFFLINE_PID, port: $OFFLINE_PORT).${NC}"
-}
-
-stop_offline() {
-    # Stop offline server if running
-    local OFFLINE_PORT
-    if [ "$TYPE" = "beta" ]; then
-        OFFLINE_PORT=8001
-    else
-        OFFLINE_PORT=8000
-    fi
-
-    # Find and kill process using the offline port
-    if lsof -i:"$OFFLINE_PORT" > /dev/null 2>&1; then
-        EXISTING_PID=$(lsof -ti:"$OFFLINE_PORT" 2>/dev/null | head -1)
-        echo -e "${CYAN}Stopping offline server (PID: ${EXISTING_PID:-unknown})...${NC}"
-        lsof -ti:"$OFFLINE_PORT" | xargs kill -9 2>/dev/null
-        echo -e "${GREEN}Offline server stopped.${NC}"
-    else
-        echo -e "${YELLOW}No offline server running on port $OFFLINE_PORT.${NC}"
     fi
 }
 

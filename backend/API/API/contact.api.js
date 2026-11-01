@@ -55,33 +55,38 @@ export default class ContactApi {
         return '';
     }
 
-    // Read bans JSON with safe fallback shape.
+    // Read bans JSON with safe fallback shape. Cached per file mtime so every worker sees
+    // changes made by another worker without re-parsing the file on each contact request.
     readBansFile() {
-        const empty = { emails: [], ips: [] };
-
-        if (!fs.existsSync(this.bansPath)) {
-            return empty;
+        const empty = () => ({ emails: [], ips: [] });
+        let mtimeMs;
+        try {
+            mtimeMs = fs.statSync(this.bansPath).mtimeMs;
+        } catch {
+            return empty();
         }
-
+        if (this._bansCache?.mtimeMs === mtimeMs) return structuredClone(this._bansCache.value);
         try {
             const parsed = JSON.parse(fs.readFileSync(this.bansPath, 'utf8'));
-
-            if (!parsed || typeof parsed !== 'object') {
-                return empty;
-            }
-
-            return {
-                emails: Array.isArray(parsed.emails) ? parsed.emails : [],
-                ips: Array.isArray(parsed.ips) ? parsed.ips : [],
+            const value = {
+                emails: Array.isArray(parsed?.emails) ? parsed.emails : [],
+                ips: Array.isArray(parsed?.ips) ? parsed.ips : [],
             };
+            this._bansCache = { mtimeMs, value };
+            return structuredClone(value);
         } catch {
-            return empty;
+            return empty();
         }
     }
 
-    // Persist bans file in a readable JSON format.
+    // Persist atomically (tmp + rename): concurrent workers can never observe or leave a
+    // half-written file. (Read-modify-write races between workers remain possible but the
+    // window is tiny and writes are admin-only; moving bans to Firestore is a follow-up.)
     writeBansFile(bans) {
-        fs.writeFileSync(this.bansPath, JSON.stringify(bans, null, 2), 'utf8');
+        const tmp = `${this.bansPath}.${process.pid}.tmp`;
+        fs.writeFileSync(tmp, JSON.stringify(bans, null, 2), 'utf8');
+        fs.renameSync(tmp, this.bansPath);
+        this._bansCache = null;
     }
 
     // Public accessor used by admin endpoints.

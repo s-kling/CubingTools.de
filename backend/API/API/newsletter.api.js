@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import nodemailer from 'nodemailer';
+import { getMailer } from '../../lib/mailer.js';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -232,16 +232,9 @@ export default class NewsletterApi {
             .toLowerCase();
     }
 
+    // Shared pooled SMTP transport (see lib/mailer.js) instead of a new connection per mail.
     createTransporter() {
-        return nodemailer.createTransport({
-            host: process.env.EMAIL_HOST,
-            port: 587,
-            secure: false,
-            auth: {
-                user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASSWORD,
-            },
-        });
+        return getMailer();
     }
 
     escapeHtml(str) {

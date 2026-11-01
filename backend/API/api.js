@@ -1,5 +1,8 @@
 import express from 'express';
-import rateLimit from 'express-rate-limit';
+import { createRateLimiter } from '../lib/ratelimit.js';
+import { WorkerPool } from '../lib/workerpool.js';
+import { WcaStore } from '../wca/store.js';
+import { loadConfig } from '../lib/config.js';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -17,33 +20,8 @@ const packageJson = JSON.parse(
     ),
 );
 
-const BCRYPT_ROUNDS = 12;
-
 import { RecaptchaEnterpriseServiceClient } from '@google-cloud/recaptcha-enterprise';
 
-import dotenv from 'dotenv';
-dotenv.config({ path: path.join(path.dirname(new URL(import.meta.url).pathname), '../.env') });
-
-// Shared helper to create endpoint-specific rate limiters with a consistent payload shape.
-function createRateLimiter(windowMs, max, message, options = {}) {
-    // Create the limiter instance at initialization time (required by express-rate-limit)
-    const limiter = rateLimit({
-        windowMs,
-        max,
-        standardHeaders: true,
-        legacyHeaders: false,
-        message: { error: message },
-        ...options,
-    });
-    // If not on beta.cubingtools.de or cubingtools.de, disable rate limiting
-    return (req, res, next) => {
-        const host = req.headers.host || '';
-        if (!host.includes('cubingtools.de')) {
-            return next();
-        }
-        return limiter(req, res, next);
-    };
-}
 
 /*
 const limier = createRateLimiter(
@@ -172,7 +150,14 @@ import ContactApi from './API/contact.api.js';
 // Handles newsletter subscriptions, confirmations, and unsubscribes.
 import NewsletterApi from './API/newsletter.api.js';
 
-const wcaApi = new WcaApi();
+const config = loadConfig();
+const wcaStore = new WcaStore();
+// CPU/SQL-heavy WCA work (profile building, Monte-Carlo ranking) runs off the request thread.
+const cpuPool = new WorkerPool(new URL('../wca/worker.js', import.meta.url), {
+    size: config.cpu_pool_size,
+    workerData: { dir: wcaStore.dir },
+});
+const wcaApi = new WcaApi({ store: wcaStore, pool: cpuPool });
 const statusApi = new StatusApi();
 const contactApi = new ContactApi(db);
 const adminSessionApi = new AdminSessionApi(contactApi, db);
@@ -209,10 +194,10 @@ router.get('/api/scramble/:event', scrambleLimiter, async (req, res) => {
 
     if (event === 'fto') {
         try {
-            // For FTO, generate scrambles using the cubing.net library
-            const scrambles = await Promise.all(
-                Array.from({ length: count }, () => randomScrambleForEvent(event)),
-            );
+            // For FTO, generate scrambles using the cubing.net library (one at a time,
+            // capped, so a 50-scramble request cannot monopolise the worker).
+            const scrambles = [];
+            for (let i = 0; i < Math.min(count, 12); i++) scrambles.push(await randomScrambleForEvent(event));
 
             return res.json({
                 event,
@@ -235,9 +220,15 @@ router.get('/api/scramble/:event', scrambleLimiter, async (req, res) => {
                 const ready = scrambleCache[puzzleKey];
 
                 if (ready?.scrambles?.length > 0) {
-                    const scrambles = ready.scrambles;
-                    delete scrambleCache[puzzleKey];
-                    prefetchScramble(puzzleKey);
+                    // The prefetch stores a small batch; hand out exactly ONE scramble per
+                    // request (it used to return the whole batch of 3 for count=1) and only
+                    // refill once the batch is used up. shift() is synchronous, so two
+                    // concurrent requests can never receive the same scramble.
+                    const scrambles = [ready.scrambles.shift()];
+                    if (ready.scrambles.length === 0) {
+                        delete scrambleCache[puzzleKey];
+                        prefetchScramble(puzzleKey);
+                    }
                     return res.json({ event, scrambles });
                 }
 
@@ -641,8 +632,11 @@ const TNOODLE_BASE_URL = process.env.TNOODLE_URL || 'http://localhost:2014';
 // Prefetch cache: stores one scramble ahead per puzzle key so the next request is instant.
 const scrambleCache = {};
 
+// Hard timeout so a hung TNoodle cannot pile up sockets.
+const tnoodleHttp = axios.create({ timeout: 15_000 });
+
 async function fetchScramblesFromTnoodle(puzzleKey, count) {
-    return axios
+    return tnoodleHttp
         .get(`${TNOODLE_BASE_URL}/api/v0/scramble/${puzzleKey}`, {
             params: { numScrambles: count },
         })
@@ -661,6 +655,7 @@ function prefetchScramble(puzzleKey) {
 }
 
 export default router;
+export { cpuPool, wcaStore };
 export const __internals = {
     createRateLimiter,
     WcaApi,

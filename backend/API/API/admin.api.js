@@ -1,15 +1,62 @@
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
+import { SessionTokens, loadSessionSecret } from '../../lib/session-token.js';
 
 const BCRYPT_ROUNDS = 12;
 
 export default class AdminSessionApi {
-    constructor(contactApi, _db) {
-        // In-memory token -> { expiry, username, role } map.
-        this.sessions = new Map();
+    constructor(contactApi, _db, options = {}) {
         this.SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
+        // Stateless HMAC tokens: valid on every logic worker and across restarts.
+        this.tokens = new SessionTokens({
+            secret: options.secret || loadSessionSecret(),
+            ttlMs: this.SESSION_TTL_MS,
+        });
+        // lowercased username -> { role, sessionsValidFrom }; kept fresh by a Firestore
+        // listener so deleted/demoted users lose access on all workers within moments.
+        this.userIndex = new Map();
+        this.userIndexReady = false;
         this.contactApi = contactApi;
         this.db = _db;
+        if (options.watchUsers !== false) this._watchUsers();
+    }
+
+    _rebuildUserIndex(users) {
+        const next = new Map();
+        for (const u of users) {
+            if (!u?.username) continue;
+            next.set(String(u.username).toLowerCase(), {
+                role: u.role,
+                sessionsValidFrom: Number(u.sessionsValidFrom) || 0,
+            });
+        }
+        this.userIndex = next;
+        this.userIndexReady = true;
+    }
+
+    _watchUsers() {
+        const col = this.db?.collection?.('users');
+        if (!col) return;
+        const poll = async () => {
+            try {
+                this._rebuildUserIndex((await col.get()).docs.map((d) => d.data()));
+            } catch (err) {
+                console.error('[admin] user index refresh failed:', err.message);
+            }
+        };
+        if (typeof col.onSnapshot === 'function') {
+            col.onSnapshot(
+                (snap) => this._rebuildUserIndex(snap.docs.map((d) => d.data())),
+                (err) => {
+                    console.error('[admin] user listener error, falling back to polling:', err.message);
+                    poll();
+                    setInterval(poll, 30_000).unref();
+                },
+            );
+        } else {
+            poll();
+            setInterval(poll, 30_000).unref();
+        }
     }
 
     // Load all users from the Firestore 'users' collection.
@@ -30,28 +77,14 @@ export default class AdminSessionApi {
         await this.db.collection('users').doc(docId).delete();
     }
 
-    // Remove stale sessions before issuing/validating tokens.
-    _cleanExpired() {
-        const now = Date.now();
-        for (const [token, session] of this.sessions) {
-            if (now > session.expiry) this.sessions.delete(token);
-        }
-    }
-
-    // Create a new bearer token with configured TTL.
+    // Create a signed bearer token with the configured TTL.
     createSession(username, role, displayRole = null, name = null) {
-        this._cleanExpired();
-        const token = crypto.randomBytes(32).toString('hex');
-        const safeDisplayRole = String(displayRole || '').trim() || null;
-        const safeName = String(name || '').trim() || null;
-        this.sessions.set(token, {
-            expiry: Date.now() + this.SESSION_TTL_MS,
+        return this.tokens.issue({
             username,
             role,
-            displayRole: safeDisplayRole,
-            name: safeName,
+            displayRole: String(displayRole || '').trim() || null,
+            name: String(name || '').trim() || null,
         });
-        return token;
     }
 
     resolveDisplayRole(user, fallbackRole = 'Operator') {
@@ -70,12 +103,13 @@ export default class AdminSessionApi {
 
     // Validate token and return session metadata or null.
     verifyToken(token) {
-        if (!token || typeof token !== 'string') return null;
-        const session = this.sessions.get(token);
+        const session = this.tokens.verify(token);
         if (!session) return null;
-        if (Date.now() > session.expiry) {
-            this.sessions.delete(token);
-            return null;
+        if (this.userIndexReady) {
+            const user = this.userIndex.get(String(session.username || '').toLowerCase());
+            if (!user) return null; // account deleted
+            if (session.iat < user.sessionsValidFrom) return null; // explicitly revoked
+            if (user.role) session.role = user.role; // demotions apply immediately
         }
         return session;
     }
@@ -352,12 +386,9 @@ export default class AdminSessionApi {
         }
 
         await this._deleteUserDoc(user.username);
-        // Invalidate any active sessions for the deleted user.
-        for (const [token, s] of this.sessions) {
-            if (s.username.toLowerCase() === username.trim().toLowerCase()) {
-                this.sessions.delete(token);
-            }
-        }
+        // Tokens are stateless; the user listener drops the account from userIndex, which
+        // makes verifyToken() reject every outstanding token for it on all workers.
+        this.userIndex.delete(user.username.toLowerCase());
         return res.json({ success: true });
     }
 
