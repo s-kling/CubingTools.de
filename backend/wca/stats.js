@@ -1,3 +1,5 @@
+import { CubingCore } from '../lib/cubing-core.js';
+
 /**
  * Pure statistics used by the round-analysis feature. Extracted from WcaApi so the same
  * code runs on the main thread, in worker threads and in unit tests.
@@ -8,13 +10,9 @@ export function centisecondsToSeconds(cs) {
     return cs / 100;
 }
 
-// Abramowitz & Stegun 26.2.17 normal CDF approximation (|error| < 7.5e-8).
+// One implementation shared with the browser tools (public/js/cubingCore.js).
 export function normCdf(z) {
-    const t = 1 / (1 + 0.2316419 * Math.abs(z));
-    const poly =
-        t * (0.31938153 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
-    const approx = 1 - (1 / Math.sqrt(2 * Math.PI)) * Math.exp(-0.5 * z * z) * poly;
-    return z >= 0 ? approx : 1 - approx;
+    return CubingCore.normalCdf(z);
 }
 
 export function normalPdf(x, mu, sigma) {
@@ -169,13 +167,21 @@ export function computeRoundRankings(profiles, { sims = 2000, rng = Math.random 
 }
 
 /**
- * Trimmed mean (drop fastest and slowest) of the given solves, in seconds.
- * Contract kept from the original implementation because clients depend on it:
- * no solves -> null, 1-2 solves -> 0 (nothing left after trimming), otherwise the mean.
+ * Trimmed average of centisecond solves, in seconds, dropping 5 % (at least one) from each end -
+ * identical to csTimer's "ao n" and to what the tools compute locally (CubingCore.trimmedAverage).
+ * For 12 solves that is still best+worst; for 25 it is 2+2 (it used to stay at 1+1 for any n).
+ *
+ * Contract kept for existing clients: no solves -> null, 1-2 solves -> 0 (too few to trim), else the mean.
+ * Use averageOrNull() when "not enough data" must be distinguishable from a real value.
  */
 export function calculateAverage(solves) {
     if (!solves || solves.length === 0) return null;
-    const trimmed = [...solves].sort((a, b) => a - b).slice(1, -1);
-    if (trimmed.length === 0) return 0;
-    return trimmed.reduce((a, b) => a + b, 0) / trimmed.length / 100;
+    return averageOrNull(solves) ?? 0;
+}
+
+/** Same as calculateAverage but returns null (not 0) when there are fewer than 3 solves. */
+export function averageOrNull(solves) {
+    if (!solves || solves.length < 3) return null;
+    const result = CubingCore.trimmedAverage(solves.map((cs) => cs / 100));
+    return Number.isFinite(result) ? result : null;
 }

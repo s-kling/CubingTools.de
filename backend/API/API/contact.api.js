@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { SECRET_DIR, BANS_FILE } from '../../lib/config.js';
 import path from 'path';
 
 import crypto from 'crypto';
@@ -9,13 +10,16 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+/** The CAPTCHA provider answered and the answer was "no" (as opposed to being unreachable or unconfigured). */
+export class RecaptchaRejected extends Error {}
+
 export default class ContactApi {
     constructor(_db) {
         this.password = process.env.CONTACT_API_PASSWORD || '';
         this.projectID = process.env.RECAPTCHA_PROJECT_ID || '';
         this.recaptchaKey = process.env.RECAPTCHA_SITE_KEY || '';
         this.recaptchaAction = process.env.RECAPTCHA_ACTION || '';
-        this.bansPath = path.join(__dirname, '..', 'mail', 'bans.json');
+        this.bansPath = BANS_FILE;
         this.unconfirmedTtlMs = 60 * 60 * 1000;
         this.db = _db;
     }
@@ -363,6 +367,10 @@ export default class ContactApi {
                 }
             })
             .catch((error) => {
+                if (error instanceof RecaptchaRejected) {
+                    console.warn(`reCAPTCHA rejected the submission (${error.message})`);
+                    return res.status(400).json({ success: false, error: 'reCAPTCHA verification failed' });
+                }
                 console.error('Error verifying reCAPTCHA:', error);
                 // Graceful degradation: allow submission if verification fails
                 console.warn('Allowing submission due to reCAPTCHA verification error');
@@ -411,9 +419,13 @@ export default class ContactApi {
         token = 'action-token',
         recaptchaAction = this.recaptchaAction,
     }) {
-        const serviceAccountPath = path.join(__dirname, '..', 'secret', 'service-account.json');
+        // This used to look in backend/API/secret (a directory that does not exist), so file credentials were
+        // never found and every submission silently skipped CAPTCHA verification.
+        const serviceAccountPath = ['firebase-service-account.json', 'service-account.json']
+            .map((name) => path.join(SECRET_DIR, name))
+            .find((file) => fs.existsSync(file));
         const hasEnvCredentials = Boolean(process.env.GOOGLE_APPLICATION_CREDENTIALS);
-        const hasFileCredentials = fs.existsSync(serviceAccountPath);
+        const hasFileCredentials = Boolean(serviceAccountPath);
 
         if (!hasEnvCredentials && !hasFileCredentials) {
             console.warn(
@@ -442,10 +454,9 @@ export default class ContactApi {
 
             // Check if the token is valid.
             if (!response.tokenProperties.valid) {
-                console.log(
-                    `The CreateAssessment call failed because the token was: ${response.tokenProperties.invalidReason}`,
-                );
-                return null;
+                // null means "verification not configured" and lets the message through, so a rejected
+                // token must NOT return null (a bot could send token="x" and pass).
+                throw new RecaptchaRejected(`token invalid: ${response.tokenProperties.invalidReason}`);
             }
 
             // Check if the expected action was executed.
@@ -461,10 +472,7 @@ export default class ContactApi {
 
                 return response.riskAnalysis.score;
             } else {
-                console.log(
-                    'The action attribute in your reCAPTCHA tag does not match the action you are expecting to score',
-                );
-                return null;
+                throw new RecaptchaRejected('action mismatch');
             }
         } catch (error) {
             // Check if this is a credentials error

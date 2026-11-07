@@ -4,7 +4,6 @@ let frequencyMap = {};
 let sessions = {};
 let sessionNames = {};
 let currentDataSourceMode = 'cstimer';
-const meanEvents = new Set(['666', '777', '444bf', '555bf', '333bf']);
 
 function setDataSourceMode(mode) {
     currentDataSourceMode = mode === 'wca' ? 'wca' : mode === 'average' ? 'average' : 'cstimer';
@@ -79,16 +78,16 @@ function parseSessionNames(sessionData) {
     return {};
 }
 
+// csTimer solve: [[penaltyMs, timeMs], scramble, comment, timestamp]; penalty -1 = DNF, 2000 = +2.
+// Returns centiseconds, DNF_MARK for a DNF, or null for rows that cannot be used.
+const DNF_MARK = -1;
+
 function extractSolveCentiseconds(solve) {
-    const baseTime = Number(solve?.[0]?.[0]);
-    const penaltyTime = Number(solve?.[0]?.[1] || 0);
-
-    if (!Number.isFinite(baseTime) || baseTime < 0) {
-        return null;
-    }
-
-    const totalMilliseconds = baseTime + Math.max(0, penaltyTime);
-    return Math.round(totalMilliseconds / 10);
+    const penaltyMs = Number(solve?.[0]?.[0]);
+    const timeMs = Number(solve?.[0]?.[1]);
+    if (penaltyMs === -1) return DNF_MARK;
+    if (!Number.isFinite(timeMs) || timeMs < 0 || !Number.isFinite(penaltyMs)) return null;
+    return Math.round((timeMs + Math.max(0, penaltyMs)) / 10);
 }
 
 function populateSessionDropdown() {
@@ -125,8 +124,8 @@ function generateChartFromSession() {
 
     originalArray = sessionData
         .map((item) => extractSolveCentiseconds(item))
-        .filter((time) => Number.isFinite(time) && time > 0)
-        .reverse(); // Convert milliseconds to centiseconds
+        .filter((time) => time === DNF_MARK || (Number.isFinite(time) && time > 0))
+        .reverse(); // csTimer lists oldest first; everything below works newest first
 
     if (originalArray.length === 0) {
         setEmptyState('No valid solves found in this session.');
@@ -154,7 +153,7 @@ async function fetchWCAData() {
     btn.innerHTML = '<span class="spinner"></span>';
     btn.disabled = true;
 
-    const apiUrl = `/api/wca/${wcaId}/${event}?getsolves=true`;
+    const apiUrl = `/api/wca/${wcaId}/${event}?getsolves=true&dnf=1`;
     try {
         const data = await window.fetchJsonOrThrow(apiUrl, {
             errorContext: 'Could not load WCA solve data',
@@ -162,8 +161,8 @@ async function fetchWCAData() {
 
         if (data.allResults && data.allResults.length > 0) {
             originalArray = data.allResults
-                .filter((time) => time > 0)
-                .map((time) => Math.floor(time));
+                .filter((time) => time > 0 || time === DNF_MARK)
+                .map((time) => (time > 0 ? Math.floor(time) : DNF_MARK));
 
             if (originalArray.length === 0) {
                 setEmptyState('No valid solve data found for this WCA ID and event.');
@@ -213,17 +212,7 @@ function formatTimeForChart(seconds) {
 }
 
 function formatSecondsToClock(seconds) {
-    if (!Number.isFinite(seconds)) {
-        return '—';
-    }
-
-    if (seconds < 60) {
-        return seconds.toFixed(2);
-    }
-
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = (seconds % 60).toFixed(2);
-    return `${minutes}:${remainingSeconds.padStart(5, '0')}`;
+    return CubingCore.formatTime(seconds, { dnf: '—' });
 }
 
 function setEmptyState(message) {
@@ -246,36 +235,16 @@ function setEmptyState(message) {
 }
 
 function getEventWindow(eventId) {
-    return meanEvents.has(eventId) ? 3 : 5;
+    return CubingCore.requiredSolves(eventId);
 }
 
+// Average of one window of attempts (DNF = Infinity) under the event's WCA format.
 function computeAttemptMetric(attemptTimes, eventId) {
-    if (meanEvents.has(eventId)) {
-        return attemptTimes.reduce((sum, value) => sum + value, 0) / attemptTimes.length;
-    }
-
-    const sorted = [...attemptTimes].sort((a, b) => a - b);
-    const middle = sorted.slice(1, 4);
-    return middle.reduce((sum, value) => sum + value, 0) / middle.length;
+    return CubingCore.averageForEvent(attemptTimes, eventId);
 }
 
 function computeBestRollingAverage(times, eventId) {
-    const windowSize = getEventWindow(eventId);
-
-    if (times.length < windowSize) {
-        return null;
-    }
-
-    let best = Infinity;
-    for (let i = 0; i <= times.length - windowSize; i++) {
-        const window = times.slice(i, i + windowSize);
-        const value = computeAttemptMetric(window, eventId);
-        if (value < best) {
-            best = value;
-        }
-    }
-
-    return Number.isFinite(best) ? best : null;
+    return CubingCore.bestRollingAverage(times, eventId);
 }
 
 function getRecencyWeights(count, oldestWeight = 0.85) {
@@ -417,26 +386,8 @@ function calculateStdDev(times, weights) {
     return Math.sqrt(weightedVariance / totalWeight);
 }
 
-function erfApprox(x) {
-    const sign = x < 0 ? -1 : 1;
-    const absX = Math.abs(x);
-    const t = 1 / (1 + 0.3275911 * absX);
-    const a1 = 0.254829592;
-    const a2 = -0.284496736;
-    const a3 = 1.421413741;
-    const a4 = -1.453152027;
-    const a5 = 1.061405429;
-    const y = 1 - ((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-absX * absX);
-    return sign * y;
-}
-
 function normalCdf(x, mean, stdDev) {
-    if (!Number.isFinite(stdDev) || stdDev <= 0) {
-        return x > mean ? 1 : 0;
-    }
-
-    const z = (x - mean) / (stdDev * Math.sqrt(2));
-    return 0.5 * (1 + erfApprox(z));
+    return CubingCore.normalCdf(x, mean, stdDev);
 }
 
 function formatProbability(probability) {
@@ -469,9 +420,24 @@ function updateChart() {
         return;
     }
 
-    const chronologicalTimesInSeconds = inputArray.map((centiseconds) => centiseconds / 100);
-    const sortedTimesInSeconds = [...chronologicalTimesInSeconds].sort((a, b) => a - b);
-    const recencyWeights = getRecencyWeights(chronologicalTimesInSeconds.length);
+    // `attempts` is newest first and keeps DNFs (as Infinity) in their real position, so a rolling
+    // average never glues together solves that were not actually consecutive. Statistics about the
+    // distribution of times (frequency, spread, best single) only use the solved attempts.
+    const attempts = inputArray.map((cs) => (cs === DNF_MARK ? Infinity : cs / 100));
+    const recencyWeights = getRecencyWeights(attempts.length);
+    const solved = [];
+    const solvedWeights = [];
+    attempts.forEach((time, i) => {
+        if (Number.isFinite(time)) {
+            solved.push(time);
+            solvedWeights.push(recencyWeights[i]);
+        }
+    });
+    if (solved.length === 0) {
+        setEmptyState('No finished solves in the selected range (only DNFs).');
+        return;
+    }
+    const sortedTimesInSeconds = [...solved].sort((a, b) => a - b);
 
     frequencyMap = {};
     sortedTimesInSeconds.forEach((time) => {
@@ -504,11 +470,11 @@ function updateChart() {
     }
 
     const globalTime = document.getElementById('predictedGlobal');
-    const averageDeviation = calculateAverageDeviation(chronologicalTimesInSeconds, recencyWeights);
-    const bestSingle = Math.min(...chronologicalTimesInSeconds);
-    const bestAverage = computeBestRollingAverage(chronologicalTimesInSeconds, eventId);
+    const averageDeviation = calculateAverageDeviation(solved, solvedWeights);
+    const bestSingle = Math.min(...solved);
+    const bestAverage = computeBestRollingAverage(attempts, eventId);
     const simulatedAverages = simulateNextAverageDistribution(
-        chronologicalTimesInSeconds,
+        attempts,
         eventId,
         recencyWeights,
     );
@@ -516,16 +482,17 @@ function updateChart() {
     let predictedGlobal = null;
     let probabilityBetterAverage = null;
     if (simulatedAverages.length > 0) {
-        predictedGlobal =
-            simulatedAverages.reduce((sum, value) => sum + value, 0) / simulatedAverages.length;
+        // The prediction is the typical finished average; simulated DNF averages still count against
+        // "probability of beating your best" below because the denominator is every simulation.
+        predictedGlobal = CubingCore.meanOfFinite(simulatedAverages);
         if (bestAverage !== null) {
             const betterCount = simulatedAverages.filter((value) => value < bestAverage).length;
             probabilityBetterAverage = betterCount / simulatedAverages.length;
         }
     }
 
-    const stdDev = calculateStdDev(chronologicalTimesInSeconds, recencyWeights);
-    const mean = weightedAverage(chronologicalTimesInSeconds, recencyWeights);
+    const stdDev = calculateStdDev(solved, solvedWeights);
+    const mean = weightedAverage(solved, solvedWeights);
     const probabilityBetterSingle = normalCdf(bestSingle, mean, stdDev);
 
     globalTime.textContent =
@@ -537,9 +504,11 @@ function updateChart() {
         averageDeviation === null ? '—' : '±' + formatSecondsToClock(averageDeviation);
     document.getElementById('bestSingle').textContent = formatSecondsToClock(bestSingle);
     document.getElementById('bestAverage').textContent =
-        bestAverage === null
-            ? `Need ${getEventWindow(eventId)} solves`
-            : formatSecondsToClock(bestAverage);
+        bestAverage !== null
+            ? formatSecondsToClock(bestAverage)
+            : attempts.length >= getEventWindow(eventId)
+              ? 'No finished average yet (too many DNFs)'
+              : `Need ${getEventWindow(eventId)} solves`;
     document.getElementById('probBetterSingle').textContent =
         formatProbability(probabilityBetterSingle);
     document.getElementById('probBetterAverage').textContent =
@@ -645,62 +614,21 @@ function loadAverageToolData() {
         eventType.value = event;
     }
 
+    // Oldest first: completed averages in the order they were saved, then the solves of the average in progress.
+    const toCs = (seconds) => (Number.isFinite(seconds) ? Math.round(seconds * 100) : DNF_MARK);
     const allTimes = [];
-
-    // Load completed averages
-    // Compact format: [average, event, averageId, [[raw, penalty, averageId, scramble], ...]]
-    const stored = localStorage.getItem('ct_averages');
-    if (stored) {
-        let allAverages;
-        try {
-            allAverages = JSON.parse(stored);
-        } catch {
-            /* skip malformed data */
-        }
-        if (Array.isArray(allAverages)) {
-            for (const avg of allAverages.filter((avg) => avg[1] === event)) {
-                const solves = avg[3];
-                if (!Array.isArray(solves)) continue;
-                for (const solve of solves) {
-                    const raw = Number(solve[0]);
-                    const penalty = solve[1];
-                    if (penalty === 'dnf') continue;
-                    const value = penalty === 'plus2' ? raw + 2 : raw;
-                    if (Number.isFinite(value) && value > 0) {
-                        allTimes.push(Math.round(value * 100));
-                    }
-                }
-            }
-        }
+    for (const avg of CubingCore.parseSavedAverages(localStorage.getItem('ct_averages'))) {
+        if (avg.event === event) allTimes.push(...avg.solves.map(toCs));
     }
-
-    // Also include incomplete (in-progress) solves for this event
-    const incompleteStored = localStorage.getItem(`ct_incomplete_${event}`);
-    if (incompleteStored) {
-        try {
-            const incomplete = JSON.parse(incompleteStored);
-            if (Array.isArray(incomplete)) {
-                for (const solve of incomplete) {
-                    const raw = Number(solve[0]);
-                    const penalty = solve[1];
-                    if (penalty === 'dnf') continue;
-                    const value = penalty === 'plus2' ? raw + 2 : raw;
-                    if (Number.isFinite(value) && value > 0) {
-                        allTimes.push(Math.round(value * 100));
-                    }
-                }
-            }
-        } catch {
-            /* skip malformed data */
-        }
-    }
+    allTimes.push(...CubingCore.parseIncompleteSolves(localStorage.getItem(`ct_incomplete_${event}`)).map(toCs));
+    allTimes.reverse(); // the rest of this tool works newest first (the slider keeps the most recent N)
 
     if (allTimes.length === 0) {
         setEmptyState('No averages found for this event in the Average Calculator.');
         return;
     }
 
-    originalArray = allTimes;
+    originalArray = allTimes.filter((cs) => cs === DNF_MARK || cs > 0);
     inputArray = [...originalArray];
     initializeSlider();
     updateChart();

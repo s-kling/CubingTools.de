@@ -78,20 +78,13 @@
     const $inspClose = document.getElementById('scoutInspClose');
 
     // ── Utilities ───────────────────────────────────────────
-    function esc(s) {
-        return String(s || '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
-    }
+    // Shared with every other tool (public/js/cubingCore.js).
+    const esc = CubingCore.escapeHtml;
 
+    // centiseconds -> "12.34" / "1:02.34"; empty for missing values
     function fmtTime(cs) {
         if (!cs || cs <= 0) return '—';
-        const s = cs / 100;
-        if (s < 60) return s.toFixed(2);
-        const m = Math.floor(s / 60);
-        return `${m}:${(s % 60).toFixed(2).padStart(5, '0')}`;
+        return CubingCore.formatCentiseconds(cs, { dnf: '—' });
     }
 
     function fmtPct(p) {
@@ -992,9 +985,7 @@
                     .map((cs) => (isFMC ? cs : +(cs / 100).toFixed(2)));
 
                 // Calculate model mean
-                const modelMean = displaySolves.length
-                    ? displaySolves.reduce((a, b) => a + b, 0) / displaySolves.length
-                    : 0;
+                const modelMean = CubingCore.meanOfFinite(displaySolves) ?? 0;
 
                 // Calculate trend line (linear regression)
                 function calcTrendLine(data) {

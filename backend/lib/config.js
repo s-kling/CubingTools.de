@@ -6,7 +6,14 @@ import dotenv from 'dotenv';
 export const BACKEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const ROOT_DIR = path.resolve(BACKEND_DIR, '..');
 
+// Must run before the path constants below read process.env (backend/.env may define them).
 dotenv.config({ path: path.join(BACKEND_DIR, '.env') });
+
+// Writable locations can be moved onto volumes (Docker) without touching the code.
+export const SECRET_DIR = process.env.SECRET_DIR || path.join(BACKEND_DIR, 'secret');
+export const LOG_DIR = process.env.LOG_DIR || path.join(BACKEND_DIR, 'log');
+export const BANS_FILE =
+    process.env.BANS_FILE || path.join(BACKEND_DIR, 'API', 'mail', 'bans.json');
 
 const DEFAULTS = {
     prod_port: 8000,
@@ -45,11 +52,19 @@ export function loadConfig() {
     } catch {
         // config.json is optional now; defaults apply.
     }
-    return {
+    const merged = {
         ...DEFAULTS,
         ...file,
         newsletter: { ...DEFAULTS.newsletter, ...(file.newsletter || {}) },
     };
+    // Environment wins over config.json: this is how containers are configured.
+    const int = (name) =>
+        Number.isInteger(Number(process.env[name])) && process.env[name]
+            ? Number(process.env[name])
+            : null;
+    if (int('WEB_WORKERS') !== null) merged.web_workers = int('WEB_WORKERS');
+    if (int('LOGIC_WORKERS') !== null) merged.logic_workers = int('LOGIC_WORKERS');
+    return merged;
 }
 
 export function parseArgs(argv = process.argv) {
@@ -66,17 +81,22 @@ export function resolveWorkerCount(configured, cap = 8) {
 
 function availableCpus() {
     try {
-        return (typeof process.availableParallelism === 'function'
+        return typeof process.availableParallelism === 'function'
             ? process.availableParallelism()
-            : 2);
+            : 2;
     } catch {
         return 2;
     }
 }
 
 export function portsFor(config, { beta, debug }) {
-    if (debug) return { web: config.dev_port, logic: config.logic_dev_port };
-    return beta
-        ? { web: config.beta_port, logic: config.logic_beta_port }
-        : { web: config.prod_port, logic: config.logic_prod_port };
+    const ports = debug
+        ? { web: config.dev_port, logic: config.logic_dev_port }
+        : beta
+          ? { web: config.beta_port, logic: config.logic_beta_port }
+          : { web: config.prod_port, logic: config.logic_prod_port };
+    // PORT / LOGIC_PORT override config.json (containers publish fixed ports).
+    if (Number(process.env.PORT) > 0) ports.web = Number(process.env.PORT);
+    if (Number(process.env.LOGIC_PORT) > 0) ports.logic = Number(process.env.LOGIC_PORT);
+    return ports;
 }

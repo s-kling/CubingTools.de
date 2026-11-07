@@ -26,36 +26,37 @@ const state = {
 
 // ============================================================
 // EVENT METADATA
-// Single source of truth for event name / puzzle-viewer id / icon / whether
-// the event uses Mean-of-3 instead of Average-of-5. Previously this was
+// Single source of truth for event name / puzzle-viewer id / icon. Whether an
+// event uses Mean-of-3 instead of Average-of-5 comes from CubingCore (shared
+// with every other tool and the backend). Previously this was
 // spread across meanEvents / PUZZLE_MAP / EVENT_NAMES / an inline icons map
 // that had drifted out of sync with each other.
 // ============================================================
 
 const EVENTS = {
-    '222': { name: '2x2x2', puzzle: '2x2x2', isMean: false },
-    '333': { name: '3x3x3', puzzle: '3x3x3', isMean: false },
-    '444': { name: '4x4x4', puzzle: '4x4x4', isMean: false },
-    '555': { name: '5x5x5', puzzle: '5x5x5', isMean: false },
-    '666': { name: '6x6x6', puzzle: '6x6x6', isMean: true },
-    '777': { name: '7x7x7', puzzle: '7x7x7', isMean: true },
-    '333bf': { name: '3x3 Blindfolded', puzzle: '3x3x3', isMean: false },
-    '333oh': { name: '3x3 One-Handed', puzzle: '3x3x3', isMean: false },
-    'clock': { name: 'Clock', puzzle: 'clock', isMean: false },
-    'fto': { name: 'FTO', puzzle: 'fto', isMean: false },
-    'minx': { name: 'Megaminx', puzzle: 'megaminx', isMean: false },
-    'pyram': { name: 'Pyraminx', puzzle: 'pyraminx', isMean: false },
-    'skewb': { name: 'Skewb', puzzle: 'skewb', isMean: false },
-    'sq1': { name: 'Square-1', puzzle: 'square1', isMean: false },
-    '444bf': { name: '4x4 Blindfolded', puzzle: '4x4x4', isMean: true },
-    '555bf': { name: '5x5 Blindfolded', puzzle: '5x5x5', isMean: true },
-    '333mbf': { name: '3x3 Multi-Blind', puzzle: '3x3x3', isMean: false },
-    '333fm': { name: '3x3 Fewest Moves', puzzle: '3x3x3', isMean: false },
+    '222': { name: '2x2x2', puzzle: '2x2x2' },
+    '333': { name: '3x3x3', puzzle: '3x3x3' },
+    '444': { name: '4x4x4', puzzle: '4x4x4' },
+    '555': { name: '5x5x5', puzzle: '5x5x5' },
+    '666': { name: '6x6x6', puzzle: '6x6x6' },
+    '777': { name: '7x7x7', puzzle: '7x7x7' },
+    '333bf': { name: '3x3 Blindfolded', puzzle: '3x3x3' },
+    '333oh': { name: '3x3 One-Handed', puzzle: '3x3x3' },
+    'clock': { name: 'Clock', puzzle: 'clock' },
+    'fto': { name: 'FTO', puzzle: 'fto' },
+    'minx': { name: 'Megaminx', puzzle: 'megaminx' },
+    'pyram': { name: 'Pyraminx', puzzle: 'pyraminx' },
+    'skewb': { name: 'Skewb', puzzle: 'skewb' },
+    'sq1': { name: 'Square-1', puzzle: 'square1' },
+    '444bf': { name: '4x4 Blindfolded', puzzle: '4x4x4' },
+    '555bf': { name: '5x5 Blindfolded', puzzle: '5x5x5' },
+    '333mbf': { name: '3x3 Multi-Blind', puzzle: '3x3x3' },
+    '333fm': { name: '3x3 Fewest Moves', puzzle: '3x3x3' },
 };
 
 // Events that use Mean of 3 rather than Average of 5, derived from EVENTS
 // so this can never drift out of sync with the rest of the event metadata.
-const meanEvents = Object.keys(EVENTS).filter((id) => EVENTS[id].isMean);
+const meanEvents = Object.keys(EVENTS).filter((id) => CubingCore.isMeanEvent(id));
 
 const BLIND_EVENTS = ['333bf', '444bf', '555bf'];
 
@@ -91,38 +92,8 @@ function getSolveValue(solve) {
 // ============================================================
 
 function parseTimeString(rawInput) {
-    const input = String(rawInput ?? '').trim();
-    if (!input) {
-        return { raw: null, isDnf: false, error: 'Invalid time format' };
-    }
-
-    if (input.toUpperCase() === 'DNF') {
-        return { raw: null, isDnf: true, error: null };
-    }
-
-    let numericValue;
-    if (input.includes(':')) {
-        const parts = input.split(':');
-        if (parts.length !== 2) {
-            return { raw: null, isDnf: false, error: 'Invalid time format' };
-        }
-
-        const minutes = Number.parseFloat(parts[0]);
-        const seconds = Number.parseFloat(parts[1]);
-        if (!Number.isFinite(minutes) || !Number.isFinite(seconds)) {
-            return { raw: null, isDnf: false, error: 'Invalid time format' };
-        }
-
-        numericValue = minutes * 60 + seconds;
-    } else {
-        numericValue = Number.parseFloat(input);
-    }
-
-    if (!Number.isFinite(numericValue)) {
-        return { raw: null, isDnf: false, error: 'Invalid time format' };
-    }
-
-    return { raw: numericValue, isDnf: false, error: null };
+    const parsed = CubingCore.parseTime(rawInput);
+    return { raw: parsed.seconds, isDnf: parsed.isDnf, error: parsed.error };
 }
 
 // Wraps parseTimeString for the main time-input field / edit modal, which
@@ -151,31 +122,7 @@ function getFiniteAverageValues(items) {
 // ============================================================
 
 function getBestWorstIndices(values) {
-    let bestIdx = -1;
-    let worstIdx = -1;
-    let bestValue = Infinity;
-    let worstValue = -Infinity;
-    let sawDnf = false;
-
-    values.forEach((value, idx) => {
-        if (!Number.isFinite(value)) {
-            if (!sawDnf) {
-                sawDnf = true;
-                worstIdx = idx;
-            }
-            return;
-        }
-        if (value < bestValue) {
-            bestValue = value;
-            bestIdx = idx;
-        }
-        if (!sawDnf && value > worstValue) {
-            worstValue = value;
-            worstIdx = idx;
-        }
-    });
-
-    return { bestIdx, worstIdx };
+    return CubingCore.bestWorstIndices(values);
 }
 
 // === Format input field on input ===
@@ -219,60 +166,12 @@ function updateTargetDisplay() {
 
 // === Format input field ===
 function formatInputField(input) {
-    var currentValue = input.value;
-
-    // Test if there are any letters in the input, if so set to DNF
-    // Check if the last character is a number, if so set to that number
-    if (/[a-zA-Z]/.test(currentValue)) {
-        const lastCharacter = currentValue.slice(-1);
-        if (/\d/.test(lastCharacter)) {
-            input.value = lastCharacter;
-        } else {
-            input.value = 'DNF';
-            return;
-        }
-    }
-
-    var valDigitsOnly = currentValue.replace(/[^0-9]/g, '');
-
-    while (valDigitsOnly.startsWith('0')) {
-        valDigitsOnly = valDigitsOnly.substring(1, valDigitsOnly.length);
-    }
-
-    if (valDigitsOnly.length < 3) {
-        while (valDigitsOnly.length < 3) {
-            valDigitsOnly = '0' + valDigitsOnly;
-        }
-    }
-
-    var currLength = valDigitsOnly.length;
-    var modified = '';
-    if (currLength <= 4) {
-        modified =
-            valDigitsOnly.slice(0, currLength - 2) + '.' + valDigitsOnly.slice(currLength - 2);
-
-        if (modified == '0.00') {
-            modified = '';
-        }
-    } else if (currLength > 4) {
-        modified =
-            valDigitsOnly.slice(0, currLength - 2) + '.' + valDigitsOnly.slice(currLength - 2);
-        modified =
-            modified.slice(0, modified.length - 5) + ':' + modified.slice(modified.length - 5);
-    }
-    input.value = modified;
+    input.value = CubingCore.formatTimeInputValue(input.value);
 }
 
 // === Format time for display (handles minutes:seconds) ===
 function formatTime(seconds) {
-    if (isDnfValue(seconds)) return 'DNF';
-    if (typeof seconds !== 'number' || Number.isNaN(seconds)) return 'DNF';
-    if (seconds >= 60) {
-        const mins = Math.floor(seconds / 60);
-        const secs = (seconds % 60).toFixed(2);
-        return `${mins}:${secs.padStart(5, '0')}`;
-    }
-    return seconds.toFixed(2);
+    return CubingCore.formatTime(seconds);
 }
 
 function getRequiredSolvesForEvent(eventType) {
@@ -285,27 +184,19 @@ function getRequiredSolves() {
 }
 
 function getMeanOfFiniteValues(values) {
-    const finiteValues = values.filter((value) => Number.isFinite(value));
-    if (!finiteValues.length) return null;
-    return finiteValues.reduce((sum, value) => sum + value, 0) / finiteValues.length;
+    return CubingCore.meanOfFinite(values);
 }
 
+// Average of the most recent solves for the event (Ao5 / Mo3, WCA rules).
+// Returns null while there are not enough solves, Infinity for a DNF average and
+// otherwise the average in seconds. (An Ao5 with exactly one DNF is a valid average:
+// the DNF counts as the worst solve. This used to be reported as "no average".)
 function getAverageValueForSet(solves, eventType = state.eventType) {
-    const required = getRequiredSolvesForEvent(eventType);
-    if (!Array.isArray(solves) || solves.length < required) return null;
-
-    const values = solves
-        .slice(-required)
-        .map((solve) => getSolveValue(solve))
-        .sort((a, b) => a - b);
-
-    if (!values.every(Number.isFinite)) return null;
-
-    if (meanEvents.includes(eventType)) {
-        return values.reduce((sum, value) => sum + value, 0) / required;
-    }
-
-    return values.slice(1, 4).reduce((sum, value) => sum + value, 0) / 3;
+    if (!Array.isArray(solves)) return null;
+    return CubingCore.averageForEvent(
+        solves.map((solve) => getSolveValue(solve)),
+        eventType,
+    );
 }
 
 // === Rebuild userAverages from stored averages for an event ===
@@ -361,7 +252,7 @@ function updateSessionStats() {
 
         if (validSolves.length > 0) {
             const best = Math.min(...validSolves);
-            const mean = validSolves.reduce((a, b) => a + b, 0) / validSolves.length;
+            const mean = CubingCore.meanOfFinite(validSolves);
             if (bestElem) bestElem.textContent = formatTime(best);
             if (avgElem) avgElem.textContent = formatTime(mean);
         } else {
@@ -387,7 +278,7 @@ function updateSessionStats() {
 
         if (validAverages.length > 0) {
             const best = Math.min(...validAverages);
-            const mean = validAverages.reduce((a, b) => a + b, 0) / validAverages.length;
+            const mean = CubingCore.meanOfFinite(validAverages);
             if (bestElem) bestElem.textContent = formatTime(best);
             if (avgElem) avgElem.textContent = formatTime(mean);
         } else {
@@ -501,9 +392,7 @@ function renderStatsCharts() {
                 (_, i) => allSolves.length - recentSolves.length + i + 1,
             );
             const validSingles = chartData.filter((v) => v !== null);
-            meanVal = validSingles.length
-                ? validSingles.reduce((a, b) => a + b, 0) / validSingles.length
-                : 0;
+            meanVal = CubingCore.meanOfFinite(validSingles) ?? 0;
         } else {
             if (avgLabelEl) avgLabelEl.textContent = 'Averages';
             const eventTags = state.averageTags.filter((tag) => tag.event === currentEvent);
@@ -514,7 +403,7 @@ function renderStatsCharts() {
             });
             chartLabels = recentTags.map((_, i) => eventTags.length - recentTags.length + i + 1);
             const validAvg = chartData.filter((v) => v !== null);
-            meanVal = validAvg.length ? validAvg.reduce((a, b) => a + b, 0) / validAvg.length : 0;
+            meanVal = CubingCore.meanOfFinite(validAvg) ?? 0;
         }
 
         if (chartData.length > 1) {
@@ -610,7 +499,7 @@ function renderStatsCharts() {
         }
         if (hasInsp && recentSolves.length > 1) {
             const validInsp = inspVals.filter((v) => v !== null);
-            const inspMean = validInsp.reduce((a, b) => a + b, 0) / validInsp.length;
+            const inspMean = CubingCore.meanOfFinite(validInsp);
             const inspTrend = calcStatsTrend(inspVals);
 
             statsInspChart = new window.Chart(inspCanvas, {
@@ -894,14 +783,8 @@ function updateMean(n) {
         return;
     }
 
-    const hasDnf = state.times.some((time) => !Number.isFinite(getSolveValue(time)));
-    if (hasDnf) {
-        elem.textContent = 'DNF';
-        return;
-    }
-
-    const mean = state.times.reduce((sum, time) => sum + getSolveValue(time), 0) / n;
-    elem.textContent = Number.isFinite(mean) ? formatTime(mean) : 'DNF';
+    const mean = CubingCore.mean(state.times.map((time) => getSolveValue(time)));
+    elem.textContent = mean !== null && Number.isFinite(mean) ? formatTime(mean) : 'DNF';
 }
 
 function updateAverageProgressUI(n, required) {
@@ -930,20 +813,15 @@ function calculateCurrentAverages(n) {
 
     const eventType = state.eventType;
     const required = getRequiredSolvesForEvent(eventType);
+    if (n < required) return { ao5, mo3 };
 
-    if (n >= required && !meanEvents.includes(eventType)) {
-        const averageValue = getAverageValueForSet(state.times.slice(-required), eventType);
-        if (averageValue !== null) {
-            ao5 = averageValue.toFixed(2);
-        }
-    }
+    const averageValue = getAverageValueForSet(state.times.slice(-required), eventType);
+    if (averageValue === null) return { ao5, mo3 };
 
-    if (n >= required && meanEvents.includes(eventType)) {
-        const averageValue = getAverageValueForSet(state.times.slice(-required), eventType);
-        if (averageValue !== null) {
-            mo3 = averageValue.toFixed(2);
-        }
-    }
+    // 'DNF' is a real, saved result (e.g. two DNFs in an Ao5, any DNF in a Mo3).
+    const text = Number.isFinite(averageValue) ? averageValue.toFixed(2) : 'DNF';
+    if (meanEvents.includes(eventType)) mo3 = text;
+    else ao5 = text;
 
     return { ao5, mo3 };
 }
@@ -1083,6 +961,11 @@ function updateAo5Probability(probBpaElem, probWpaElem, mlaElem, mlaSolveElem) {
     const best = Math.min(...validValues);
     const worst = Math.max(...validValues);
     const total = state.userSolves.length;
+    if (total === 0 || validValues.length === 0) {
+        clearProbabilityPills(probBpaElem, probWpaElem);
+        updateMla(mlaElem, mlaSolveElem);
+        return;
+    }
 
     const pBpa =
         state.userSolves.filter((solve) => isFinite(solve) && solve <= best).length / total;
@@ -1174,9 +1057,7 @@ function runMonteCarlo(iterations, callback) {
 }
 
 function displayMlaResult(mlaElem, mlaSolveElem, results, isMean) {
-    const expectedNextSolve = results.length
-        ? results.reduce((sum, value) => sum + value, 0) / results.length
-        : null;
+    const expectedNextSolve = CubingCore.meanOfFinite(results);
 
     if (mlaSolveElem) {
         mlaSolveElem.textContent =
@@ -1190,18 +1071,13 @@ function displayMlaResult(mlaElem, mlaSolveElem, results, isMean) {
         return;
     }
 
-    const currentTimes = state.times.map((a) => a.value);
-    currentTimes.push(expectedNextSolve);
-    const sortedSolves = currentTimes.sort((a, b) => a - b);
+    // Same rules as a real average: Ao5 drops best+worst, Mo3 is the plain mean.
+    const expectedMla = CubingCore.averageForEvent(
+        [...state.times.map((solve) => getSolveValue(solve)), expectedNextSolve],
+        state.eventType,
+    );
 
-    // Ao5 trims the best and worst of the 5 values; Mo3 uses the plain mean
-    // of all 3 (no trimming) — these are different formulas, so they must be
-    // branched rather than sharing the Ao5 splice(1, 3) logic.
-    const expectedMla = isMean
-        ? sortedSolves.reduce((a, b) => a + b, 0) / sortedSolves.length
-        : sortedSolves.slice(1, 4).reduce((a, b) => a + b, 0) / 3;
-
-    if (!Number.isFinite(expectedMla)) {
+    if (expectedMla === null || !Number.isFinite(expectedMla)) {
         mlaElem.textContent = 'DNF';
         return;
     }
@@ -2004,7 +1880,7 @@ function initSmoothedPerfFromHistory() {
         .map((t) => parseFloat(t.average))
         .filter((v) => !isNaN(v) && isFinite(v));
     if (validAvgs.length === 0) return null;
-    const mean = validAvgs.reduce((a, b) => a + b, 0) / validAvgs.length;
+    const mean = CubingCore.meanOfFinite(validAvgs);
     setStorage(`setting_smoothed_perf_${event}`, mean.toFixed(4));
     return mean;
 }
@@ -2552,8 +2428,21 @@ if (timerEventSelect) {
 }
 
 // === Persist incomplete solves on page unload ===
-window.addEventListener('beforeunload', () => {
+// Completed averages are saved on a 5 s debounce. Flush it whenever the page may go away; otherwise an
+// average finished within 5 s of closing or reloading the tab was lost. `pagehide` and `visibilitychange`
+// are the events mobile browsers actually deliver (beforeunload is not reliable there).
+function flushPendingSaves() {
+    if (_saveDebounceTimer) {
+        clearTimeout(_saveDebounceTimer);
+        _saveDebounceTimer = null;
+        flushSave();
+    }
     saveIncomplete();
+}
+window.addEventListener('beforeunload', flushPendingSaves);
+window.addEventListener('pagehide', flushPendingSaves);
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushPendingSaves();
 });
 
 // === Stats display visibility ===
@@ -4485,7 +4374,7 @@ function calculateCompStats() {
             meanEl.textContent = 'DNF';
         } else if (finiteFilledVals.length > 0) {
             meanEl.textContent = formatTime(
-                finiteFilledVals.reduce((a, b) => a + b, 0) / finiteFilledVals.length,
+                CubingCore.meanOfFinite(finiteFilledVals),
             );
         }
     }
@@ -4496,7 +4385,8 @@ function calculateCompStats() {
         afterCards.forEach((el) => (el.style.display = 'flex'));
 
         const averageValue = getAverageValueForSet(compState.times.slice(0, n), state.eventType);
-        const average = averageValue === null ? 'DNF' : averageValue.toFixed(2);
+        const average =
+            averageValue === null || !Number.isFinite(averageValue) ? 'DNF' : averageValue.toFixed(2);
 
         if (avgEl) {
             const numeric = average === 'DNF' ? null : parseFloat(average);
@@ -4564,15 +4454,11 @@ function calculateCompStats() {
 
                 if (mlaSolveEl) mlaSolveEl.textContent = `if ${formatTime(medianSolve)}`;
 
-                const all5 = [...currentValues, medianSolve].sort((a, b) => a - b);
-                const dnfCount5 = all5.filter((v) => !isFinite(v)).length;
-
                 if (mlaEl) {
-                    const middle3 = all5.slice(1, 4);
-                    if (dnfCount5 > 1 || middle3.some((v) => !isFinite(v))) {
+                    const mlaVal = CubingCore.averageForEvent([...currentValues, medianSolve], state.eventType);
+                    if (mlaVal === null || !Number.isFinite(mlaVal)) {
                         renderMetricValue(mlaEl, 'DNF', {});
                     } else {
-                        const mlaVal = (middle3[0] + middle3[1] + middle3[2]) / 3;
                         renderMetricValue(mlaEl, formatTime(mlaVal), {
                             rank: getCompAverageRank(mlaVal),
                             pillKind: 'average',

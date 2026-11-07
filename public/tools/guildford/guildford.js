@@ -262,43 +262,8 @@ async function addEventInputs() {
 }
 
 function formatInputField(input) {
-    var currentValue = input.value;
-
-    if (input.value.includes('DNF')) {
-        input.value = '0.00';
-    } else if (/[a-zA-Z]/.test(currentValue)) {
-        input.value = 'DNF';
-        return;
-    }
-
-    var valDigitsOnly = currentValue.replace(/[^0-9]/g, '');
-
-    while (valDigitsOnly.startsWith('0')) {
-        valDigitsOnly = valDigitsOnly.substring(1, valDigitsOnly.length);
-    }
-
-    if (valDigitsOnly.length < 3) {
-        while (valDigitsOnly.length < 3) {
-            valDigitsOnly = '0' + valDigitsOnly;
-        }
-    }
-
-    var currLength = valDigitsOnly.length;
-    var modified = '';
-    if (currLength <= 4) {
-        modified =
-            valDigitsOnly.slice(0, currLength - 2) + '.' + valDigitsOnly.slice(currLength - 2);
-
-        if (modified == '0.00') {
-            modified = '';
-        }
-    } else if (currLength > 4) {
-        modified =
-            valDigitsOnly.slice(0, currLength - 2) + '.' + valDigitsOnly.slice(currLength - 2);
-        modified =
-            modified.slice(0, modified.length - 5) + ':' + modified.slice(modified.length - 5);
-    }
-    input.value = modified;
+    // DNF is not an accepted input here: an unknown time stays empty and is treated as "cannot do".
+    input.value = CubingCore.formatTimeInputValue(input.value, { allowDnf: false });
 }
 
 // Function to update URL with form data (including event times)
@@ -535,43 +500,31 @@ function optimizeGuildford() {
 }
 
 // Function to fetch average times and all solves from the API for a given WCA ID and event
-async function getCurrentAverage(wcaId, event) {
-    // Validate and sanitize inputs
+// One request for all events of a competitor (was one request per event, i.e. 15-30 requests per refresh).
+// Returns { eventId: seconds|null }; null means "not enough results" (shown as an empty field).
+async function getCurrentAverages(wcaId, eventIds) {
     const sanitizedWcaId = wcaId.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-    const sanitizedEvent = event.replace(/[^a-zA-Z0-9]/g, '');
     const solvecount = parseInt(document.getElementById('solvecount').value) || 25;
-
-    // Construct the API URL
-    const avgUrl = `/api/wca/${encodeURIComponent(sanitizedWcaId)}/${encodeURIComponent(
-        sanitizedEvent,
-    )}?num=${solvecount}`;
+    const url = `/api/wca/averages?ids=${encodeURIComponent(sanitizedWcaId)}&events=${eventIds
+        .map(encodeURIComponent)
+        .join(',')}&num=${solvecount}`;
 
     try {
-        const avgData = await window.fetchJsonOrThrow(avgUrl, {
-            errorContext: 'Could not load competitor average',
-        });
-
-        // Validate the response structure
-        // `null` is a valid answer (no solves in this event); getWCAData() shows it as DNF.
-        if (!avgData || (avgData.average !== null && typeof avgData.average !== 'number')) {
-            throw new Error('Invalid response format from API (average)');
-        }
-
-        return avgData.average;
+        const data = await window.fetchJsonOrThrow(url, { errorContext: 'Could not load competitor averages' });
+        const own = data?.averages?.[sanitizedWcaId];
+        if (!own || typeof own !== 'object') throw new Error('Invalid response format from API (averages)');
+        return own;
     } catch (error) {
-        console.error(
-            `Error fetching average or all solves for event ${sanitizedEvent}: ${error.message}`,
-        );
+        console.error(`Error fetching averages for ${sanitizedWcaId}: ${error.message}`);
         window.showUserErrorPopup({
             title: 'Could not load Guildford WCA data',
-            message:
-                'Some Guildford event data could not be loaded, so missing results will stay empty.',
+            message: 'Some Guildford event data could not be loaded, so missing results will stay empty.',
             error,
             reportTitle: 'Guildford tool failed to load WCA data',
-            reportContext: `Fetching Guildford data failed for ${sanitizedWcaId} in event ${sanitizedEvent}.`,
-            dedupeKey: `guildford-average:${sanitizedWcaId}:${sanitizedEvent}`,
+            reportContext: `Fetching Guildford data failed for ${sanitizedWcaId}.`,
+            dedupeKey: `guildford-average:${sanitizedWcaId}`,
         });
-        return null;
+        return {};
     }
 }
 
@@ -615,22 +568,17 @@ async function getWCAData(competitorId) {
         const nameEl = document.getElementById(`${competitorId}-name`);
         if (nameEl) nameEl.textContent = name;
 
-        // Fetch averages in parallel for all events
-        await Promise.all(
-            events.map(async (eventName) => {
-                const eventId = eventNameToWcaId(eventName);
-                const avg = await getCurrentAverage(wcaId, eventId);
-                const input = document.getElementById(`${competitorId}-${eventName}`);
-                if (!input) return;
-                if (avg === null || avg === undefined) {
-                    input.value = 'DNF';
-                } else {
-                    const formatted = formatTime(avg);
-                    input.value = formatted;
-                }
-                formatInputField(input);
-            }),
+        const averages = await getCurrentAverages(
+            wcaId,
+            events.map((eventName) => eventNameToWcaId(eventName)),
         );
+        events.forEach((eventName) => {
+            const input = document.getElementById(`${competitorId}-${eventName}`);
+            if (!input) return;
+            const avg = averages[eventNameToWcaId(eventName)];
+            input.value = Number.isFinite(avg) && avg > 0 ? formatTime(avg) : '';
+            formatInputField(input);
+        });
 
         // After populating, run optimize
         optimizeGuildford();
@@ -659,31 +607,20 @@ function calculateMaxTime(combination, competitor1, competitor2, pickup) {
     return Math.max(time1, time2);
 }
 
-// Function to format time in seconds to "Xm Ys" format
+// Relay totals are always shown as M:SS.xx (also below a minute); rounding is done by CubingCore.
 function formatTime(seconds) {
-    const minutes = Math.floor(seconds / 60);
-    let secs = seconds % 60;
-    secs = secs < 10 ? '0' + secs.toFixed(2) : secs.toFixed(2);
-    return `${minutes}:${secs}`;
+    const text = CubingCore.formatTime(seconds);
+    return text.includes(':') ? text : `0:${text.padStart(5, '0')}`;
 }
 
+// Seconds for a typed time; NaN for empty, DNF or invalid input (callers map NaN to the DNF sentinel).
 function getTimeInSeconds(input) {
     if (typeof input !== 'string') return NaN;
-    const s = input.trim();
-    if (!s) return NaN;
-    if (/^dnf$/i.test(s)) return NaN; // caller will map NaN to DNF sentinel
-    if (s.includes(':')) {
-        const parts = s.split(':');
-        const minutes = parseInt(parts[0], 10);
-        const seconds = parseFloat(parts[1]);
-        if (isNaN(minutes) || isNaN(seconds)) return NaN;
-        return minutes * 60 + seconds;
-    } else {
-        // plain seconds (or formatted like 12.34)
-        const v = parseFloat(s);
-        return isNaN(v) ? NaN : v;
-    }
+    const parsed = CubingCore.parseTime(input);
+    return parsed.error || parsed.isDnf ? NaN : parsed.seconds;
 }
+
+const HISTORY_LIMIT = 200;
 
 function processCombinations(competitor1, competitor2, pickup) {
     const bestCombinationDiv = document.getElementById('bestCombination');
@@ -711,7 +648,7 @@ function processCombinations(competitor1, competitor2, pickup) {
             const real2 = sum2 - (group2Idxs.length > 0 ? pickup : 0);
             const totalMax = Math.max(real1, real2);
 
-            // Store the combination
+            // Keep only the best few for the history table (every leaf would be up to 2^n table rows).
             combinations.push({
                 group1: group1Idxs.map((i) => events[i]),
                 group2: group2Idxs.map((i) => events[i]),
@@ -719,6 +656,10 @@ function processCombinations(competitor1, competitor2, pickup) {
                 time2: real2,
                 totalTime: totalMax,
             });
+            if (combinations.length > HISTORY_LIMIT * 4) {
+                combinations.sort((a, b) => a.totalTime - b.totalTime);
+                combinations.length = HISTORY_LIMIT;
+            }
 
             if (totalMax < bestTime) {
                 bestTime = totalMax;
@@ -740,6 +681,8 @@ function processCombinations(competitor1, competitor2, pickup) {
     }
 
     dfs(0, [], [], 0, 0);
+    combinations.sort((a, b) => a.totalTime - b.totalTime);
+    combinations.length = Math.min(combinations.length, HISTORY_LIMIT);
 
     var stop = Date.now();
 
@@ -749,10 +692,10 @@ function processCombinations(competitor1, competitor2, pickup) {
     if (bestGroups) {
         bestCombinationDiv.innerHTML = `
             <h3>Best Combination</h3>
-            <p>${competitor1Name} (${formatTime(bestGroups.time1)}): ${bestGroups.group1.join(
+            <p>${CubingCore.escapeHtml(competitor1Name)} (${formatTime(bestGroups.time1)}): ${bestGroups.group1.join(
                 ', ',
             )}</p>
-            <p>${competitor2Name} (${formatTime(bestGroups.time2)}): ${bestGroups.group2.join(
+            <p>${CubingCore.escapeHtml(competitor2Name)} (${formatTime(bestGroups.time2)}): ${bestGroups.group2.join(
                 ', ',
             )}</p>
             <p>Total Time: ${formatTime(bestTime)}</p>`;
@@ -762,9 +705,9 @@ function processCombinations(competitor1, competitor2, pickup) {
             <table>
             <thead>
                 <tr>
-                <th>${competitor1Name}</th>
+                <th>${CubingCore.escapeHtml(competitor1Name)}</th>
                 <th>Time</th>
-                <th>${competitor2Name}</th>
+                <th>${CubingCore.escapeHtml(competitor2Name)}</th>
                 <th>Time</th>
                 <th>Total Time</th>
                 </tr>
@@ -821,31 +764,22 @@ function loadAverageToolTimes(competitorId) {
         competitorId === 'c1' ? competitor1AllEventTimes : competitor2AllEventTimes;
     let loadedAny = false;
 
+    // The Average tool keeps everything under one key (ct_averages). This used to read a legacy
+    // per-event key (averages_<event>) that the Average tool migrates away, so nothing was ever found.
+    const saved = CubingCore.parseSavedAverages(localStorage.getItem('ct_averages'));
+
     events.forEach((eventName) => {
         const wcaId = eventNameToWcaId(eventName);
         if (!wcaId) return;
 
-        const stored = localStorage.getItem(`averages_${wcaId}`);
-        if (!stored) return;
-
-        let averages;
-        try {
-            averages = JSON.parse(stored);
-        } catch {
-            return;
-        }
-
-        if (!Array.isArray(averages) || averages.length === 0) return;
-
-        // Use the most recent average's value
-        const lastAvg = averages[averages.length - 1];
-        const avgValue = parseFloat(lastAvg.average);
+        // Most recent finished average for this event
+        const last = saved.filter((tag) => tag.event === wcaId).pop();
+        const avgValue = last ? parseFloat(last.average) : NaN;
         if (!isFinite(avgValue) || avgValue <= 0) return;
 
-        const formatted = formatTime(avgValue);
         const input = document.getElementById(`${competitorId}-${eventName}`);
         if (input) {
-            input.value = formatted;
+            input.value = formatTime(avgValue);
             formatInputField(input);
             allEventTimes[eventName] = input.value;
             loadedAny = true;

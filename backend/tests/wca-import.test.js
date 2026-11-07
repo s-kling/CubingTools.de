@@ -210,3 +210,58 @@ test('a database built by an older importer version is rebuilt even if the expor
     imp._publish('new.db', { exportDate: '2026-10-31', version: '2' });
     assert.equal((await imp.checkForNewerExport()).needsDownload, false);
 });
+
+// ── API handlers on top of the imported fixture ──────────────────────────
+async function apiRig() {
+    const { default: WcaApi } = await import('../API/API/wca.api.js');
+    const { store } = await importFixture();
+    const api = new WcaApi({ store });
+    const call = async (method, query, params = {}) => {
+        const out = {};
+        const res = { status(c) { out.status = c; return this; }, set() { return this; }, json(b) { out.body = JSON.parse(JSON.stringify(b)); return this; } };
+        await api[method]({ query, params }, res);
+        return out;
+    };
+    return { api, store, call };
+}
+
+test('batch averages: many competitors and events in one call, null (not 0) when there is not enough data', async () => {
+    const { store, call } = await apiRig();
+    const r = await call('handleBatchAveragesRequest', { ids: '2015TEST01,2016OTHR01,2099NONE01,bad', events: '333,222,pyram', num: '12' });
+    assert.equal(r.status, undefined);
+    const a = r.body.averages;
+    assert.equal(a['2015TEST01']['333'], 9.37); // newest 12 of 14 valid solves, best and worst dropped
+    assert.equal(a['2015TEST01']['222'], 2.5);
+    assert.equal(a['2015TEST01']['pyram'], null);
+    assert.equal(a['2099NONE01']['333'], null);
+    assert.equal(a['BAD']['333'], null);
+    // 1-2 solves: the legacy endpoint answers 0, the batch endpoint never invents a value
+    const few = await call('handleBatchAveragesRequest', { ids: '2015TEST01', events: '222', num: '2' });
+    assert.equal(few.body.averages['2015TEST01']['222'], null);
+    store.close();
+});
+
+test('batch averages: input validation', async () => {
+    const { store, call } = await apiRig();
+    assert.equal((await call('handleBatchAveragesRequest', { events: '333' })).status, 400);
+    assert.equal((await call('handleBatchAveragesRequest', { ids: 'x', events: '33;3' })).status, 400);
+    assert.equal((await call('handleBatchAveragesRequest', { ids: Array.from({ length: 301 }, (_, i) => `2020TEST${String(i % 99).padStart(2, '0')}${i}`).join(','), events: '333' })).status, 400);
+    store.close();
+});
+
+test('getsolves keeps DNFs in position only when asked (?dnf=1)', async () => {
+    const { store, call } = await apiRig();
+    const plain = await call('handleRequest', { getsolves: 'true' }, { wcaId: '2015TEST01', event: '333' });
+    const withDnf = await call('handleRequest', { getsolves: 'true', dnf: '1' }, { wcaId: '2015TEST01', event: '333' });
+    assert.ok(plain.body.allResults.every((v) => v > 0));
+    assert.equal(withDnf.body.allResults.filter((v) => v === -1).length, 1);
+    assert.equal(withDnf.body.allResults.length, plain.body.allResults.length + 1);
+    store.close();
+});
+
+test('the per-person endpoint uses the shared trimming rule (5%: 25 solves drop 2 from each end)', async () => {
+    const { calculateAverage } = await import('../wca/stats.js');
+    const solves = Array.from({ length: 25 }, (_, i) => (i + 1) * 100); // 1.00 .. 25.00 s
+    assert.equal(calculateAverage(solves), 13);
+    assert.equal(calculateAverage(solves.slice(0, 12)), 6.5); // 12 solves: 1 from each end, unchanged from before
+});

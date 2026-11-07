@@ -2,9 +2,10 @@
 
 CubingTools.de is a toolkit for competitive cubing workflows: event grouping, Guildford planning, average tracking, and solve-distribution analysis.
 
-Current version: `1.2.0`
+Current version: `1.2.19`
 
 ## Table of Contents
+
 - [Overview](#overview)
 - [Tool Suite](#tool-suite)
 - [Admin Features](#admin-features)
@@ -20,6 +21,7 @@ Current version: `1.2.0`
 This project includes a Node.js/Express backend and a static frontend served from the same app.
 
 Core goals:
+
 - Competition planning support (grouping + helper role workflows)
 - WCA-backed performance analysis
 - Shareable workflows via URL state
@@ -28,9 +30,11 @@ Core goals:
 ## Tool Suite
 
 ### Guildford Optimizer
+
 Path: `public/tools/guildford/`
 
 Features:
+
 - Relay presets including FTO variants
 - Custom relay composition
 - Pickup-time-aware split optimization between two competitors
@@ -38,9 +42,11 @@ Features:
 - URL sync for shareable setups
 
 ### Grouping Tool
+
 Path: `public/tools/grouping/`
 
 Features:
+
 - Loads event definitions from `/events`
 - Event search/select with optional custom events
 - Dynamic or fixed group sizing
@@ -49,9 +55,11 @@ Features:
 - URL state restore for collaboration
 
 ### WCA Average Calculator
+
 Path: `public/tools/average/`
 
 Features:
+
 - Solve entry with penalties (`+2`, `DNF`)
 - Ao5/Mo3 and mean calculations
 - BPA/WPA/TFT metrics
@@ -59,9 +67,11 @@ Features:
 - Event-scoped cookie persistence for saved averages
 
 ### GlobalCalc
+
 Path: `public/tools/globalCalc/`
 
 Features:
+
 - Data input from csTimer export or WCA ID
 - Frequency distribution chart
 - Adjustable analysis window (slider)
@@ -73,60 +83,72 @@ Features:
 Path: `public/html/admin/`
 
 ### Admin authentication
+
 - Password login endpoint: `POST /api/admin/login`
 - Token verification endpoint: `GET /api/admin/verify`
 - Session token stored in browser session storage
 
 ### Status dashboard
+
 Page: `/admin/status`
 
 Provides:
+
 - Uptime and memory usage
 - Log file size
 - Request/error analytics
 - Log explorer and detailed matching entries
 
 ### Message moderation and bans
+
 Page: `/admin/messages`
 
 Provides:
+
 - View confirmed/unconfirmed messages
 - Bulk delete and selection actions
 - Email/IP-hash bans
 - Appeal review and resolution workflow
 
 ### Developer TODO manager
+
 Page: `/admin/dev-todo`
 
 Provides:
+
 - Protected read/write access to `md/TODO.md`
 - Checkbox toggle + add-item workflow in UI
 
 ## Backend/API
 
 Main backend paths:
+
 - `backend/server.js`
 - `backend/API/api.js`
 - `backend/API/routes.js`
 - `backend/API/tools.js`
 
 ### Public endpoints
+
 - `GET /api/tools` - tool metadata from tool HTML files
 - `GET /api/wca/:wcaId/:event` - WCA profile-derived data
 - `GET /api/version` - app version from `package.json`
 - `GET /events` - event definitions for grouping tool
 
 ### Contact pipeline
+
 - `POST /api/contact`
 - `GET /contact/confirm?id=...`
 
 Behavior:
+
 - reCAPTCHA Enterprise verification
 - message confirmation flow (double opt-in)
 - pending message expiry cleanup
 - ban/appeal handling
 
 ### Security and reliability
+
 - Endpoint-specific rate limiting (`express-rate-limit`)
 - Input sanitization (`sanitize-html`)
 - CORS allowlist handling
@@ -136,12 +158,14 @@ Behavior:
 ## Local Development
 
 1. Clone the repository.
+
 ```bash
 git clone https://github.com/s-kling/cubingtools.de.git
 cd cubingtools.de
 ```
 
 2. Install dependencies.
+
 ```bash
 npm install
 ```
@@ -149,9 +173,10 @@ npm install
 3. Configure backend ports in `backend/config.json`.
 
 4. Create backend env file.
-File: `backend/.env`
+   File: `backend/.env`
 
 5. Start app with helper script.
+
 ```bash
 ./bin/start.sh
 ```
@@ -159,6 +184,7 @@ File: `backend/.env`
 The script supports production (`8000`), beta (`8001`), or both.
 
 ### NPM scripts
+
 ```bash
 npm run start   # starts ./bin/start.sh
 npm run beta    # all three roles, beta ports
@@ -166,7 +192,7 @@ npm run dev     # all three roles, single worker each, request logging
 npm run web     # only the page-serving server
 npm run logic   # only the API server
 npm run jobs    # only the background jobs
-npm test        # node --test backend/tests/*.test.js (no network or Firebase needed)
+npm test        # unit + browser-logic tests (jsdom); no network, Firebase or Docker needed
 ```
 
 ## Environment Variables
@@ -174,6 +200,7 @@ npm test        # node --test backend/tests/*.test.js (no network or Firebase ne
 Configured in `backend/.env`.
 
 Commonly used variables:
+
 - `SESSION_SECRET` (optional, ≥32 chars; otherwise generated into `backend/secret/session.key`)
 - `STATUS_PAGE_PASSWORD` (SHA-256 hash expected by admin auth)
 - `EMAIL_HOST`

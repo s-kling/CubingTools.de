@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { BACKEND_DIR } from './config.js';
+import { SECRET_DIR } from './config.js';
 
 const b64 = (buf) => Buffer.from(buf).toString('base64url');
 
@@ -13,7 +13,7 @@ export function loadSessionSecret() {
     if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.length >= 32) {
         return process.env.SESSION_SECRET;
     }
-    const dir = path.join(BACKEND_DIR, 'secret');
+    const dir = SECRET_DIR;
     const file = path.join(dir, 'session.key');
     try {
         return fs.readFileSync(file, 'utf8').trim();

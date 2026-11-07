@@ -91,6 +91,9 @@ export function createWebApp({ config, logger = null, logicUrl = null, publicDir
 
     app.use(corsMiddleware());
 
+    // Liveness for Docker / load balancers: depends on nothing but this process.
+    app.get('/healthz', (_req, res) => res.json({ ok: true, role: 'web', pid: process.pid }));
+
     // Tiny local endpoints (must be registered before the /api proxy mount below).
     const toolsIndex = createToolsIndex();
     let toolsCache = { at: 0, data: null };

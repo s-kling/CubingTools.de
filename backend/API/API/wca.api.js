@@ -9,6 +9,7 @@ import {
     buildPerformanceProfile,
     calculateTimeProbability,
     calculateAverage,
+    averageOrNull,
     computeRoundRankings,
     normCdf,
     probXBeatsY,
@@ -879,6 +880,42 @@ export default class WcaApi {
     }
 
     /**
+     * GET /api/wca/averages?ids=ID1,ID2&events=333,222&num=12      (`event=333` is accepted as a single event)
+     * -> { solvecount, averages: { ID1: { "333": 9.87, "222": null }, ... } }
+     *
+     * One round trip for any number of competitors x events. The grouping tool used to issue one request per
+     * competitor and event (and Guildford one per event), which exhausted the per-IP rate limit. Competitors with
+     * fewer than 3 solves, unknown IDs and invalid IDs map to null - unlike the per-person endpoint, no fake 0.
+     */
+    async handleBatchAveragesRequest(req, res) {
+        const { ids, num } = req.query;
+        const eventParam = typeof req.query.events === 'string' ? req.query.events : req.query.event;
+        if (typeof ids !== 'string' || typeof eventParam !== 'string') {
+            return res.status(400).json({ error: 'ids and events are required' });
+        }
+        const events = [...new Set(eventParam.split(',').map((e) => e.trim()).filter(Boolean))];
+        if (events.length === 0 || events.length > 30 || events.some((e) => !/^[a-z0-9]{2,12}$/i.test(e))) {
+            return res.status(400).json({ error: 'Provide between 1 and 30 valid event ids' });
+        }
+        const list = [...new Set(ids.split(',').map((i) => this.normalizeWcaId(i)).filter(Boolean))];
+        if (list.length === 0 || list.length > 300) return res.status(400).json({ error: 'Provide between 1 and 300 WCA IDs' });
+        if (!this.store.isReady()) return res.status(503).set('Retry-After', '60').json({ error: NOT_READY });
+
+        const rawNum = Number.parseInt(num, 10);
+        const solvecount = Number.isFinite(rawNum) && rawNum > 0 ? Math.min(rawNum, 200) : 12;
+        const averages = {};
+        for (const id of list) {
+            averages[id] = {};
+            for (const event of events) {
+                averages[id][event] = this.isValidWcaId(id)
+                    ? averageOrNull(this.store.getRecentSolves(id, event, solvecount))
+                    : null;
+            }
+        }
+        return res.json({ solvecount, averages });
+    }
+
+    /**
      * GET /api/wca/:wcaId/:event
      *  - event "name"          -> { name }
      *  - ?getsolves=true       -> every valid solve ever, newest first
@@ -901,7 +938,12 @@ export default class WcaApi {
 
             if (getsolves) {
                 const rows = this.store.getEventResults(normalizedId, event); // newest first
-                return res.json({ allResults: rows.flatMap((r) => this.filterAttempts([...r.attempts].reverse())) });
+                // Default: valid solves only (> 0). With ?dnf=1 DNFs stay in place as -1 so callers computing
+                // rolling averages do not silently glue together solves that were never adjacent. DNS (-2) and
+                // empty attempts (0) never count as solves.
+                const keepDnf = req.query.dnf === '1';
+                const keep = (v) => v > 0 || (keepDnf && v === -1);
+                return res.json({ allResults: rows.flatMap((r) => [...r.attempts].reverse().filter(keep)) });
             }
             if (getaverages) {
                 const rows = this.store.getEventResults(normalizedId, event).reverse();

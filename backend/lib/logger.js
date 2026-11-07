@@ -2,7 +2,7 @@ import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
 import readline from 'readline';
-import { BACKEND_DIR } from './config.js';
+import { LOG_DIR } from './config.js';
 import { notify, registerHandler, isClusterWorker } from './cluster.js';
 
 const ansi = {
@@ -19,7 +19,7 @@ const color = (c, v) => `${ansi[c] || ''}${v}${ansi.reset}`;
 export function logFilePath({ beta, role }) {
     // Keep the historical names for the web log so the status dashboard keeps working.
     const base = beta ? 'beta' : 'server';
-    return path.join(BACKEND_DIR, 'log', role === 'web' ? `${base}.log` : `${base}.${role}.log`);
+    return path.join(LOG_DIR, role === 'web' ? `${base}.log` : `${base}.${role}.log`);
 }
 
 /**
@@ -50,7 +50,7 @@ export class RequestLogger {
         if (!this.remote) {
             fs.mkdirSync(path.dirname(file), { recursive: true });
             this._open();
-            registerHandler(this.channel, (line) => this.stream?.write(line));
+            registerHandler(this.channel, (line) => this._emit(line));
         }
     }
 
@@ -61,6 +61,12 @@ export class RequestLogger {
             // Re-open on next tick; losing a few log lines beats crashing the worker.
             setTimeout(() => this._open(), 1000).unref();
         });
+    }
+
+    // File (what the status dashboard reads) and, with LOG_TO_STDOUT=1, stdout for `docker logs`.
+    _emit(line) {
+        this.stream?.write(line);
+        if (process.env.LOG_TO_STDOUT === '1') process.stdout.write(line);
     }
 
     middleware() {
@@ -86,7 +92,7 @@ export class RequestLogger {
         if (req.query?.utm_source) entry.utmSource = req.query.utm_source;
         const line = JSON.stringify(entry) + '\n';
         if (this.remote) notify(this.channel, line);
-        else this.stream.write(line);
+        else this._emit(line);
 
         if (this.debug) {
             const c = res.statusCode >= 500 ? 'red' : res.statusCode >= 400 ? 'yellow' : 'green';

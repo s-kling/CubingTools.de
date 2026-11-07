@@ -96,42 +96,6 @@ function filterEventCheckboxes(searchTerm) {
     });
 }
 
-function loadCompetitionDataFromURL() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const compressedData = urlParams.get('cd');
-    if (compressedData) {
-        const data = JSON.parse(atob(compressedData));
-        includeRunners = data.r;
-        includeJudges = data.j;
-        competitors = data.c.map(({ id, name, wcaId, events }) => ({
-            id,
-            name,
-            wcaId,
-            events,
-            groupAssignments: {},
-        }));
-        competitionData.groups = Object.fromEntries(
-            Object.entries(data.g).map(([eventId, groups]) => [
-                eventId,
-                groups.map(({ c, j, r, s }) => ({
-                    competitors: c.map((id) => competitors.find((comp) => comp.id === id)),
-                    judges: j.map((id) => competitors.find((comp) => comp.id === id)),
-                    runners: r.map((id) => competitors.find((comp) => comp.id === id)),
-                    scramblers: s.map((id) => competitors.find((comp) => comp.id === id)),
-                })),
-            ]),
-        );
-        selectedEvents = Object.keys(competitionData.groups);
-        generateGroupHTML();
-        document.getElementById('competition-setup').style.display = 'none';
-        document.getElementById('event-selection').style.display = 'none';
-        document.getElementById('competitor-setup').style.display = 'none';
-        document.getElementById('grouping-results').style.display = 'block';
-        document.getElementById('do-runners').checked = competitionData.includeRunners;
-        document.getElementById('do-judges').checked = competitionData.includeJudges;
-    }
-}
-
 document.addEventListener('DOMContentLoaded', () => {
     loadCompetitionDataFromURL();
 });
@@ -643,58 +607,52 @@ async function finalizeCompetitors() {
     generateGroups();
 }
 
-async function sortArray(array, eventId) {
-    // Attach original index to guarantee stability
-    const competitorsWithIndex = array.map((competitor, index) => ({
-        competitor,
-        index,
-        average: null,
-    }));
+// wcaId -> eventId -> average seconds (or null), filled by prefetchAverages().
+let averageCache = {};
 
-    // Fetch averages
-    for (const item of competitorsWithIndex) {
-        const { competitor } = item;
-
-        if (!competitor.wcaId) {
-            item.average = null;
-            continue;
-        }
-
+// One request for every competitor and event instead of one request per competitor and event
+// (60 competitors x 8 events used to be 480 sequential requests, far beyond the API rate limit).
+async function prefetchAverages(competitorList, eventIds) {
+    averageCache = {};
+    const ids = [...new Set(competitorList.map((c) => c.wcaId).filter(Boolean).map((id) => id.toUpperCase()))];
+    for (let i = 0; i < ids.length; i += 300) {
+        const chunk = ids.slice(i, i + 300);
         try {
-            const data = await window.fetchJsonOrThrow(`/api/wca/${competitor.wcaId}/${eventId}`, {
-                errorContext: 'Could not load competitor average',
-            });
-            item.average = data?.average ?? null;
+            const data = await window.fetchJsonOrThrow(
+                `/api/wca/averages?ids=${chunk.join(',')}&events=${eventIds.join(',')}&num=12`,
+                { errorContext: 'Could not load competitor averages' },
+            );
+            Object.assign(averageCache, data?.averages || {});
         } catch (error) {
-            console.error(`Failed to fetch data for ${competitor.wcaId}:`, error);
-            item.average = null;
+            console.error('Failed to fetch averages:', error);
             window.showUserErrorPopup({
                 title: 'Some competitor averages could not be loaded',
                 message:
                     'Grouping continued with fallback ordering because some WCA averages were unavailable.',
                 error,
                 reportTitle: 'Grouping tool failed to load competitor averages',
-                reportContext: `Fetching the average failed for WCA ID ${competitor.wcaId} in event ${eventId}.`,
-                dedupeKey: `grouping-average:${eventId}`,
+                reportContext: `Fetching averages failed for ${chunk.length} WCA IDs.`,
+                dedupeKey: 'grouping-average',
             });
         }
     }
+}
 
-    // Stable sort
-    competitorsWithIndex.sort((a, b) => {
-        const avgA = a.average ?? Number.MAX_VALUE;
-        const avgB = b.average ?? Number.MAX_VALUE;
+function sortArray(array, eventId) {
+    const averageOf = (competitor) => {
+        const value = competitor.wcaId ? averageCache[competitor.wcaId.toUpperCase()]?.[eventId] : null;
+        return Number.isFinite(value) && value > 0 ? value : null; // no usable result -> sorted as slowest
+    };
 
-        if (avgA !== avgB) {
-            return avgA - avgB; // slower → faster or vice versa per your intent
-        }
-
-        // Tie-breaker: original order
-        return a.index - b.index;
-    });
-
-    // Return sorted competitors only
-    return competitorsWithIndex.map((item) => item.competitor);
+    // Stable sort: ties keep the original order
+    return array
+        .map((competitor, index) => ({ competitor, index, average: averageOf(competitor) }))
+        .sort((a, b) => {
+            const avgA = a.average ?? Number.MAX_VALUE;
+            const avgB = b.average ?? Number.MAX_VALUE;
+            return avgA !== avgB ? avgA - avgB : a.index - b.index; // fastest first
+        })
+        .map((item) => item.competitor);
 }
 
 function shuffleArray(array) {
@@ -707,6 +665,7 @@ function shuffleArray(array) {
 
 async function generateGroups() {
     competitionData.groups = {}; // Reset groups data
+    await prefetchAverages(competitors, selectedEvents);
 
     for (const eventId of selectedEvents) {
         const maxCompetitors = competitionData.maxCompetitors;
@@ -714,8 +673,8 @@ async function generateGroups() {
         // Competitors in this event
         let eventCompetitors = competitors.filter((c) => c.events.includes(eventId));
 
-        // Sort by slowest time first
-        eventCompetitors = await sortArray(eventCompetitors, eventId);
+        // Fastest first (competitors without a usable average come last)
+        eventCompetitors = sortArray(eventCompetitors, eventId);
 
         const dynamicCheckbox = document.getElementById(`dynamic-group-${eventId}`);
         let numGroups;
@@ -747,8 +706,6 @@ async function generateGroups() {
         const sortTypeSelect = document.getElementById(`competitor-sort-type-${eventId}`);
         const sortType = sortTypeSelect?.value ?? 'Round Robin';
 
-        console.log(eventCompetitors);
-
         if (sortType === 'Round Robin') {
             eventCompetitors.forEach((competitor, index) => {
                 const groupIndex = numGroups - 1 - (index % numGroups);
@@ -757,15 +714,16 @@ async function generateGroups() {
                 competitor.groupAssignments[eventId] = groupIndex + 1;
             });
         } else if (sortType === 'Linear') {
-            eventCompetitors.reverse();
-            // slowest → fastest, straight fill
-            let numPerGroup = Math.ceil(eventCompetitors.length / numGroups);
+            // slowest → fastest, straight fill. Work on a copy: reversing eventCompetitors in place also
+            // reversed the pool the scramblers are picked from (it must stay fastest-first).
+            const slowestFirst = [...eventCompetitors].reverse();
+            let numPerGroup = Math.ceil(slowestFirst.length / numGroups);
 
             for (let i = 0; i < numGroups; i++) {
                 for (let j = 0; j < numPerGroup; j++) {
                     const competitorIndex = i * numPerGroup + j;
-                    if (competitorIndex >= eventCompetitors.length) break;
-                    const competitor = eventCompetitors[competitorIndex];
+                    if (competitorIndex >= slowestFirst.length) break;
+                    const competitor = slowestFirst[competitorIndex];
                     eventGroups[i].competitors.push(competitor);
                     competitor.groupAssignments ??= {};
                     competitor.groupAssignments[eventId] = i + 1;
@@ -1494,7 +1452,7 @@ function storeCompetitionDataInURL() {
 
         const index = Object.fromEntries(competitors.map((c, i) => [c.id, i]));
 
-        const comp = competitors.map((c) => [c.id, c.name, c.events || []]);
+        const comp = competitors.map((c) => [c.id, c.name, c.events || [], c.wcaId || null]);
 
         const groups = {};
         Object.entries(competitionData.groups || {}).forEach(([eid, gs]) => {
@@ -1507,7 +1465,9 @@ function storeCompetitionDataInURL() {
         });
 
         const json = JSON.stringify([flags, comp, groups]);
-        const encoded = btoa(json).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        // btoa() throws on anything outside Latin-1 (e.g. Chinese or Cyrillic names), which silently
+        // disabled the shareable URL for those competitions.
+        const encoded = CubingCore.encodeBase64Url(json);
 
         const url = new URL(location.href);
         url.searchParams.set('cd', encoded);
@@ -1523,16 +1483,19 @@ function loadCompetitionDataFromURL() {
             new URLSearchParams(location.search).get('cd') || location.hash.replace(/^#cd=/, '');
         if (!cd) return false;
 
-        const json = atob(cd.replace(/-/g, '+').replace(/_/g, '/'));
+        const json = CubingCore.decodeBase64Url(cd);
         const [flags, comp, groups] = JSON.parse(json);
 
         includeRunners = !!(flags & 1);
         includeJudges = !!(flags & 2);
 
-        competitors = comp.map(([id, name, events]) => ({
+        competitors = comp.map(([id, name, events, wcaId]) => ({
             id,
             name,
+            wcaId: wcaId || undefined,
             events: events || [],
+            // The saved name is authoritative (it may have been edited by hand): do not re-fetch it from the WCA.
+            nameFetched: true,
             groupAssignments: {},
         }));
 

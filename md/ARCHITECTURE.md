@@ -88,3 +88,27 @@ location /                                       { proxy_pass http://127.0.0.1:8
   used and can be deleted afterwards.
 * Admin → "update WCA data" now writes a request file that the jobs process picks up (≤ 2 s); progress and the
   last error appear in `/api/admin/wca-metadata` (`refreshState`, `refreshProgress`, `lastError`).
+
+## One implementation of the cubing arithmetic
+
+`public/js/cubingCore.js` is the only place that parses and formats times, applies the WCA averaging rules
+(Ao5 with one tolerated DNF, Mo3, 5 % trimming for longer averages), lists the Mean-of-3 events, rolls averages over
+a solve list, escapes HTML and encodes URL state. The tools load it as a classic script (`window.CubingCore`) and the
+backend evaluates the same file (`backend/lib/cubing-core.js`), so a value computed in a browser and the same value
+computed by the API cannot disagree. All averages are computed in integer centiseconds (what the WCA uses).
+
+Rules worth knowing (all covered by `backend/tests/cubing-core.test.js`):
+
+| Rule | Behaviour |
+|------|-----------|
+| Mo3 events | 666, 777, 333bf, 444bf, 555bf, 333fm - everything else with an average is Ao5 |
+| Ao5 | best and worst dropped; one DNF is allowed (it is the dropped worst); two DNFs = DNF |
+| Mo3 | plain mean; any DNF = DNF |
+| Ao*n* (n > 5) | 5 % (at least 1) dropped from each end: 12 -> 1+1, 25 -> 2+2, 100 -> 5+5 |
+| Rounding | to the nearest centisecond; `59.996` is shown as `1:00.00`, never `60.00` |
+
+## API additions used by the tools
+
+* `GET /api/wca/averages?ids=A,B&events=333,222&num=12` - averages for many competitors and events in one request
+  (`null` when there are fewer than 3 solves). Grouping and Guildford use it instead of one request per event.
+* `GET /api/wca/:id/:event?getsolves=true&dnf=1` - like `getsolves`, but DNFs stay in place as `-1`.
