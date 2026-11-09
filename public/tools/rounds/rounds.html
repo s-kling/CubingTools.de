@@ -67,75 +67,78 @@
         <main>
             <section class="heading">
                 <div class="scout-root">
-                
-                <!-- Page heading -->
-                <div class="scout-header">
-                    <h1>WCA Competition Round Analyzer</h1>
-                    <p>Search competitions, explore rounds, and see statistical competitor rankings — including live updates during ongoing events.</p>
-                </div>
-                
-                <!-- Search + country filter -->
-                <div class="scout-search-row">
-                    <div class="scout-search-wrap">
-                    <svg class="scout-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                    </svg>
-                    <input
-                        id="scoutSearch"
-                        class="scout-search-input"
-                        type="text"
-                        placeholder="Search by name or city…"
-                        autocomplete="off"
-                        spellcheck="false"
-                    />
-                    <button class="scout-search-clear" id="scoutSearchClear" aria-label="Clear search">✕</button>
+                    <header class="scout-header">
+                        <div class="scout-header-copy">
+                            <span class="scout-kicker">Competition insights</span>
+                            <h1>WCA Competition Round Analyzer</h1>
+                            <p>Search competitions, compare event rounds, and monitor rankings as each competition unfolds.</p>
+                        </div>
+                    </header>
+
+                    <div class="scout-toolbar" aria-label="Competition search and filters">
+                        <div class="scout-search-row">
+                            <div class="scout-search-wrap">
+                                <svg class="scout-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                </svg>
+                                <input
+                                    id="scoutSearch"
+                                    class="scout-search-input"
+                                    type="text"
+                                    placeholder="Search by name or city…"
+                                    autocomplete="off"
+                                    spellcheck="false"
+                                />
+                                <button class="scout-search-clear" id="scoutSearchClear" aria-label="Clear search">✕</button>
+                            </div>
+
+                            <label class="scout-country-wrap" for="scoutCountry">
+                                <span class="scout-country-label">Country</span>
+                                <select id="scoutCountry" class="scout-country-select" aria-label="Filter by country">
+                                    <option value="">All countries</option>
+                                    <option value="DE">🇩🇪 Germany</option>
+                                    <option value="AT">🇦🇹 Austria</option>
+                                    <option value="CH">🇨🇭 Switzerland</option>
+                                    <option value="US">🇺🇸 USA</option>
+                                    <option value="GB">🇬🇧 UK</option>
+                                    <option value="FR">🇫🇷 France</option>
+                                    <option value="NL">🇳🇱 Netherlands</option>
+                                    <option value="PL">🇵🇱 Poland</option>
+                                    <option value="CN">🇨🇳 China</option>
+                                    <option value="JP">🇯🇵 Japan</option>
+                                    <option value="AU">🇦🇺 Australia</option>
+                                    <option value="BR">🇧🇷 Brazil</option>
+                                    <option value="CA">🇨🇦 Canada</option>
+                                    <option value="ES">🇪🇸 Spain</option>
+                                    <option value="IT">🇮🇹 Italy</option>
+                                    <option value="SE">🇸🇪 Sweden</option>
+                                    <option value="CZ">🇨🇿 Czechia</option>
+                                </select>
+                            </label>
+                        </div>
                     </div>
-                    <select id="scoutCountry" class="scout-country-select" aria-label="Filter by country">
-                        <option value="">🌍 All countries</option>
-                        <option value="DE">🇩🇪 Germany</option>
-                        <option value="AT">🇦🇹 Austria</option>
-                        <option value="CH">🇨🇭 Switzerland</option>
-                        <option value="US">🇺🇸 USA</option>
-                        <option value="GB">🇬🇧 UK</option>
-                        <option value="FR">🇫🇷 France</option>
-                        <option value="NL">🇳🇱 Netherlands</option>
-                        <option value="PL">🇵🇱 Poland</option>
-                        <option value="CN">🇨🇳 China</option>
-                        <option value="JP">🇯🇵 Japan</option>
-                        <option value="AU">🇦🇺 Australia</option>
-                        <option value="BR">🇧🇷 Brazil</option>
-                        <option value="CA">🇨🇦 Canada</option>
-                        <option value="ES">🇪🇸 Spain</option>
-                        <option value="IT">🇮🇹 Italy</option>
-                        <option value="SE">🇸🇪 Sweden</option>
-                        <option value="CZ">🇨🇿 Czechia</option>
-                    </select>
-                </div>
-                
-                <!-- Filter chips -->
-                <div class="scout-filters">
-                    <button class="scout-chip active" data-filter="all">All</button>
-                    <button class="scout-chip" data-filter="ongoing">🟢 Live now</button>
-                    <button class="scout-chip" data-filter="upcoming">Upcoming</button>
-                </div>
-                
-                <!-- Results list -->
-                <div id="scoutResults" class="scout-results">
-                    <div class="scout-loading"><div class="scout-spinner"></div>Loading competitions…</div>
-                    <button class="scout-comp-card" data-id="HessenOpen2026" aria-label="Hessen Open 2026">
-                        <span class="scout-status-dot"></span>
-                        <span class="scout-comp-info">
-                            <span class="scout-comp-name">Hessen Open 2026</span>
-                            <span class="scout-comp-meta">
-                            <span>🇩🇪 Lampertheim-Hofheim</span>
-                            <span>16 May 2026 – 17 May 2026</span>
-                            
+
+                    <div class="scout-filters" aria-label="Competition status filters">
+                        <button class="scout-chip active" data-filter="all">All</button>
+                        <button class="scout-chip" data-filter="ongoing">Live now</button>
+                        <button class="scout-chip" data-filter="upcoming">Upcoming</button>
+                    </div>
+
+                    <div id="scoutResults" class="scout-results" aria-live="polite">
+                        <div class="scout-loading"><div class="scout-spinner"></div>Loading competitions…</div>
+                        <button class="scout-comp-card" data-id="HessenOpen2026" aria-label="Hessen Open 2026">
+                            <span class="scout-status-dot"></span>
+                            <span class="scout-comp-info">
+                                <span class="scout-comp-name">Hessen Open 2026</span>
+                                <span class="scout-comp-meta">
+                                    <span>🇩🇪 Lampertheim-Hofheim</span>
+                                    <span>16 May 2026 – 17 May 2026</span>
+                                </span>
                             </span>
-                        </span>
-                        <span class="scout-comp-arrow">›</span>
+                            <span class="scout-comp-arrow" aria-hidden="true">›</span>
                         </button>
-                </div>
-                
+                    </div>
                 </div><!-- /.scout-root -->
 
             <div class="scout-backdrop" id="scoutBackdrop"></div>

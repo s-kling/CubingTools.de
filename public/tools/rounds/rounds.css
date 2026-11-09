@@ -5,7 +5,6 @@
     padding: 0;
 }
 
-/* Undo the global ul bullet styles inside our component */
 .scout-root ul {
     list-style: none;
     background: none;
@@ -28,31 +27,117 @@
     background: none;
 }
 
-/* Undo global button reset inside our component */
 .scout-root button {
     font-family: var(--font-main);
     font-size: var(--font-size-base);
     cursor: pointer;
-    background: none;
     border: none;
     color: inherit;
-    padding: 0;
-    transition: none;
+    transition: all 0.15s ease;
 }
-.scout-root button:hover { background: none; color: inherit; }
 
-/* ── Root wrapper ──────────────────────────────────────────── */
+.scout-root button:hover { 
+    color: inherit;
+}
+
 .scout-root {
-    font-family: var(--font-main);
-    color: var(--main-text);
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
     width: 100%;
+    color: var(--main-text);
+    font-family: var(--font-main);
 }
 
-/* ── Search bar ────────────────────────────────────────────── */
+.scout-header {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 1rem;
+    padding: 1.5rem 1.5rem 1.25rem;
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.12), transparent 42%), var(--secondary-background);
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+}
+
+.scout-header::before {
+    content: "";
+    position: absolute;
+    inset: -30% auto auto -10%;
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(63, 167, 214, 0.22), transparent 68%);
+    pointer-events: none;
+}
+
+.scout-header-copy,
+.scout-header-meta {
+    position: relative;
+    z-index: 1;
+}
+
+.scout-header-copy {
+    flex: 1;
+    min-width: 0;
+}
+
+.scout-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.35rem 0.7rem;
+    margin-bottom: 0.75rem;
+    border: 1px solid rgba(79, 70, 229, 0.35);
+    border-radius: 999px;
+    background: rgba(79, 70, 229, 0.08);
+    color: var(--link-color);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.scout-header h1 {
+    margin: 0;
+    font-size: clamp(2rem, 2.5vw, 2.8rem);
+    line-height: 1.1;
+    color: var(--main-text);
+    letter-spacing: -0.04em;
+}
+
+.scout-header p {
+    margin-top: 0.65rem;
+    max-width: 52rem;
+    color: var(--secondary-text);
+    line-height: 1.55;
+    font-size: 0.98rem;
+}
+
+.scout-header-meta {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(100px, 1fr));
+    gap: 0.75rem;
+    min-width: 220px;
+}
+
+.scout-toolbar {
+    display: flex;
+    gap: 0.75rem;
+    padding: 1rem;
+    border-radius: 16px;
+    border: 1px solid var(--card-border);
+    background: rgba(255, 255, 255, 0.02);
+    box-shadow: var(--shadow-sm);
+}
+
 .scout-search-row {
     display: flex;
-    gap: var(--space-sm);
-    margin: var(--space-sm) 0;
+    gap: 0.75rem;
+    width: 100%;
     flex-wrap: wrap;
 }
 
@@ -64,34 +149,34 @@
 
 .scout-search-icon {
     position: absolute;
-    left: var(--space-sm);
+    left: calc(0.9rem - 8px);
     top: 50%;
     transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
     color: var(--secondary-text);
-    width: 16px;
-    height: 16px;
     pointer-events: none;
-    flex-shrink: 0;
 }
 
+/* No clue why global.css is overriding this part of the input css */
+/* Should be fine to handle it like this */
 .scout-search-input {
-    width: 100%;
-    padding: var(--space-xs) var(--space-md) var(--space-xs) calc(var(--space-sm) * 3);
-    background: var(--input-background);
-    border: 1px solid var(--input-border);
-    border-radius: var(--main-radius);
-    color: var(--main-text);
-    font-family: var(--font-main);
-    font-size: var(--font-size-base);
-    outline: none;
-    transition: border-color 0.2s;
+    width: 100% !important; 
+    min-height: 48px !important;
+    padding: 0.8rem 2.9rem 0.8rem 2.8rem !important;
+    margin: 0 !important;
+    border: 1px solid var(--input-border) !important;
+    border-radius: 14px !important;
+    background: var(--input-background) !important;
+    color: var(--main-text) !important;
+    font-family: var(--font-main) !important;
+    font-size: 0.98rem !important;
+    outline: none !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease !important;
 }
-
-.scout-search-input
 
 .scout-search-input::placeholder {
     color: var(--secondary-text);
-    padding-left: 14px;
 }
 
 .scout-search-input:focus {
@@ -105,82 +190,107 @@
 
 .scout-search-clear {
     position: absolute;
-    right: var(--space-sm);
+    right: 0.75rem;
     top: 50%;
     transform: translateY(-50%);
-    color: var(--secondary-text);
-    font-size: 0.9rem;
-    line-height: 1;
     display: none;
-    padding: 2px;
-    cursor: pointer;
-    transition: color 0.15s;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    color: var(--secondary-text);
+    font-size: 0.8rem;
+    line-height: 1;
+    padding: 0;
 }
 
 .scout-search-clear:hover {
     color: var(--main-text) !important;
+    background: var(--subtle-hover) !important;
+}
+
+.scout-country-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 0.5rem 0.65rem 0.5rem 0.8rem;
+    background: rgba(255, 255, 255, 0.02);
+    min-width: 185px;
+}
+
+.scout-country-label {
+    color: var(--secondary-text);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
 }
 
 .scout-country-select {
-    padding: var(--space-xs) var(--space-sm);
+    appearance: none;
     background: var(--input-background);
     border: 1px solid var(--input-border);
-    border-radius: var(--main-radius);
+    border-radius: 10px;
     color: var(--main-text);
     font-family: var(--font-main);
-    font-size: var(--font-size-base);
+    font-size: 0.94rem;
     outline: none;
     cursor: pointer;
-    min-width: 150px;
+    min-width: 120px;
+    padding: 0.65rem 2.2rem 0.65rem 0.8rem;
+    background-image: linear-gradient(45deg, transparent 50%, var(--secondary-text) 50%), linear-gradient(135deg, var(--secondary-text) 50%, transparent 50%);
+    background-position: calc(100% - 18px) calc(50% - 2px), calc(100% - 12px) calc(50% - 2px);
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
 }
 
 .scout-country-select:focus {
     border-color: var(--link-color);
+    box-shadow: 0 0 0 3px rgba(63, 167, 214, 0.12);
 }
 
-/* ── Filter chips ──────────────────────────────────────────── */
 .scout-filters {
     display: flex;
-    gap: var(--space-xs);
+    gap: 0.5rem;
     flex-wrap: wrap;
-    margin-bottom: var(--space-md);
+    margin-top: 0.2rem;
 }
 
 .scout-chip {
-    padding: var(--space-xxs) var(--space-sm);
-    font-size: 0.82rem;
-    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.52rem 0.9rem;
     border: 1px solid var(--card-border);
+    border-radius: 999px;
     background: var(--subtle-hover);
     color: var(--secondary-text);
-    cursor: pointer;
-    transition: all 0.15s;
+    font-size: 0.82rem;
+    font-weight: 600;
+    transition: all 0.15s ease;
     white-space: nowrap;
-    font-family: var(--font-main);
 }
 
 .scout-chip:hover {
-    border-color: var(--link-color);
-    color: var(--link-color);
-    border-radius: var(--main-radius);
-    background-color: var(--hover-background);
-    transition: all 0.15s ease-in-out;
+    transform: translateY(-1px);
 }
 
 .scout-chip.active {
-    background: var(--button-background);
-    border-color: var(--button-background);
+    background: linear-gradient(135deg, var(--button-background), rgba(79, 70, 229, 0.84));
+    border-color: transparent;
     color: var(--button-color);
+    box-shadow: 0 10px 18px rgba(79, 70, 229, 0.22);
 }
 
-/* ── Loading / empty states ────────────────────────────────── */
 .scout-loading {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-lg) var(--space-md);
+    gap: 0.75rem;
+    padding: 1.2rem 1rem;
     color: var(--secondary-text);
-    font-size: var(--font-size-base);
+    font-size: 0.96rem;
 }
 
 .scout-spinner {
@@ -196,53 +306,54 @@
 @keyframes scout-spin { to { transform: rotate(360deg); } }
 
 .scout-empty {
-    padding: var(--space-lg) var(--space-md);
+    padding: 1.5rem 1rem;
     color: var(--secondary-text);
     text-align: center;
-    font-size: var(--font-size-base);
+    font-size: 0.98rem;
+    border: 1px dashed var(--card-border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.015);
 }
 
-/* ── Competition cards list ────────────────────────────────── */
 .scout-results {
     display: flex;
     flex-direction: column;
-    gap: var(--space-xs);
+    gap: 0.75rem;
 }
 
 .scout-comp-card {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-sm) var(--space-md);
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: var(--main-radius);
-    cursor: pointer;
-    transition: transform 0.3s ease-in;
-    text-align: left;
+    gap: 0.8rem;
     width: 100%;
-    font-family: var(--font-main);
+    padding: 5px 15px;
+    text-align: left;
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0.01));
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
 }
 
 .scout-comp-card:hover {
-    background: var(--hover-background);
-    border-color: var(--link-color);
-    transform: translateX(3px);
+    background: rgba(79, 70, 229, 0.04);
+    border-color: rgba(63, 167, 214, 0.45);
+    transform: translateY(-1px);
 }
 
 .scout-status-dot {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
     background: var(--secondary-text);
     flex-shrink: 0;
-    opacity: 0.4;
+    opacity: 0.45;
 }
 
 .scout-status-dot.live {
     background: var(--success);
     opacity: 1;
-    box-shadow: 0 0 6px var(--success);
+    box-shadow: 0 0 8px rgba(46, 204, 113, 0.8);
     animation: scout-pulse 2s infinite;
 }
 
@@ -251,36 +362,44 @@
     50% { opacity: 0.35; }
 }
 
-.scout-comp-info { flex: 1; min-width: 0; }
+.scout-comp-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
 
 .scout-comp-name {
-    font-size: var(--font-size-base);
-    font-weight: 500;
     color: var(--main-text);
+    font-size: 1.04rem;
+    font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .scout-comp-meta {
-    font-size: 0.8rem;
-    color: var(--secondary-text);
-    margin-top: 2px;
     display: flex;
-    gap: var(--space-sm);
     flex-wrap: wrap;
+    gap: 0.55rem;
+    align-items: center;
+    color: var(--secondary-text);
+    font-size: 0.8rem;
+    line-height: 1.4;
 }
 
 .scout-live-label {
     color: var(--color-success-text);
-    font-weight: 600;
-    font-size: 0.78rem;
+    font-weight: 700;
+    font-size: 0.74rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
 }
 
 .scout-comp-arrow {
     color: var(--secondary-text);
-    font-size: 1.1rem;
-    transition: color 0.15s;
+    font-size: 1.25rem;
     flex-shrink: 0;
 }
 
@@ -288,43 +407,38 @@
     color: var(--link-color);
 }
 
-/* ── LIVE badge (inline) ───────────────────────────────────── */
 .scout-live-badge {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    background: color-mix(in srgb, var(--success) 10%, transparent);
-    border: 1px solid color-mix(in srgb, var(--success) 25%, transparent);
-    color: var(--color-success-text);
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.07em;
-    padding: 2px 8px;
+    gap: 6px;
+    padding: 0.2rem 0.55rem;
+    border: 1px solid rgba(46, 204, 113, 0.25);
     border-radius: 999px;
+    background: rgba(46, 204, 113, 0.08);
+    color: var(--color-success-text);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    vertical-align: middle;
 }
 
 .scout-live-badge::before {
-    content: '';
-    width: 5px;
-    height: 5px;
+    content: "";
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     background: var(--success);
     animation: scout-pulse 2s infinite;
 }
 
-/* ══════════════════════════════════════════════════════════════
-   COMPETITION DRAWER (right-side panel)
-   ══════════════════════════════════════════════════════════════ */
 .scout-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.65);
+    background: rgba(0, 0, 0, 0.7);
     z-index: 1080;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.25s;
+    transition: opacity 0.2s ease;
 }
 
 .scout-backdrop.open {
@@ -342,7 +456,7 @@
     right: 0;
     bottom: 0;
     width: min(520px, 100vw);
-    background: var(--secondary-background);
+    background: linear-gradient(180deg, var(--secondary-background), rgba(25, 25, 35, 0.98));
     border-left: 1px solid var(--card-border);
     z-index: 1081;
     transform: translateX(100%);
@@ -358,30 +472,33 @@
 }
 
 .scout-drawer-head {
-    padding: var(--space-md);
+    padding: 1rem 1.1rem;
     border-bottom: 1px solid var(--card-border);
-    background: var(--main-lighter);
+    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
     display: flex;
-    gap: var(--space-sm);
+    gap: 0.75rem;
     align-items: flex-start;
     flex-shrink: 0;
 }
 
-.scout-drawer-head-info { flex: 1; min-width: 0; }
+.scout-drawer-head-info {
+    flex: 1;
+    min-width: 0;
+}
 
 .scout-drawer-title {
-    font-size: var(--font-size-lg);
-    font-weight: 600;
+    font-size: 1.2rem;
+    font-weight: 700;
     color: var(--main-text);
-    margin-bottom: 4px;
-    line-height: 1.3;
+    line-height: 1.25;
+    margin-bottom: 0.25rem;
 }
 
 .scout-drawer-meta {
-    font-size: 0.8rem;
+    font-size: 0.76rem;
     color: var(--secondary-text);
     display: flex;
-    gap: var(--space-sm);
+    gap: 0.5rem;
     flex-wrap: wrap;
     align-items: center;
 }
@@ -390,8 +507,8 @@
     background: var(--subtle-hover) !important;
     border: 1px solid var(--card-border) !important;
     color: var(--secondary-text) !important;
-    border-radius: var(--main-radius) !important;
-    padding: var(--space-xxs) var(--space-xs) !important;
+    border-radius: 10px !important;
+    padding: 0.45rem 0.6rem !important;
     font-size: 1rem !important;
     line-height: 1 !important;
     flex-shrink: 0;
@@ -406,7 +523,7 @@
 .scout-drawer-body {
     flex: 1;
     overflow-y: auto;
-    padding: var(--space-md);
+    padding: 1rem;
     scroll-behavior: smooth;
 }
 
@@ -416,56 +533,56 @@
     border-radius: 2px;
 }
 
-/* ── Event accordion blocks ────────────────────────────────── */
 .scout-events-list {
     display: flex;
     flex-direction: column;
-    gap: var(--space-sm);
+    gap: 0.8rem;
 }
 
 .scout-event-block {
     border: 1px solid var(--card-border);
-    border-radius: var(--main-radius);
+    border-radius: 14px;
     overflow: hidden;
+    background: rgba(255, 255, 255, 0.015);
 }
 
 .scout-event-header {
-    padding: var(--space-xs) var(--space-sm);
-    background: var(--main-lighter);
+    padding: 0.7rem 0.8rem;
+    background: rgba(255, 255, 255, 0.03);
     display: flex;
     align-items: center;
-    gap: var(--space-xs);
-    font-size: var(--font-size-base);
-    font-weight: 500;
+    gap: 0.5rem;
+    font-size: 0.96rem;
+    font-weight: 600;
     color: var(--main-text);
     border-bottom: 1px solid var(--card-border);
 }
 
 .scout-event-icon {
-    font-size: 1rem;
+    font-size: 0.95rem;
     flex-shrink: 0;
 }
 
 .scout-rounds-list {
-    padding: var(--space-xs);
+    padding: 0.55rem;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 0.45rem;
 }
 
 .scout-round-btn {
     width: 100%;
-    padding: var(--space-xs) var(--space-sm);
+    padding: 0.7rem 0.8rem;
     background: var(--card-bg) !important;
     border: 1px solid var(--card-border) !important;
-    border-radius: var(--main-radius) !important;
+    border-radius: 12px !important;
     color: var(--secondary-text) !important;
     font-size: 0.85rem !important;
     text-align: left;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-xs);
+    gap: 0.5rem;
     transition: all 0.15s !important;
     cursor: pointer;
 }
@@ -473,21 +590,18 @@
 .scout-round-btn:hover {
     border-color: var(--link-color) !important;
     color: var(--main-text) !important;
-    background: var(--hover-background) !important;
+    background: rgba(79, 70, 229, 0.05) !important;
 }
 
 .scout-round-label {
-    font-weight: 500;
+    font-weight: 600;
 }
 
 .scout-round-meta {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     color: var(--secondary-text);
 }
 
-/* ══════════════════════════════════════════════════════════════
-   ROUND ANALYSIS OVERLAY (slides over the drawer)
-   ══════════════════════════════════════════════════════════════ */
 .scout-overlay {
     position: fixed;
     inset: 0;
@@ -508,7 +622,7 @@
     right: 0;
     bottom: 0;
     width: min(680px, 100vw);
-    background: var(--secondary-background);
+    background: linear-gradient(180deg, var(--secondary-background), rgba(25, 25, 35, 0.98));
     border-left: 1px solid var(--card-border);
     box-shadow: -12px 0 40px rgba(0, 0, 0, 0.45);
     transform: translateX(100%);
@@ -527,12 +641,12 @@
 }
 
 .scout-overlay-head {
-    padding: var(--space-sm) var(--space-md);
+    padding: 0.8rem 1rem;
     border-bottom: 1px solid var(--card-border);
-    background: var(--main-lighter);
+    background: rgba(255, 255, 255, 0.03);
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
+    gap: 0.75rem;
     flex-shrink: 0;
 }
 
@@ -540,23 +654,22 @@
     background: var(--subtle-hover) !important;
     border: 1px solid var(--card-border) !important;
     color: var(--secondary-text) !important;
-    border-radius: var(--main-radius) !important;
-    padding: var(--space-xxs) var(--space-xs) !important;
-    font-size: 1rem !important;
-    line-height: 1.2 !important;
+    border-radius: 10px !important;
+    padding: 0.45rem 0.7rem !important;
+    font-size: 0.9rem !important;
     transition: all 0.15s !important;
 }
 
 .scout-back-btn:hover {
     border-color: var(--link-color) !important;
     color: var(--link-color) !important;
-    background: color-mix(in srgb, var(--link-color) 8%, transparent) !important;
+    background: rgba(63, 167, 214, 0.08) !important;
 }
 
 .scout-overlay-title {
     flex: 1;
-    font-size: var(--font-size-lg);
-    font-weight: 600;
+    font-size: 1.1rem;
+    font-weight: 700;
     color: var(--main-text);
     white-space: nowrap;
     overflow: hidden;
@@ -567,20 +680,17 @@
     background: var(--subtle-hover) !important;
     border: 1px solid var(--card-border) !important;
     color: var(--secondary-text) !important;
-    border-radius: var(--main-radius) !important;
-    padding: var(--space-xxs) var(--space-sm) !important;
-    font-size: 0.8rem !important;
-    font-weight: 500 !important;
+    border-radius: 10px !important;
+    padding: 0.5rem 0.7rem !important;
     display: flex !important;
     align-items: center;
-    gap: 5px;
-    transition: all 0.15s !important;
+    gap: 0.35rem;
     white-space: nowrap;
 }
 
 .scout-refresh-btn:hover {
     border-color: var(--link-color) !important;
-    color: var(--link-color) !important;
+    color: var(--main-text) !important;
 }
 
 .scout-refresh-btn.spinning .scout-refresh-icon {
@@ -590,7 +700,7 @@
 .scout-overlay-body {
     flex: 1;
     overflow-y: auto;
-    padding: var(--space-md);
+    padding: 1rem;
 }
 
 .scout-overlay-body::-webkit-scrollbar { width: 4px; }
@@ -599,30 +709,31 @@
     border-radius: 2px;
 }
 
-/* ── Analysis meta pills ───────────────────────────────────── */
 .scout-analysis-pills {
     display: flex;
-    gap: var(--space-xs);
+    gap: 0.45rem;
     flex-wrap: wrap;
-    margin-bottom: var(--space-md);
+    margin-bottom: 1rem;
 }
 
 .scout-pill {
-    padding: var(--space-xxs) var(--space-sm);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.35rem 0.7rem;
     background: var(--subtle-hover);
     border: 1px solid var(--card-border);
     border-radius: 999px;
-    font-size: 0.78rem;
+    font-size: 0.76rem;
     color: var(--secondary-text);
 }
 
 .scout-pill strong {
     color: var(--main-text);
-    font-weight: 600;
-    margin-left: 4px;
+    font-weight: 700;
+    margin-left: 0.2rem;
 }
 
-/* ── Row states ────────────────────────────────────────────── */
 .scout-pending-row td {
     opacity: 0.55;
 }
@@ -652,26 +763,26 @@
 .scout-unranked-row {
     display: flex;
     align-items: center;
-    gap: var(--space-xs);
-    padding: var(--space-xxs) var(--space-sm);
+    gap: 0.5rem;
+    padding: 0.35rem 0.6rem;
     font-size: 0.8rem;
     color: var(--secondary-text);
     opacity: 0.4;
 }
 
 .scout-update-note {
-    font-size: 0.75rem;
+    margin: 0 0 0.7rem;
+    font-size: 0.74rem;
     color: var(--secondary-text);
     text-align: right;
-    margin-bottom: var(--space-sm);
-    opacity: 0.7;
+    opacity: 0.8;
 }
 
-/* ── Competitors table ─────────────────────────────────────── */
 .scout-table-wrap {
     overflow-x: auto;
     border: 1px solid var(--card-border);
-    border-radius: var(--main-radius);
+    border-radius: 14px;
+    background: rgba(255,255,255,0.015);
 }
 
 .scout-table {
@@ -681,7 +792,7 @@
 }
 
 .scout-table thead tr {
-    background: var(--main-lighter);
+    background: rgba(255,255,255,0.02);
     border-bottom: 1px solid var(--card-border);
 }
 
@@ -689,16 +800,15 @@
     padding: 0;
     text-transform: uppercase;
     text-align: left;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 700;
-    letter-spacing: 0.07em;
+    letter-spacing: 0.08em;
     color: var(--secondary-text);
     white-space: nowrap;
     background: transparent;
     border: 0 !important;
     outline: none;
     font-family: var(--font-main);
-    /* Move slightly to the left*/
     transform: translateX(-8px);
 }
 
@@ -709,12 +819,12 @@
 }
 
 .scout-table th {
-    padding: var(--space-xs) var(--space-sm);
+    padding: 0.7rem 0.75rem;
     text-align: left;
-    font-size: 0.75rem;
-    font-weight: 700;
+    font-size: 0.71rem;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.07em;
+    letter-spacing: 0.08em;
     color: var(--secondary-text);
     white-space: nowrap;
 }
@@ -724,7 +834,7 @@
 .scout-table tbody tr {
     border-bottom: 1px solid var(--card-border);
     cursor: pointer;
-    transition: background 0.1s;
+    transition: background 0.1s ease;
 }
 
 .scout-table tbody tr:last-child {
@@ -732,7 +842,7 @@
 }
 
 .scout-table tbody tr:hover {
-    background: var(--hover-background);
+    background: rgba(79,70,229,0.03);
 }
 
 .scout-table tbody tr.scout-unranked {
@@ -745,14 +855,13 @@
 }
 
 .scout-table td {
-    padding: var(--space-xs) var(--space-sm);
+    padding: 0.7rem 0.75rem;
     vertical-align: middle;
     color: var(--main-text);
 }
 
 .scout-table td.r { text-align: right; }
 
-/* ── Rank badge ────────────────────────────────────────────── */
 .scout-rank {
     display: inline-flex;
     align-items: center;
@@ -761,100 +870,90 @@
     height: 24px;
     border-radius: 50%;
     font-size: 0.72rem;
-    font-weight: 600;
-    background: var(--main-lighter);
+    font-weight: 700;
+    background: rgba(255,255,255,0.04);
     color: var(--secondary-text);
 }
 
 .scout-rank.gold {
-    background: color-mix(in srgb, var(--warning) 20%, transparent);
+    background: rgba(243, 156, 18, 0.14);
     color: var(--warning);
 }
 
 .scout-rank.silver {
-    background: color-mix(in srgb, var(--secondary-text) 20%, transparent);
+    background: rgba(161, 161, 170, 0.18);
     color: var(--secondary-text);
 }
 
 .scout-rank.bronze {
-    background: color-mix(in srgb, var(--color-warning-text) 15%, transparent);
+    background: rgba(246, 193, 92, 0.14);
     color: var(--color-warning-text);
 }
 
-/* ── Monospace time ────────────────────────────────────────── */
 .scout-time {
     font-family: 'Courier New', Courier, monospace;
     font-size: 0.85rem;
     color: var(--main-text);
-    font-weight: 500;
-}
-
-/* Actual (live) result — shown in success green */
-.scout-time.live {
-    color: var(--success);
     font-weight: 600;
 }
 
-/* Row that contains a real competition result */
-.scout-ranked-row.has-real-result {
-    background: color-mix(in srgb, var(--success) 4%, transparent);
-}
-
-/* ── Advancement indicators ──────────────────────────────── */
-
-/* Ranks 4+ that are expected to (or did) advance */
-.scout-rank.advancing {
-    background: color-mix(in srgb, var(--success) 18%, transparent);
+.scout-time.live {
     color: var(--success);
 }
 
-/* Competitor who didn't participate when others in the round did */
+.scout-ranked-row.has-real-result {
+    background: rgba(46, 204, 113, 0.04);
+}
+
+.scout-rank.advancing {
+    background: rgba(46, 204, 113, 0.16);
+    color: var(--success);
+}
+
 .scout-rank.inactive {
-    background: var(--main-lighter);
+    background: rgba(255,255,255,0.04);
     color: var(--secondary-text);
     opacity: 0.55;
 }
+
 .scout-ranked-row.inactive-row {
     opacity: 0.6;
 }
 
-/* Dashed cutoff line after the last advancing row */
 .scout-ranked-row.last-advancing td {
-    border-bottom: 2px dashed color-mix(in srgb, var(--success) 55%, transparent);
+    border-bottom: 2px dashed rgba(46, 204, 113, 0.5);
 }
 
-/* ── Probability bar ───────────────────────────────────────── */
 .scout-prob-wrap {
     display: flex;
     align-items: center;
-    gap: var(--space-xs);
+    gap: 0.45rem;
     min-width: 88px;
 }
 
 .scout-prob-bar {
     flex: 1;
-    height: 4px;
-    background: var(--main-lighter);
-    border-radius: 2px;
+    height: 5px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 999px;
     overflow: hidden;
 }
 
 .scout-prob-fill {
     height: 100%;
-    background: var(--button-background);
-    border-radius: 2px;
+    background: linear-gradient(90deg, var(--button-background), rgba(63,167,214,0.9));
+    border-radius: 999px;
     transition: width 0.4s ease;
 }
 
 .scout-prob-val {
-    font-size: 0.75rem;
+    font-size: 0.73rem;
     color: var(--secondary-text);
     min-width: 32px;
     text-align: right;
-    font-weight: 500;
+    font-weight: 600;
 }
 
-/* ── Live result marker ────────────────────────────────────── */
 .scout-live-dot {
     display: inline-block;
     width: 6px;
@@ -871,8 +970,8 @@
     border: none !important;
     color: var(--secondary-text) !important;
     font-size: 0.85rem !important;
-    padding: 2px 4px !important;
-    border-radius: var(--main-radius) !important;
+    padding: 0.3rem 0.5rem !important;
+    border-radius: 8px !important;
     transition: color 0.15s !important;
     cursor: pointer;
 }
@@ -881,9 +980,6 @@
     color: var(--link-color) !important;
 }
 
-/* ══════════════════════════════════════════════════════════════
-   COMPETITOR INSPECTOR MODAL
-   ══════════════════════════════════════════════════════════════ */
 .scout-inspector {
     position: fixed;
     inset: 0;
@@ -891,10 +987,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: var(--space-md);
+    padding: 1rem;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.2s;
+    transition: opacity 0.2s ease;
 }
 
 .scout-inspector.open {
@@ -931,10 +1027,10 @@
 }
 
 .scout-inspector-head {
-    padding: var(--space-md);
+    padding: 1rem;
     border-bottom: 1px solid var(--card-border);
     display: flex;
-    gap: var(--space-sm);
+    gap: 0.8rem;
     align-items: flex-start;
     flex-shrink: 0;
 }
@@ -943,12 +1039,12 @@
     width: 44px;
     height: 44px;
     border-radius: 50%;
-    background: var(--button-background);
+    background: linear-gradient(135deg, var(--button-background), rgba(63, 167, 214, 0.9));
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 700;
-    font-size: 1.2rem;
+    font-size: 1.15rem;
     color: var(--button-color);
     flex-shrink: 0;
 }
@@ -956,17 +1052,17 @@
 .scout-inspector-name-wrap { flex: 1; }
 
 .scout-inspector-name {
-    font-size: var(--font-size-lg);
-    font-weight: 600;
+    font-size: 1.2rem;
+    font-weight: 700;
     color: var(--main-text);
-    margin-bottom: 3px;
+    margin-bottom: 0.2rem;
 }
 
 .scout-inspector-sub {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     color: var(--secondary-text);
     display: flex;
-    gap: var(--space-sm);
+    gap: 0.5rem;
     flex-wrap: wrap;
     align-items: center;
 }
@@ -974,16 +1070,16 @@
 .scout-inspector-sub a {
     color: var(--link-color);
     text-decoration: none;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
 }
 
 .scout-inspector-body {
     flex: 1;
     overflow-y: auto;
-    padding: var(--space-md);
+    padding: 1rem;
     display: flex;
     flex-direction: column;
-    gap: var(--space-md);
+    gap: 1rem;
 }
 
 .scout-inspector-body::-webkit-scrollbar { width: 4px; }
@@ -992,43 +1088,41 @@
     border-radius: 2px;
 }
 
-/* ── Section label ─────────────────────────────────────────── */
 .scout-section-label {
-    font-size: 0.75rem;
-    font-weight: 700;
+    font-size: 0.72rem;
+    font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     color: var(--secondary-text);
-    margin-bottom: var(--space-xs);
+    margin-bottom: 0.5rem;
 }
 
-/* ── PR cards ──────────────────────────────────────────────── */
 .scout-pr-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--space-sm);
+    gap: 0.75rem;
 }
 
 .scout-pr-card {
     background: var(--card-bg);
     border: 1px solid var(--card-border);
-    border-radius: var(--main-radius);
-    padding: var(--space-sm);
+    border-radius: 14px;
+    padding: 0.8rem;
 }
 
 .scout-pr-label {
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--secondary-text);
-    margin-bottom: var(--space-xxs);
+    margin-bottom: 0.4rem;
 }
 
 .scout-pr-value {
     font-family: 'Courier New', Courier, monospace;
-    font-size: 1.3rem;
-    font-weight: 600;
+    font-size: 1.25rem;
+    font-weight: 700;
     color: var(--main-text);
 }
 
@@ -1037,72 +1131,69 @@
 }
 
 .scout-pr-sub {
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     color: var(--secondary-text);
-    margin-top: 2px;
+    margin-top: 0.2rem;
 }
 
-/* ── Rank probability bars ─────────────────────────────────── */
 .scout-rankprob-list {
     display: flex;
     flex-direction: column;
-    gap: var(--space-xs);
+    gap: 0.55rem;
 }
 
 .scout-rankprob-row {
     display: grid;
     grid-template-columns: 120px 1fr 48px;
     align-items: center;
-    gap: var(--space-sm);
+    gap: 0.6rem;
 }
 
 .scout-rankprob-label {
-    font-size: 0.82rem;
+    font-size: 0.8rem;
     color: var(--secondary-text);
     white-space: nowrap;
 }
 
 .scout-rankprob-track {
-    height: 6px;
-    background: var(--main-lighter);
-    border-radius: 3px;
+    height: 7px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 999px;
     overflow: hidden;
 }
 
 .scout-rankprob-fill {
     height: 100%;
-    border-radius: 3px;
-    background: var(--button-background);
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--button-background), rgba(63,167,214,0.9));
     transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.scout-rankprob-fill.win    { background: var(--success); }
-.scout-rankprob-fill.podium { background: var(--warning); }
-.scout-rankprob-fill.top8   { background: var(--link-color); }
+.scout-rankprob-fill.win    { background: linear-gradient(90deg, var(--success), rgba(46,204,113,0.75)); }
+.scout-rankprob-fill.podium { background: linear-gradient(90deg, var(--warning), rgba(243,156,18,0.75)); }
+.scout-rankprob-fill.top8   { background: linear-gradient(90deg, var(--link-color), rgba(63,167,214,0.8)); }
 
 .scout-rankprob-pct {
-    font-size: 0.8rem;
-    font-weight: 600;
+    font-size: 0.78rem;
+    font-weight: 700;
     color: var(--main-text);
     text-align: right;
     font-family: 'Courier New', Courier, monospace;
 }
 
-/* ── History chart ─────────────────────────────────────────── */
 .scout-chart-wrap {
     background: var(--card-bg);
     border: 1px solid var(--card-border);
-    border-radius: var(--main-radius);
-    padding: var(--space-sm);
+    border-radius: 14px;
+    padding: 0.6rem;
     height: 160px;
     position: relative;
 }
 
-/* ── Pairwise table ────────────────────────────────────────── */
 .scout-pairwise-list {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 0.3rem;
     max-height: 260px;
     overflow-y: auto;
 }
@@ -1116,10 +1207,10 @@
 .scout-pairwise-head {
     display: grid;
     grid-template-columns: 1fr 67px 67px;
-    gap: var(--space-xs);
-    padding: var(--space-xxs) var(--space-sm);
-    font-size: 0.7rem;
-    font-weight: 700;
+    gap: 0.5rem;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.68rem;
+    font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.07em;
     color: var(--secondary-text);
@@ -1129,12 +1220,12 @@
 .scout-pairwise-row {
     display: grid;
     grid-template-columns: 1fr 67px 67px;
-    gap: var(--space-xs);
+    gap: 0.5rem;
     align-items: center;
-    padding: var(--space-xxs) var(--space-sm);
-    background: var(--card-bg);
-    border-radius: var(--main-radius);
-    font-size: 0.82rem;
+    padding: 0.42rem 0.6rem;
+    background: rgba(255,255,255,0.015);
+    border-radius: 10px;
+    font-size: 0.8rem;
 }
 
 .scout-pairwise-name {
@@ -1148,7 +1239,7 @@
     font-size: 0.8rem;
     text-align: right;
     color: var(--color-success-text);
-    font-weight: 600;
+    font-weight: 700;
     font-family: 'Courier New', Courier, monospace;
 }
 
@@ -1159,8 +1250,32 @@
     font-family: 'Courier New', Courier, monospace;
 }
 
-/* ── Responsive ────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .scout-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .scout-header-meta {
+        width: 100%;
+        min-width: 0;
+    }
+}
+
 @media (max-width: 480px) {
+    .scout-toolbar {
+        padding: 0.8rem;
+    }
+
+    .scout-country-wrap {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .scout-country-select {
+        width: 100%;
+    }
+
     .scout-drawer,
     .scout-overlay-panel { width: 100vw; }
     .scout-inspector { align-items: flex-end; padding: 0; }
