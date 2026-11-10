@@ -32,7 +32,6 @@
     font-size: var(--font-size-base);
     cursor: pointer;
     border: none;
-    color: inherit;
     transition: all 0.15s ease;
 }
 

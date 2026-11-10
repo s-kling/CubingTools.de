@@ -179,6 +179,7 @@ router.post('/api/contact', contactLimiter, (req, res) => contactApi.handleReque
 router.get('/contact/confirm', (req, res) => contactApi.handleRequest(req, res));
 
 // WCA data endpoint
+router.get('/api/wca/countries', wcaLimiter, (req, res) => wcaApi.handleCountriesRequest(req, res));
 router.get('/api/wca/averages', wcaLimiter, (req, res) => wcaApi.handleBatchAveragesRequest(req, res));
 router.get('/api/wca/:wcaId/:event', wcaLimiter, (req, res) => wcaApi.handleRequest(req, res));
 

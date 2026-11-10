@@ -141,6 +141,34 @@ test('refresh downloads from the tsv_url advertised by the export API', async ()
     assert.ok(seen.includes('https://exports.example/WCA_export_v2_303.tsv.zip'));
 });
 
+test('GET /api/wca/countries reads the imported export TSV and returns WCA entries', async () => {
+    const { default: WcaApi } = await import('../API/API/wca.api.js');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wca-countries-'));
+    fs.writeFileSync(path.join(dir, 'WCA_export_countries.tsv'), [
+        'id\tiso2\tname\tcontinent_id',
+        'Germany\tDE\tGermany\t_Europe',
+        'USA\tUS\tUnited States\t_North America',
+        'XA\tXA\tMultiple Countries (Asia)\t_Asia',
+    ].join('\n'));
+
+    const api = new WcaApi({ store: { dir, version: () => 'imported', getPerson: () => null } });
+
+    let body;
+    const res = {
+        status() { return this; },
+        json(b) { body = b; return this; },
+        set() { return this; },
+    };
+
+    await api.handleCountriesRequest({}, res);
+    assert.deepEqual(body, [
+        { id: 'Germany', iso2: 'DE', name: 'Germany', continent_id: '_Europe', isPseudoCountry: false },
+        { id: 'USA', iso2: 'US', name: 'United States', continent_id: '_North America', isPseudoCountry: false },
+        { id: 'XA', iso2: 'XA', name: 'Multiple Countries (Asia)', continent_id: '_Asia', isPseudoCountry: true },
+    ]);
+    fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('GET /api/wca/:id/:event keeps the client contract: number for 1-2 solves, null only when there are none', async () => {
     const { default: WcaApi } = await import('../API/API/wca.api.js');
     const { store } = await importFixture();

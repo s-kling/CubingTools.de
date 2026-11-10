@@ -1,7 +1,7 @@
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
-import { WcaStore, toDateInt, fromDateInt } from '../../wca/store.js';
+import { WcaStore, toDateInt, fromDateInt, DEFAULT_EXPORT_DIR } from '../../wca/store.js';
 import {
     centisecondsToSeconds,
     buildDistribution,
@@ -47,7 +47,10 @@ export default class WcaApi {
         // Network response caches (WCIF / live).
         this.cacheTtlMs = 5 * 60 * 1000;
         this.wcifCacheTtlMs = 2 * 60 * 1000;
+        this.countriesCacheTtlMs = 60 * 60 * 1000;
         this.responseCache = new Map();
+        this.countriesCache = null;
+        this.countriesCacheExpiresAt = 0;
 
         this.maxConcurrentPersonFetches = 20;
 
@@ -272,6 +275,64 @@ export default class WcaApi {
 
     async searchCompetitions(query, options = {}) {
         return this.fetchUpcomingCompetitions({ ...options, query });
+    }
+
+    _parseCountriesTsv(content) {
+        const rows = String(content || '')
+            .split(/\r?\n/)
+            .map((line) => line.replace(/\r$/, ''))
+            .filter(Boolean);
+        if (rows.length < 2) return [];
+
+        const countries = [];
+        for (const line of rows.slice(1)) {
+            const fields = line.split('\t');
+            if (fields.length < 4) continue;
+            const [id, iso2, name, continentId] = fields.map((v) => v.trim());
+            if (!id && !iso2 && !name && !continentId) continue;
+            countries.push({ id, iso2, name, continent_id: continentId, isPseudoCountry: /^X[A-Z]$/.test(iso2 || '') });
+        }
+        return countries;
+    }
+
+    async fetchCountriesFromDump() {
+        const now = Date.now();
+        if (this.countriesCache && now < this.countriesCacheExpiresAt) return this.countriesCache;
+
+        const exportDir = this.store?.dir || DEFAULT_EXPORT_DIR;
+        const candidates = [
+            path.join(exportDir, 'countries.json'),
+            path.join(exportDir, 'WCA_export_countries.tsv'),
+        ];
+
+        for (const filePath of candidates) {
+            if (!fs.existsSync(filePath)) continue;
+            try {
+                const raw = fs.readFileSync(filePath, 'utf8');
+                const countries = filePath.endsWith('.json')
+                    ? JSON.parse(raw)
+                    : this._parseCountriesTsv(raw);
+                if (Array.isArray(countries)) {
+                    this.countriesCache = countries;
+                    this.countriesCacheExpiresAt = Date.now() + this.countriesCacheTtlMs;
+                    return countries;
+                }
+            } catch (err) {
+                logger.warn(`Could not read WCA countries file ${filePath}:`, err.message);
+            }
+        }
+
+        this.countriesCache = [];
+        this.countriesCacheExpiresAt = Date.now() + this.countriesCacheTtlMs;
+        return [];
+    }
+
+    async handleCountriesRequest(req, res) {
+        try {
+            return res.json(await this.fetchCountriesFromDump());
+        } catch (error) {
+            return res.status(500).json({ error: error.message });
+        }
     }
 
 

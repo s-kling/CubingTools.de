@@ -28,7 +28,33 @@ const TSV_FILES = {
     ranksAverage: 'WCA_export_ranks_average.tsv',
 };
 
-const APPROX_ROWS = { competitions: 30_000, persons: 250_000, attempts: 30_000_000, results: 6_600_000, ranks: 600_000 };
+const APPROX_ROWS = { competitions: 30_000, persons: 250_000, attempts: 30_000_000, results: 6_600_000, ranks: 1_000_000 };
+export const COUNTRIES_FILE = 'WCA_export_countries.tsv';
+export const COUNTRIES_JSON_FILE = 'countries.json';
+
+export function parseCountriesTsv(content) {
+    const rows = String(content || '')
+        .split(/\r?\n/)
+        .map((line) => line.replace(/\r$/, ''))
+        .filter(Boolean);
+    if (rows.length < 2) return [];
+
+    const countries = [];
+    for (const line of rows.slice(1)) {
+        const fields = line.split('\t');
+        if (fields.length < 4) continue;
+        const [id, iso2, name, continentId] = fields.map((v) => v.trim());
+        if (!id && !iso2 && !name && !continentId) continue;
+        countries.push({
+            id,
+            iso2,
+            name,
+            continent_id: continentId,
+            isPseudoCountry: /^X[A-Z]$/.test(iso2 || ''),
+        });
+    }
+    return countries;
+}
 
 /**
  * Write side of the WCA data. Runs ONLY in the jobs process.
@@ -232,6 +258,17 @@ export class WcaImporter {
                 .on('error', (e) => (signal?.removeEventListener('abort', onAbort), reject(e)));
         });
         fs.unlinkSync(zipPath);
+    }
+
+    persistCountriesFromExport(tsvDir, targetDir = this.dir) {
+        const src = path.join(tsvDir, COUNTRIES_FILE);
+        if (!fs.existsSync(src)) return [];
+        const countries = parseCountriesTsv(fs.readFileSync(src, 'utf8'));
+        const outJson = path.join(targetDir, COUNTRIES_JSON_FILE);
+        const outTsv = path.join(targetDir, COUNTRIES_FILE);
+        fs.writeFileSync(outJson, JSON.stringify(countries, null, 2));
+        if (src !== outTsv) fs.copyFileSync(src, outTsv);
+        return countries;
     }
 
     // ── import ──────────────────────────────────────────────────────────────
@@ -474,6 +511,7 @@ export class WcaImporter {
             fs.rmSync(work, { recursive: true, force: true });
             await this.downloadAndExtract(work, signal, tsvUrl || this.urls.exportTsv);
             this.assertFormatVersion(work);
+            this.persistCountriesFromExport(work, this.dir);
 
             const version = `${Date.now()}`;
             const outName = `wca-${version}.db`;

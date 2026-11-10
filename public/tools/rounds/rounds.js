@@ -12,6 +12,7 @@
         '333bf': '3×3 Blind',
         '333oh': '3×3 OH',
         'clock': 'Clock',
+        'fto': 'FTO',
         'minx': 'Megaminx',
         'pyram': 'Pyraminx',
         'skewb': 'Skewb',
@@ -21,28 +22,31 @@
         '333mbf': 'Multi-Blind',
         '333fm': 'FMC',
     };
+
     const EVT_ICON = {
-        '333': '<span class="cubing-icon event-333 unofficial-333"></span>',
-        '222': '<span class="cubing-icon event-222 unofficial-222"></span>',
-        '444': '<span class="cubing-icon event-444 unofficial-444"></span>',
-        '555': '<span class="cubing-icon event-555 unofficial-555"></span>',
-        '666': '<span class="cubing-icon event-666 unofficial-666"></span>',
-        '777': '<span class="cubing-icon event-777 unofficial-777"></span>',
-        '333bf': '<span class="cubing-icon event-333bf unofficial-333bf"></span>',
-        '333oh': '<span class="cubing-icon event-333oh unofficial-333oh"></span>',
-        'clock': '<span class="cubing-icon event-clock unofficial-clock"></span>',
-        'minx': '<span class="cubing-icon event-minx unofficial-minx"></span>',
-        'pyram': '<span class="cubing-icon event-pyram unofficial-pyram"></span>',
-        'skewb': '<span class="cubing-icon event-skewb unofficial-skewb"></span>',
-        'sq1': '<span class="cubing-icon event-sq1 unofficial-sq1"></span>',
-        '444bf': '<span class="cubing-icon event-444bf unofficial-444bf"></span>',
-        '555bf': '<span class="cubing-icon event-555bf unofficial-555bf"></span>',
-        '333mbf': '<span class="cubing-icon event-333mbf unofficial-333mbf"></span>',
-        '333fm': '<span class="cubing-icon event-333fm unofficial-333fm"></span>',
+        '333': '<span class="cubing-icon event-333"></span>',
+        '222': '<span class="cubing-icon event-222"></span>',
+        '444': '<span class="cubing-icon event-444"></span>',
+        '555': '<span class="cubing-icon event-555"></span>',
+        '666': '<span class="cubing-icon event-666"></span>',
+        '777': '<span class="cubing-icon event-777"></span>',
+        '333bf': '<span class="cubing-icon event-333bf"></span>',
+        '333oh': '<span class="cubing-icon event-333oh"></span>',
+        'clock': '<span class="cubing-icon event-clock"></span>',
+        'fto': '<span class="cubing-icon event-fto unofficial-fto"></span>',
+        'minx': '<span class="cubing-icon event-minx"></span>',
+        'pyram': '<span class="cubing-icon event-pyram"></span>',
+        'skewb': '<span class="cubing-icon event-skewb"></span>',
+        'sq1': '<span class="cubing-icon event-sq1"></span>',
+        '444bf': '<span class="cubing-icon event-444bf"></span>',
+        '555bf': '<span class="cubing-icon event-555bf"></span>',
+        '333mbf': '<span class="cubing-icon event-333mbf"></span>',
+        '333fm': '<span class="cubing-icon event-333fm"></span>',
     };
 
     // ── State ───────────────────────────────────────────────
     let allComps = [];
+    let countries = {};
     let activeFilter = 'all';
     let searchQuery = '';
     let currentComp = null;
@@ -122,6 +126,23 @@
         const r = await fetch(url);
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
+    }
+
+    // ── Load countries ───────────────────────────────────
+    async function loadCountries() {
+        countries = await apiFetch('/api/wca/countries');
+        countries = countries.filter((c) => !c.isPseudoCountry || c.name == 'Kosovo');
+        renderCountryOptions();
+    }
+
+    function renderCountryOptions() {
+        if (!countries?.length) return;
+        countries.forEach((c) => {
+            const opt = document.createElement('option');
+            opt.value = c.iso2;
+            opt.textContent = `${flag(c.iso2)} ${c.name}`;
+            $country.appendChild(opt);
+        });
     }
 
     // ── Load competitions ───────────────────────────────────
@@ -234,7 +255,7 @@
         const html = `<div class="scout-events-list">${ov.events
             .map((ev) => {
                 const name = EVT_NAME[ev.id] || ev.id;
-                const icon = EVT_ICON[ev.id] || '🎲';
+                const icon = EVT_ICON[ev.id] || '?';
                 const rounds = (ev.rounds || [])
                     .map((r, i, arr) => {
                         const n = i + 1;
@@ -856,7 +877,7 @@
             inspectorChart = null;
         }
 
-        $inspAvatar.innerHTML = EVT_ICON[currentAnalysis.eventId] || '🎲';
+        $inspAvatar.innerHTML = EVT_ICON[currentAnalysis.eventId] || '?';
         $inspName.textContent = competitor.name;
         $inspSub.innerHTML = `
       <span>${flag(competitor.countryIso2)} ${esc(competitor.countryIso2 || 'Unknown')}</span>
@@ -865,7 +886,7 @@
               ? `<a href="https://www.worldcubeassociation.org/persons/${esc(competitor.wcaId)}"
              target="_blank" rel="noopener">${esc(competitor.wcaId)}</a>`
               : ''
-      }
+      }oeoo 
       <span>Expected rank: <strong style="color:var(--main-text)">#${idx + 1}</strong></span>`;
 
         $inspBody.innerHTML =
@@ -1132,5 +1153,6 @@
     });
 
     // ── Boot ────────────────────────────────────────────────
+    loadCountries();
     loadCompetitions();
 })();
